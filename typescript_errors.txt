@@ -1,0 +1,78 @@
+app/admin/BlogManagement.tsx(920,17): error TS2322: Type 'RefObject<HTMLInputElement | null>' is not assignable to type 'LegacyRef<HTMLInputElement> | undefined'.
+app/admin/BookManagement.tsx(707,19): error TS2552: Cannot find name 'response'. Did you mean 'Response'?
+app/admin/BookManagement.tsx(708,23): error TS2552: Cannot find name 'response'. Did you mean 'Response'?
+app/admin/EmailGatewayManagement.tsx(246,9): error TS2451: Cannot redeclare block-scoped variable 'getGatewayIcon'.
+app/admin/EmailGatewayManagement.tsx(258,9): error TS2451: Cannot redeclare block-scoped variable 'getGatewayDescription'.
+app/admin/EmailGatewayManagement.tsx(270,9): error TS2451: Cannot redeclare block-scoped variable 'getGatewayIcon'.
+app/admin/EmailGatewayManagement.tsx(282,9): error TS2451: Cannot redeclare block-scoped variable 'getGatewayDescription'.
+app/admin/EmailGatewayManagement.tsx(550,36): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ gmail: { host: string; port: number; secure: boolean; }; outlook: { host: string; port: number; secure: boolean; }; yahoo: { host: string; port: number; secure: boolean; }; protonmail: { host: string; port: number; secure: boolean; }; custom: { ...; }; }'.
+app/admin/ShippingManagement.tsx(63,47): error TS2339: Property 'accessToken' does not exist on type 'Session'.
+app/admin/ShippingManagement.tsx(97,47): error TS2339: Property 'accessToken' does not exist on type 'Session'.
+app/admin/ShippingManagement.tsx(123,47): error TS2339: Property 'accessToken' does not exist on type 'Session'.
+app/admin/ShippingManagement.tsx(151,47): error TS2339: Property 'accessToken' does not exist on type 'Session'.
+app/api/admin/blog/route.ts(110,57): error TS2339: Property 'name' does not exist on type '{ id: string; email: string; username: string; firstName: string; lastName: string; role: string; roleDisplayName: string; roles: string[]; permissions: string[]; lastLogin: string; }'.
+app/api/admin/notifications/batch-delete/route.ts(37,85): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app/api/admin/notifications/route.ts(139,8): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app/api/admin/notifications/route.ts(178,89): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app/api/admin/permissions/[id]/route.ts(46,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/permissions/[id]/route.ts(114,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/permissions/[id]/route.ts(172,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/permissions/route.ts(35,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/permissions/route.ts(100,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/reviews/route.ts(88,94): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app/api/admin/reviews/route.ts(134,77): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app/api/admin/roles/[id]/permissions/route.ts(43,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/roles/[id]/permissions/route.ts(113,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/roles/[id]/permissions/route.ts(182,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/roles/[id]/route.ts(49,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/roles/[id]/route.ts(116,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/roles/[id]/route.ts(174,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/roles/route.ts(35,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/roles/route.ts(99,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/users/[id]/library/route.ts(167,9): error TS18047: 'result.rowCount' is possibly 'null'.
+app/api/admin/users/[id]/roles/route.ts(43,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/users/[id]/roles/route.ts(50,18): error TS2339: Property 'role_name' does not exist on type 'UserRole'.
+app/api/admin/users/[id]/roles/route.ts(51,26): error TS2339: Property 'role_display_name' does not exist on type 'UserRole'.
+app/api/admin/users/[id]/roles/route.ts(52,25): error TS2339: Property 'role_description' does not exist on type 'UserRole'.
+app/api/admin/users/[id]/roles/route.ts(53,22): error TS2339: Property 'role_priority' does not exist on type 'UserRole'.
+app/api/admin/users/[id]/roles/route.ts(54,28): error TS2339: Property 'role_is_system_role' does not exist on type 'UserRole'.
+app/api/admin/users/[id]/roles/route.ts(55,24): error TS2339: Property 'role_created_at' does not exist on type 'UserRole'.
+app/api/admin/users/[id]/roles/route.ts(127,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/users/route.ts(49,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/admin/users/route.ts(134,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/auth/forgot-password/route.ts(47,9): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/auth/reset-password/route.ts(44,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+app/api/book-files/[...path]/route.ts(52,29): error TS2345: Argument of type 'Buffer<ArrayBufferLike>' is not assignable to parameter of type 'BodyInit | null | undefined'.
+app/api/checkout-enhanced/route.ts(331,11): error TS2345: Argument of type 'number | null' is not assignable to parameter of type 'number'.
+app/api/checkout-enhanced/route.ts(448,9): error TS2322: Type 'number | null' is not assignable to type 'number'.
+app/api/checkout-enhanced/route.ts(459,9): error TS2322: Type '"pending" | "pending_bank_transfer"' is not assignable to type '"pending" | "paid" | "refunded" | "failed"'.
+app/api/dashboard/activity/route.ts(41,24): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app/api/dashboard/activity/route.ts(45,22): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app/api/dashboard/library/route.ts(23,59): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app/api/dashboard/library/route.ts(28,68): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app/api/dashboard/reading-sessions/route.ts(45,22): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+app/api/media-root/[...path]/route.ts(44,29): error TS2345: Argument of type 'Buffer<ArrayBufferLike>' is not assignable to parameter of type 'BodyInit | null | undefined'.
+app/api/orders/[id]/invoice/route.ts(134,29): error TS2345: Argument of type 'Buffer<ArrayBufferLike>' is not assignable to parameter of type 'BodyInit | null | undefined'.
+app/api/orders/[id]/receipt/route.ts(108,29): error TS2345: Argument of type 'Buffer<ArrayBufferLike>' is not assignable to parameter of type 'BodyInit | null | undefined'.
+app/api/payment-proofs/[filename]/route.ts(84,29): error TS2345: Argument of type 'Buffer<ArrayBufferLike>' is not assignable to parameter of type 'BodyInit | null | undefined'.
+app/api/payment/status/[id]/route.ts(32,48): error TS2339: Property 'getPaymentIntentStatus' does not exist on type 'PaymentService'.
+app/api/shipping-methods/route.ts(12,25): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+app/api/shipping-methods/route.ts(15,29): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+app/api/shipping-methods/route.ts(16,33): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+app/api/shipping-methods/route.ts(17,43): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'string'.
+app/api/static/[...path]/route.ts(81,29): error TS2345: Argument of type 'Buffer<ArrayBufferLike>' is not assignable to parameter of type 'BodyInit | null | undefined'.
+app/api/test-books/route.ts(35,50): error TS18046: 'error' is of type 'unknown'.
+app/api/uploads/[...path]/route.ts(57,29): error TS2345: Argument of type 'Buffer<ArrayBufferLike>' is not assignable to parameter of type 'BodyInit | null | undefined'.
+utils/bank-transfer-service.ts(365,5): error TS2322: Type 'number | null' is not assignable to type 'number'.
+utils/blog-service.ts(306,14): error TS18047: 'result.rowCount' is possibly 'null'.
+utils/blog-service.ts(439,14): error TS18047: 'result.rowCount' is possibly 'null'.
+utils/ecommerce-service-new.ts(72,7): error TS2322: Type '{ id: any; user_id: any; book_id: any; quantity: any; added_at: any; book: { id: any; title: any; author_name: any; price: any; original_price: any; cover_image_url: any; category_name: any; format: any; status: any; stock_quantity: any; }; }[]' is not assignable to type 'CartItem[]'.
+utils/ecommerce-service-new.ts(480,38): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+utils/ecommerce-service-new.ts(604,7): error TS2322: Type '{ id: any; user_id: any; book_id: any; order_id: any; purchase_date: any; download_count: any; last_downloaded_at: any; is_favorite: any; book: { id: any; title: any; author_name: any; category_name: any; cover_image_url: any; format: any; ebook_file_url: any; }; }[]' is not assignable to type 'UserLibraryItem[]'.
+utils/ecommerce-service.ts(555,12): error TS18047: 'result.rowCount' is possibly 'null'.
+utils/ecommerce-service.ts(620,12): error TS18047: 'result.rowCount' is possibly 'null'.
+utils/ecommerce-service.ts(642,5): error TS2322: Type '{ id: any; user_id: any; book_id: any; quantity: any; added_at: any; book: { id: any; title: any; author_name: any; price: any; original_price: any; cover_image_url: any; category_name: any; format: any; status: any; }; }[]' is not assignable to type 'CartItem[]'.
+utils/ecommerce-service.ts(710,12): error TS18047: 'result.rowCount' is possibly 'null'.
+utils/ecommerce-service.ts(764,14): error TS18047: 'result.rowCount' is possibly 'null'.
+utils/error-handler.ts(272,9): error TS2741: Property 'message' is missing in type 'Promise<ErrorDetails>' but required in type 'ErrorDetails'.
+utils/rbac-service.ts(491,28): error TS7006: Parameter 'row' implicitly has an 'any' type.

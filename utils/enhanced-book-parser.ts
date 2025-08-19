@@ -75,8 +75,8 @@ export class EnhancedBookParser {
 
   constructor() {
     this.bookFilesDir = process.env.NODE_ENV === 'production' 
-      ? '/app/book-files' 
-      : join(process.cwd(), 'book-files');
+      ? '/uploads/books' 
+      : join(process.cwd(), 'uploads', 'books');
     
     this.processedDir = join(this.bookFilesDir, 'processed');
     this.tempDir = join(this.bookFilesDir, 'temp');

@@ -250,20 +250,11 @@ export class EnhancedFileUploadService {
     
     // Generate appropriate relative URL based on file type
     if (fileType === 'cover') {
-      // Use media-root API for cover images in production
-      return process.env.NODE_ENV === 'production' 
-        ? `/api/media-root/public/uploads/covers/${filename}`
-        : `/uploads/covers/${filename}`;
+      return `/uploads/covers/${filename}`;
     } else if (fileType === 'ebook') {
-      // Determine format from file extension
-      const extension = extname(filename).toLowerCase();
-      if (extension === '.epub') {
-        return `/book-files/${filename}`; // Simplified path for existing books
-      } else if (extension === '.html' || extension === '.htm') {
-        return `/book-files/${filename}`; // Simplified path for existing books
-      } else {
-        return `/book-files/${filename}`;
-      }
+      // For ebooks, we need to include the book ID in the path
+      // This will be handled by the uploadBookFile method
+      return `/uploads/books/${filename}`;
     } else {
       return `/uploads/temp/${filename}`;
     }
@@ -275,22 +266,17 @@ export class EnhancedFileUploadService {
   private getAbsolutePath(relativeUrl: string): string {
     const filename = basename(relativeUrl);
     
-    if (relativeUrl.startsWith('/api/media-root/public/uploads/covers/')) {
-      return join(this.coversDir, filename);
-    } else if (relativeUrl.startsWith('/uploads/covers/')) {
+    if (relativeUrl.startsWith('/uploads/covers/')) {
       return join(this.coversDir, filename);
     } else if (relativeUrl.startsWith('/uploads/books/')) {
       // Extract book ID from path like /uploads/books/111/filename.epub
       const pathParts = relativeUrl.split('/');
       const bookId = pathParts[3]; // uploads/books/111/filename.epub -> 111
       return join(this.booksDir, bookId, filename);
-    } else if (relativeUrl.startsWith('/book-files/')) {
-      // All book files are stored in the main books directory
-      return join(this.booksDir, filename);
     } else if (relativeUrl.startsWith('/uploads/temp/')) {
       return join(this.tempDir, filename);
     } else {
-      // Fallback to book-files directory
+      // Fallback to books directory
       return join(this.booksDir, filename);
     }
   }

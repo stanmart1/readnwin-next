@@ -1,14 +1,21 @@
+"use client";
 
-'use client';
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import {
+  BookOpen,
+  Search,
+  Filter,
+  Star,
+  Calendar,
+  Download,
+  X,
+} from "lucide-react";
+import { UserLibraryItem } from "@/types/ecommerce";
 
-import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import { BookOpen, Search, Filter, Star, Calendar, Download, X } from 'lucide-react';
-import { UserLibraryItem } from '@/types/ecommerce';
-import UnifiedEbookReader from '@/app/reading/components/UnifiedEbookReader';
-import { Book as EReaderBook } from '@/types/ereader';
-import { toast } from 'react-toastify';
+import { Book as EReaderBook } from "@/types/ereader";
+import { toast } from "react-toastify";
 
 interface LibraryBook {
   id: number;
@@ -26,19 +33,20 @@ interface LibraryBook {
 export default function LibrarySection() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState("all");
   const [books, setBooks] = useState<LibraryBook[]>([]);
   const [libraryItems, setLibraryItems] = useState<UserLibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState('all'); // all, favorites, recent
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState("all"); // all, favorites, recent
   const [selectedBook, setSelectedBook] = useState<EReaderBook | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [selectedBookForReview, setSelectedBookForReview] = useState<UserLibraryItem | null>(null);
+  const [selectedBookForReview, setSelectedBookForReview] =
+    useState<UserLibraryItem | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
-  const [reviewText, setReviewText] = useState('');
-  const [reviewTitle, setReviewTitle] = useState('');
+  const [reviewText, setReviewText] = useState("");
+  const [reviewTitle, setReviewTitle] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
@@ -52,16 +60,16 @@ export default function LibrarySection() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/user/library');
+      const response = await fetch("/api/user/library");
       if (!response.ok) {
-        throw new Error('Failed to load library');
+        throw new Error("Failed to load library");
       }
 
       const data = await response.json();
       setLibraryItems(data.libraryItems || []);
     } catch (err) {
-      console.error('Error loading library:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load library');
+      console.error("Error loading library:", err);
+      setError(err instanceof Error ? err.message : "Failed to load library");
     } finally {
       setLoading(false);
     }
@@ -70,71 +78,74 @@ export default function LibrarySection() {
   const toggleFavorite = async (bookId: number) => {
     try {
       const response = await fetch(`/api/user/library/${bookId}/favorite`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ is_favorite: !libraryItems.find(item => item.book_id === bookId)?.is_favorite }),
+        body: JSON.stringify({
+          is_favorite: !libraryItems.find((item) => item.book_id === bookId)
+            ?.is_favorite,
+        }),
       });
 
       if (response.ok) {
-        setLibraryItems(prev => 
-          prev.map(item => 
-            item.book_id === bookId 
+        setLibraryItems((prev) =>
+          prev.map((item) =>
+            item.book_id === bookId
               ? { ...item, is_favorite: !item.is_favorite }
-              : item
-          )
+              : item,
+          ),
         );
       }
     } catch (error) {
-      console.error('Error toggling favorite:', error);
+      console.error("Error toggling favorite:", error);
     }
   };
 
   // Convert library item to e-reader book format
   const convertToEReaderBook = (item: UserLibraryItem): EReaderBook => ({
     id: item.book_id.toString(),
-    title: item.book?.title || '',
-    author: item.book?.author_name || '',
-    cover: item.book?.cover_image_url || '',
-    contentType: 'markdown' as const, // Default to markdown, could be determined from book data
-    category: item.book?.category_name || '',
-    description: item.book?.description || '',
+    title: item.book?.title || "",
+    author: item.book?.author_name || "",
+    cover: item.book?.cover_image_url || "",
+    contentType: "markdown" as const, // Default to markdown, could be determined from book data
+    category: item.book?.category_name || "",
+    description: item.book?.description || "",
     totalPages: 0, // Would be calculated from content
   });
 
   // Handle book click to open e-reader
   const handleBookClick = async (item: UserLibraryItem) => {
-    console.log('handleBookClick called for:', item.book?.title);
-    
+    console.log("handleBookClick called for:", item.book?.title);
+
     if (item.book?.ebook_file_url) {
       const eReaderBook = convertToEReaderBook(item);
-      console.log('Setting selected book:', eReaderBook);
+      console.log("Setting selected book:", eReaderBook);
       setSelectedBook(eReaderBook);
-      
+
       // Track book reading activity if user hasn't started reading yet
       const progress = item.readingProgress?.progressPercentage;
       if (!progress || progress === 0) {
         try {
-          await fetch('/api/dashboard/activity', {
-            method: 'POST',
+          await fetch("/api/dashboard/activity", {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              activity_type: 'started',
+              activity_type: "started",
               title: `Started reading "${item.book.title}"`,
               book_id: item.book_id,
-              metadata: { action: 'book_started' }
+              metadata: { action: "book_started" },
             }),
           });
         } catch (activityError) {
-          console.error('Error tracking book start activity:', activityError);
+          console.error("Error tracking book start activity:", activityError);
         }
       }
     } else {
       // If no ebook file, redirect to book details or show message
-      console.log('No ebook file, redirecting to book details');
+      console.log("No ebook file, redirecting to book details");
       router.push(`/books/${item.book_id}`);
     }
   };
@@ -153,8 +164,8 @@ export default function LibrarySection() {
     setShowReviewModal(false);
     setSelectedBookForReview(null);
     setReviewRating(5);
-    setReviewText('');
-    setReviewTitle('');
+    setReviewText("");
+    setReviewTitle("");
   };
 
   const handleSubmitReview = async () => {
@@ -162,10 +173,10 @@ export default function LibrarySection() {
 
     setSubmittingReview(true);
     try {
-      const response = await fetch('/api/reviews', {
-        method: 'POST',
+      const response = await fetch("/api/reviews", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           book_id: selectedBookForReview.book?.id,
@@ -179,26 +190,32 @@ export default function LibrarySection() {
 
       if (response.ok) {
         // Check if this was an update to an existing review
-        if (data.message && data.message.includes('updated')) {
-          toast.success('Review updated successfully!');
+        if (data.message && data.message.includes("updated")) {
+          toast.success("Review updated successfully!");
         } else {
-          toast.success('Review submitted successfully! It will be reviewed by our team.');
+          toast.success(
+            "Review submitted successfully! It will be reviewed by our team.",
+          );
         }
-        
+
         handleCloseReviewModal();
         // Refresh the library to show the new review
         loadUserLibrary();
       } else {
         // Handle specific error for approved reviews
-        if (data.error && data.error.includes('approved')) {
-          toast.error('This review has been approved by an admin and cannot be modified.');
+        if (data.error && data.error.includes("approved")) {
+          toast.error(
+            "This review has been approved by an admin and cannot be modified.",
+          );
         } else {
-          toast.error(data.error || 'Failed to submit review. Please try again.');
+          toast.error(
+            data.error || "Failed to submit review. Please try again.",
+          );
         }
       }
     } catch (error) {
-      console.error('Error submitting review:', error);
-      toast.error('Failed to submit review. Please try again.');
+      console.error("Error submitting review:", error);
+      toast.error("Failed to submit review. Please try again.");
     } finally {
       setSubmittingReview(false);
     }
@@ -207,49 +224,56 @@ export default function LibrarySection() {
   const handleOpenReviewModal = async (item: UserLibraryItem) => {
     setSelectedBookForReview(item);
     setReviewRating(5);
-    setReviewTitle('');
-    setReviewText('');
+    setReviewTitle("");
+    setReviewText("");
     setSubmittingReview(false);
 
     // Check if user already has a review for this book
     try {
-      const response = await fetch(`/api/reviews?bookId=${item.book_id}&userId=${session?.user?.id}`);
+      const response = await fetch(
+        `/api/reviews?bookId=${item.book_id}&userId=${session?.user?.id}`,
+      );
       if (response.ok) {
         const data = await response.json();
         if (data.reviews && data.reviews.length > 0) {
           const existingReview = data.reviews[0];
-          if (existingReview.status === 'approved') {
-            toast.info('You already have an approved review for this book. Approved reviews cannot be modified.');
+          if (existingReview.status === "approved") {
+            toast.info(
+              "You already have an approved review for this book. Approved reviews cannot be modified.",
+            );
             return;
-          } else if (existingReview.status === 'pending') {
-            toast.info('You already have a pending review for this book. You can update it below.');
+          } else if (existingReview.status === "pending") {
+            toast.info(
+              "You already have a pending review for this book. You can update it below.",
+            );
             // Pre-fill the form with existing review data
             setReviewRating(existingReview.rating);
-            setReviewTitle(existingReview.title || '');
-            setReviewText(existingReview.review_text || '');
+            setReviewTitle(existingReview.title || "");
+            setReviewText(existingReview.review_text || "");
           }
         }
       }
     } catch (error) {
-      console.error('Error checking existing review:', error);
+      console.error("Error checking existing review:", error);
     }
 
     setShowReviewModal(true);
   };
 
-  const filteredItems = libraryItems.filter(item => {
+  const filteredItems = libraryItems.filter((item) => {
     // Ensure we have valid book data
     if (!item.book || !item.book.title || !item.book.author_name) return false;
-    
-    const matchesSearch = item.book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.book.author_name.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
+    const matchesSearch =
+      item.book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.book.author_name.toLowerCase().includes(searchTerm.toLowerCase());
+
     if (!matchesSearch) return false;
 
     switch (filter) {
-      case 'favorites':
+      case "favorites":
         return item.is_favorite;
-      case 'recent':
+      case "recent":
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         return new Date(item.purchase_date) > thirtyDaysAgo;
@@ -259,13 +283,21 @@ export default function LibrarySection() {
   });
 
   const tabs = [
-    { id: 'all', label: 'All Books', count: libraryItems.length },
-    { id: 'favorites', label: 'Favorites', count: libraryItems.filter(item => item.is_favorite).length },
-    { id: 'recent', label: 'Recent', count: libraryItems.filter(item => {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      return new Date(item.purchase_date) > thirtyDaysAgo;
-    }).length }
+    { id: "all", label: "All Books", count: libraryItems.length },
+    {
+      id: "favorites",
+      label: "Favorites",
+      count: libraryItems.filter((item) => item.is_favorite).length,
+    },
+    {
+      id: "recent",
+      label: "Recent",
+      count: libraryItems.filter((item) => {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        return new Date(item.purchase_date) > thirtyDaysAgo;
+      }).length,
+    },
   ];
 
   if (loading) {
@@ -303,7 +335,8 @@ export default function LibrarySection() {
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">My Library</h2>
         <p className="text-gray-600">
-          {libraryItems.length} book{libraryItems.length !== 1 ? 's' : ''} in your collection
+          {libraryItems.length} book{libraryItems.length !== 1 ? "s" : ""} in
+          your collection
         </p>
       </div>
 
@@ -319,7 +352,7 @@ export default function LibrarySection() {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <Filter className="h-5 w-5 text-gray-400" />
           <select
@@ -343,8 +376,8 @@ export default function LibrarySection() {
               onClick={() => setFilter(tab.id)}
               className={`px-4 py-2 text-sm font-medium rounded-full transition-colors whitespace-nowrap cursor-pointer ${
                 filter === tab.id
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-600 hover:text-gray-800"
               }`}
             >
               {tab.label} ({tab.count})
@@ -357,18 +390,19 @@ export default function LibrarySection() {
         <div className="text-center py-12">
           <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">
-            {searchTerm || filter !== 'all' ? 'No books found' : 'Your library is empty'}
+            {searchTerm || filter !== "all"
+              ? "No books found"
+              : "Your library is empty"}
           </h3>
           <p className="mt-1 text-sm text-gray-500">
-            {searchTerm || filter !== 'all' 
-              ? 'Try adjusting your search or filter criteria.'
-              : 'Start building your digital library by purchasing some books.'
-            }
+            {searchTerm || filter !== "all"
+              ? "Try adjusting your search or filter criteria."
+              : "Start building your digital library by purchasing some books."}
           </p>
-          {!searchTerm && filter === 'all' && (
+          {!searchTerm && filter === "all" && (
             <div className="mt-6">
               <button
-                onClick={() => router.push('/books')}
+                onClick={() => router.push("/books")}
                 className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
               >
                 Browse Books
@@ -379,27 +413,32 @@ export default function LibrarySection() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredItems.map((item) => (
-            <div key={item.id} className="bg-white rounded-lg shadow overflow-hidden">
+            <div
+              key={item.id}
+              className="bg-white rounded-lg shadow overflow-hidden"
+            >
               {/* Book Cover */}
               <div className="relative">
                 <img
-                  src={item.book?.cover_image_url || '/placeholder-book.jpg'}
+                  src={item.book?.cover_image_url || "/placeholder-book.jpg"}
                   alt={item.book?.title}
                   className="w-full h-48 object-cover"
                   onError={(e) => {
                     // Fallback to placeholder image
-                    e.currentTarget.src = '/placeholder-book.jpg';
+                    e.currentTarget.src = "/placeholder-book.jpg";
                   }}
                 />
                 <button
                   onClick={() => toggleFavorite(item.book_id)}
                   className={`absolute top-2 right-2 p-1 rounded-full ${
-                    item.is_favorite 
-                      ? 'bg-yellow-400 text-yellow-900' 
-                      : 'bg-white text-gray-400 hover:text-yellow-500'
+                    item.is_favorite
+                      ? "bg-yellow-400 text-yellow-900"
+                      : "bg-white text-gray-400 hover:text-yellow-500"
                   }`}
                 >
-                  <Star className={`h-4 w-4 ${item.is_favorite ? 'fill-current' : ''}`} />
+                  <Star
+                    className={`h-4 w-4 ${item.is_favorite ? "fill-current" : ""}`}
+                  />
                 </button>
               </div>
 
@@ -411,12 +450,15 @@ export default function LibrarySection() {
                 <p className="text-sm text-gray-500 truncate">
                   by {item.book?.author_name}
                 </p>
-                
+
                 <div className="mt-2 flex items-center text-xs text-gray-400">
                   <Calendar className="h-3 w-3 mr-1" />
-                  <span>Purchased {new Date(item.purchase_date).toLocaleDateString()}</span>
+                  <span>
+                    Purchased{" "}
+                    {new Date(item.purchase_date).toLocaleDateString()}
+                  </span>
                 </div>
-                
+
                 {/* Reading Progress */}
                 {(() => {
                   const progress = item.readingProgress?.progressPercentage;
@@ -433,7 +475,8 @@ export default function LibrarySection() {
                         ></div>
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
-                        Page {item.readingProgress?.currentPage || 0} of {item.readingProgress?.totalPages || 0}
+                        Page {item.readingProgress?.currentPage || 0} of{" "}
+                        {item.readingProgress?.totalPages || 0}
                       </div>
                     </div>
                   ) : null;
@@ -451,14 +494,17 @@ export default function LibrarySection() {
                   >
                     <BookOpen className="h-4 w-4 mr-1" />
                     {(() => {
-                      if (!item.book?.ebook_file_url) return 'View Book';
-                      if (item.readingProgress?.progressPercentage && item.readingProgress.progressPercentage > 0) {
-                        return 'Continue Reading';
+                      if (!item.book?.ebook_file_url) return "View Book";
+                      if (
+                        item.readingProgress?.progressPercentage &&
+                        item.readingProgress.progressPercentage > 0
+                      ) {
+                        return "Continue Reading";
                       }
-                      return 'Read Book';
+                      return "Read Book";
                     })()}
                   </button>
-                  
+
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -486,16 +532,26 @@ export default function LibrarySection() {
         </div>
       )}
 
-      {/* Unified E-Reader */}
+      {/* E-Reader placeholder - component needs to be implemented */}
       {selectedBook && (
-        <UnifiedEbookReader 
-          bookId={selectedBook.id} 
-          fileUrl={selectedBook.fileUrl || ''} 
-          bookTitle={selectedBook.title}
-          bookAuthor={selectedBook.author}
-          bookFormat={selectedBook.format || 'unknown'}
-          onClose={handleCloseReader} 
-        />
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">
+                Reading: {selectedBook.title}
+              </h3>
+              <button
+                onClick={handleCloseReader}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <p className="text-gray-600">
+              E-reader component not yet implemented.
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Review Modal */}
@@ -503,7 +559,9 @@ export default function LibrarySection() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">Write a Review</h3>
+              <h3 className="text-xl font-semibold text-gray-900">
+                Write a Review
+              </h3>
               <button
                 onClick={handleCloseReviewModal}
                 className="text-gray-400 hover:text-gray-600"
@@ -515,13 +573,17 @@ export default function LibrarySection() {
             {/* Book Info */}
             <div className="flex items-start space-x-4 mb-6 p-4 bg-gray-50 rounded-lg">
               <img
-                src={selectedBookForReview.book?.cover_image_url || ''}
+                src={selectedBookForReview.book?.cover_image_url || ""}
                 alt={selectedBookForReview.book?.title}
                 className="w-16 h-20 object-cover rounded"
               />
               <div>
-                <h4 className="font-semibold text-gray-900">{selectedBookForReview.book?.title}</h4>
-                <p className="text-sm text-gray-600">by {selectedBookForReview.book?.author_name}</p>
+                <h4 className="font-semibold text-gray-900">
+                  {selectedBookForReview.book?.title}
+                </h4>
+                <p className="text-sm text-gray-600">
+                  by {selectedBookForReview.book?.author_name}
+                </p>
                 {/* Review Status Indicator */}
                 {selectedBookForReview.book && (
                   <div className="mt-2">
@@ -545,7 +607,7 @@ export default function LibrarySection() {
                     key={star}
                     onClick={() => setReviewRating(star)}
                     className={`text-2xl ${
-                      star <= reviewRating ? 'text-yellow-400' : 'text-gray-300'
+                      star <= reviewRating ? "text-yellow-400" : "text-gray-300"
                     } hover:text-yellow-400 transition-colors`}
                   >
                     ★
@@ -553,10 +615,15 @@ export default function LibrarySection() {
                 ))}
               </div>
               <p className="text-sm text-gray-500 mt-1">
-                {reviewRating === 1 ? 'Poor' : 
-                 reviewRating === 2 ? 'Fair' : 
-                 reviewRating === 3 ? 'Good' : 
-                 reviewRating === 4 ? 'Very Good' : 'Excellent'}
+                {reviewRating === 1
+                  ? "Poor"
+                  : reviewRating === 2
+                    ? "Fair"
+                    : reviewRating === 3
+                      ? "Good"
+                      : reviewRating === 4
+                        ? "Very Good"
+                        : "Excellent"}
               </p>
             </div>
 
@@ -607,7 +674,7 @@ export default function LibrarySection() {
                 disabled={!reviewText.trim() || submittingReview}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {submittingReview ? 'Submitting...' : 'Submit Review'}
+                {submittingReview ? "Submitting..." : "Submit Review"}
               </button>
             </div>
           </div>

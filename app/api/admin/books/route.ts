@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
           UPDATE books 
           SET 
             ebook_file_url = $2,
-            format = $3,
+            file_format = $3,
             file_size = $4,
             file_hash = $5
           WHERE id = $1
@@ -289,6 +289,7 @@ export async function POST(request: NextRequest) {
           price: book.price,
           book_type: book.book_type,
           format: book.format,
+          file_format: book.file_format,
           parsing_status: book.parsing_status,
           word_count: book.word_count,
           estimated_reading_time: book.estimated_reading_time,

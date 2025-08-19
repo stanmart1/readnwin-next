@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
-import { FileProcessor } from '@/utils/fileProcessor';
-import { join } from 'path';
-import { existsSync, readFileSync } from 'fs';
+import StorageService from '@/lib/services/StorageService';
 
 export async function GET(
   request: NextRequest,
@@ -12,194 +10,201 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = session.user.id;
-    const bookId = parseInt(params.bookId);
+    const bookId = params.bookId;
+    
+    console.log(`Fetching content for book ${bookId}`);
 
-    if (isNaN(bookId)) {
-      return NextResponse.json(
-        { error: 'Invalid book ID' },
-        { status: 400 }
-      );
-    }
-
-    // Check if user has access to this book
-    const accessCheck = await query(`
-      SELECT b.id, b.title, b.author, b.format, b.book_type, b.parsing_status, b.parsing_error,
-             b.cover_image_url, b.ebook_file_url, b.word_count, b.estimated_reading_time,
-             ul.user_id
+    // Get book basic information
+    const bookResult = await query(`
+      SELECT 
+        b.*,
+        a.name as author_name,
+        c.name as category_name
       FROM books b
-      LEFT JOIN user_library ul ON b.id = ul.book_id AND ul.user_id = $1
-      WHERE b.id = $2
-    `, [userId, bookId]);
+      LEFT JOIN authors a ON b.author_id = a.id
+      LEFT JOIN categories c ON b.category_id = c.id
+      WHERE b.id = $1 AND b.status = 'published'
+    `, [bookId]);
 
-    if (accessCheck.rows.length === 0) {
+    if (bookResult.rows.length === 0) {
       return NextResponse.json(
-        { error: 'Book not found' },
+        { success: false, error: 'Book not found or not published' },
         { status: 404 }
       );
     }
 
-    const book = accessCheck.rows[0];
-    
+    const book = bookResult.rows[0];
+
     // Check if user has access to this book
-    if (!book.user_id) {
+    // This should be implemented based on your access control system
+    const hasAccess = await checkUserBookAccess(session.user.id, bookId);
+    if (!hasAccess) {
       return NextResponse.json(
-        { error: 'Access denied. Book not in your library.' },
+        { success: false, error: 'Access denied to this book' },
         { status: 403 }
       );
     }
 
-    // Check if book has been parsed successfully
-    if (book.parsing_status !== 'completed') {
-      return NextResponse.json({
-        success: false,
-        error: 'Book content is not ready',
-        parsing_status: book.parsing_status,
-        parsing_error: book.parsing_error,
-        message: book.parsing_status === 'processing' 
-          ? 'Book is being processed. Please try again in a few minutes.'
-          : 'Book processing failed. Please contact support.'
-      }, { status: 202 });
+    // Get book content structure
+    const structureResult = await query(`
+      SELECT * FROM book_content_structure 
+      WHERE book_id = $1 
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `, [bookId]);
+
+    if (structureResult.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Book content not available' },
+        { status: 404 }
+      );
     }
 
-    // Get book content from file system
-    let content = '';
-    let contentType: 'markdown' | 'html' | 'epub' = 'html';
+    const structure = structureResult.rows[0];
 
-    if (book.ebook_file_url) {
-      try {
-        // Determine file path
-        let filePath: string;
-        if (book.ebook_file_url.startsWith('/uploads/')) {
-          const mediaRootDir = process.env.NODE_ENV === 'production' 
-            ? '/uploads' 
-            : join(process.cwd(), 'uploads');
-          const relativePath = book.ebook_file_url.replace('/uploads/', '');
-          filePath = join(mediaRootDir, relativePath);
-        } else {
-          filePath = book.ebook_file_url;
+    // Get chapters
+    const chaptersResult = await query(`
+      SELECT 
+        id,
+        chapter_number,
+        chapter_title,
+        content_html,
+        word_count,
+        reading_time_minutes,
+        content_start_offset,
+        content_end_offset
+      FROM book_chapters 
+      WHERE book_id = $1 
+      ORDER BY chapter_number ASC
+    `, [bookId]);
+
+    const chapters = chaptersResult.rows;
+
+    // Process chapter content to update asset URLs
+    const processedChapters = await Promise.all(
+      chapters.map(async (chapter) => {
+        let processedContent = chapter.content_html;
+        
+        // Get assets for this book
+        const assetsResult = await query(`
+          SELECT asset_path, original_path FROM book_assets 
+          WHERE book_id = $1
+        `, [bookId]);
+
+        // Replace asset references with secure URLs
+        for (const asset of assetsResult.rows) {
+          if (StorageService.validateFilePath(asset.asset_path)) {
+            const secureUrl = StorageService.createSecureUrl(asset.asset_path, 3600); // 1 hour expiry
+            const regex = new RegExp(asset.original_path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+            processedContent = processedContent.replace(regex, secureUrl);
+          }
         }
 
-        if (existsSync(filePath)) {
-          const fileContent = readFileSync(filePath, 'utf8');
-          
-          // Determine content type based on file extension
-          const extension = book.ebook_file_url.toLowerCase().split('.').pop();
-          switch (extension) {
-            case 'md':
-            case 'markdown':
-              contentType = 'markdown';
-              break;
-            case 'epub':
-              contentType = 'epub';
-              break;
-            default:
-              contentType = 'html';
-          }
+        return {
+          ...chapter,
+          content_html: processedContent,
+        };
+      })
+    );
 
-          // Process content based on type
-          if (contentType === 'markdown') {
-            content = FileProcessor.preprocessContent(fileContent, 'markdown');
-          } else if (contentType === 'epub') {
-            // For EPUB, we'll return the processed HTML content
-            content = fileContent; // This should be the processed HTML from EPUB
-          } else {
-            content = FileProcessor.preprocessContent(fileContent, 'html');
-          }
-        } else {
-          throw new Error('Book file not found');
-        }
-      } catch (error) {
-        console.error('Error reading book file:', error);
-        return NextResponse.json(
-          { error: 'Failed to read book content' },
-          { status: 500 }
-        );
-      }
-    }
+    // Get table of contents
+    const tableOfContents = structure.table_of_contents || [];
 
-    // Log access for security tracking
-    try {
-      await query(`
-        INSERT INTO book_access_logs (book_id, user_id, access_type, ip_address, user_agent)
-        VALUES ($1, $2, $3, $4, $5)
-      `, [
-        bookId,
-        userId,
-        'read',
-        request.headers.get('x-forwarded-for') || request.ip || null,
-        request.headers.get('user-agent') || null
-      ]);
-    } catch (error) {
-      // Ignore logging errors - table might not exist
-      console.warn('Failed to log book access:', error);
-    }
+    // Log access for analytics
+    await logBookAccess(session.user.id, bookId, 'read');
+
+    // Prepare response
+    const bookContent = {
+      id: book.id,
+      title: book.title,
+      author: book.author_name,
+      cover_image_url: book.cover_image_url,
+      book_type: book.book_type,
+      primary_format: book.primary_format,
+      word_count: book.word_count,
+      reading_time_minutes: book.reading_time_minutes,
+      language: book.language,
+      chapters: processedChapters,
+      table_of_contents: tableOfContents,
+    };
 
     return NextResponse.json({
       success: true,
-      title: book.title,
-      author: book.author,
-      content: content,
-      contentType: contentType,
-      wordCount: book.word_count || 0,
-      filePath: book.ebook_file_url,
-      coverImage: book.cover_image_url,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      book: bookContent,
     });
 
   } catch (error) {
-    console.error('Error in book content API:', error);
+    console.error('Error fetching book content:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        success: false, 
+        error: 'Failed to fetch book content',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { bookId: string } }
-) {
+// Helper function to check user access to book
+async function checkUserBookAccess(userId: string, bookId: string): Promise<boolean> {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Check if user owns the book (purchased or in library)
+    const accessResult = await query(`
+      SELECT 1 FROM user_library 
+      WHERE user_id = $1 AND book_id = $2
+      UNION
+      SELECT 1 FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE o.user_id = $1 AND oi.book_id = $2 AND o.status = 'completed'
+      LIMIT 1
+    `, [userId, bookId]);
+
+    if (accessResult.rows.length > 0) {
+      return true;
     }
 
-    const userId = session.user.id;
-    const bookId = parseInt(params.bookId);
-    const { chapterId, position, wordsRead } = await request.json();
+    // Check if book is free or has public access
+    const bookResult = await query(`
+      SELECT price, visibility FROM books 
+      WHERE id = $1 AND status = 'published'
+    `, [bookId]);
 
-    if (isNaN(bookId)) {
-      return NextResponse.json(
-        { error: 'Invalid book ID' },
-        { status: 400 }
-      );
+    if (bookResult.rows.length > 0) {
+      const book = bookResult.rows[0];
+      
+      // Free books or public visibility
+      if (book.price === 0 || book.visibility === 'public') {
+        return true;
+      }
     }
 
-    // Update reading progress
-    await query(`
-      INSERT INTO reading_progress (book_id, user_id, current_position, words_read, last_read_at)
-      VALUES ($1, $2, $3, $4, NOW())
-      ON CONFLICT (book_id, user_id) 
-      DO UPDATE SET 
-        current_position = $3,
-        words_read = $4,
-        last_read_at = NOW()
-    `, [bookId, userId, position || 0, wordsRead || 0]);
-
-    return NextResponse.json({ success: true });
-
+    return false;
   } catch (error) {
-    console.error('Error updating reading progress:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Error checking book access:', error);
+    return false;
   }
-} 
+}
+
+// Helper function to log book access
+async function logBookAccess(userId: string, bookId: string, accessType: string): Promise<void> {
+  try {
+    await query(`
+      INSERT INTO book_access_logs (book_id, user_id, access_type, ip_address, user_agent)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [
+      bookId,
+      userId,
+      accessType,
+      null, // IP address would be extracted from request headers
+      null, // User agent would be extracted from request headers
+    ]);
+  } catch (error) {
+    console.error('Error logging book access:', error);
+    // Don't throw error as this is not critical
+  }
+}

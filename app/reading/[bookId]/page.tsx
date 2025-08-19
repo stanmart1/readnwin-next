@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import EReader from '../components/EReader';
+import ModernEReader from '../components/ModernEReader';
 
 export default function ReadingPage() {
   const params = useParams();
   const router = useRouter();
   const { data: session, status } = useSession();
-  const [showReader, setShowReader] = useState(true);
 
   const bookId = params.bookId as string;
 
@@ -47,18 +46,13 @@ export default function ReadingPage() {
   }
 
   const handleClose = () => {
-    setShowReader(false);
     router.push('/dashboard');
   };
 
-  if (!showReader) {
-    return null;
-  }
-
   return (
-    <EReader 
+    <ModernEReader 
       bookId={bookId} 
       onClose={handleClose}
     />
   );
-} 
+}

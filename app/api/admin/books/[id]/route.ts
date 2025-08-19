@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { rbacService } from '@/utils/rbac-service';
 import { ecommerceService } from '@/utils/ecommerce-service';
+import ModernBookService from '@/lib/services/ModernBookService';
 
 export async function GET(
   request: NextRequest,

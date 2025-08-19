@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'year';
 
-    // Calculate date range based on period
     const now = new Date();
     let startDate: Date;
     
@@ -31,63 +30,48 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // Get monthly reading data with error handling
-    let monthlyDataResult, genreDataResult, statsResult;
-    
-    try {
-      [monthlyDataResult, genreDataResult, statsResult] = await Promise.allSettled([
-        query(`
-          SELECT 
-            TO_CHAR(session_start, 'Mon') as month,
-            COUNT(DISTINCT rs.book_id) as books,
-            SUM(rs.reading_time_minutes) / 60.0 as hours
-          FROM reading_sessions rs
-          WHERE rs.user_id = $1 AND rs.session_start >= $2
-          GROUP BY TO_CHAR(session_start, 'Mon'), EXTRACT(MONTH FROM session_start)
-          ORDER BY EXTRACT(MONTH FROM session_start)
-        `, [userId, startDate]),
-        
-        query(`
-          SELECT 
-            COALESCE(c.name, 'Unknown') as name,
-            COUNT(DISTINCT rs.book_id) as count,
-            ROUND(COUNT(DISTINCT rs.book_id) * 100.0 / (
-              SELECT COUNT(DISTINCT rs2.book_id) 
-              FROM reading_sessions rs2 
-              WHERE rs2.user_id = $1 AND rs2.session_start >= $2
-            ), 1) as percentage
-          FROM reading_sessions rs
-          JOIN books b ON rs.book_id = b.id
-          LEFT JOIN categories c ON b.category_id = c.id
-          WHERE rs.user_id = $1 AND rs.session_start >= $2
-          GROUP BY c.name
-          ORDER BY count DESC
-          LIMIT 10
-        `, [userId, startDate]),
-        
-        query(`
-          SELECT 
-            SUM(rs.reading_time_minutes) / 60.0 as total_hours,
-            COUNT(DISTINCT DATE(rs.session_start)) as reading_days,
-            COUNT(DISTINCT rs.book_id) as total_books,
-            AVG(b.pages) as avg_pages_per_book
-          FROM reading_sessions rs
-          JOIN books b ON rs.book_id = b.id
-          WHERE rs.user_id = $1 AND rs.session_start >= $2
-        `, [userId, startDate])
-      ]);
+    // Get monthly reading data
+    const monthlyDataResult = await query(`
+      SELECT 
+        TO_CHAR(last_read_at, 'Mon') as month,
+        COUNT(DISTINCT book_id) as books,
+        SUM(total_reading_time_seconds) / 3600.0 as hours
+      FROM reading_progress
+      WHERE user_id = $1 AND last_read_at >= $2
+      GROUP BY TO_CHAR(last_read_at, 'Mon'), EXTRACT(MONTH FROM last_read_at)
+      ORDER BY EXTRACT(MONTH FROM last_read_at)
+    `, [userId, startDate]);
 
-      // Handle individual promise results
-      monthlyDataResult = monthlyDataResult.status === 'fulfilled' ? monthlyDataResult.value : { rows: [] };
-      genreDataResult = genreDataResult.status === 'fulfilled' ? genreDataResult.value : { rows: [] };
-      statsResult = statsResult.status === 'fulfilled' ? statsResult.value : { rows: [{}] };
-    } catch (error) {
-      console.error('Error fetching analytics data:', error);
-      // Fallback to empty data
-      monthlyDataResult = { rows: [] };
-      genreDataResult = { rows: [] };
-      statsResult = { rows: [{}] };
-    }
+    // Get genre distribution
+    const genreDataResult = await query(`
+      SELECT 
+        COALESCE(c.name, 'Unknown') as name,
+        COUNT(DISTINCT rp.book_id) as count,
+        ROUND(COUNT(DISTINCT rp.book_id) * 100.0 / NULLIF((
+          SELECT COUNT(DISTINCT book_id) 
+          FROM reading_progress 
+          WHERE user_id = $1 AND last_read_at >= $2
+        ), 0), 1) as percentage
+      FROM reading_progress rp
+      JOIN books b ON rp.book_id = b.id
+      LEFT JOIN categories c ON b.category_id = c.id
+      WHERE rp.user_id = $1 AND rp.last_read_at >= $2
+      GROUP BY c.name
+      ORDER BY count DESC
+      LIMIT 10
+    `, [userId, startDate]);
+
+    // Get overall statistics
+    const statsResult = await query(`
+      SELECT 
+        SUM(total_reading_time_seconds) / 3600.0 as total_hours,
+        COUNT(DISTINCT DATE(last_read_at)) as reading_days,
+        COUNT(DISTINCT book_id) as total_books,
+        AVG(b.pages) as avg_pages_per_book
+      FROM reading_progress rp
+      LEFT JOIN books b ON rp.book_id = b.id
+      WHERE rp.user_id = $1 AND rp.last_read_at >= $2
+    `, [userId, startDate]);
 
     const monthlyData = monthlyDataResult.rows.map(row => ({
       month: row.month,
@@ -125,7 +109,6 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching reading analytics:', error);
     
-    // Return fallback data instead of error
     return NextResponse.json({
       success: true,
       analytics: {
@@ -140,4 +123,4 @@ export async function GET(request: NextRequest) {
       }
     });
   }
-} 
+}

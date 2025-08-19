@@ -1,14 +1,27 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useEReaderStore } from '@/stores/ereaderStore';
-import { Book, Settings, Bookmark, StickyNote, X, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
-import LeftDrawer from './LeftDrawer';
-import RightDrawer from './RightDrawer';
-import ProgressBar from './ProgressBar';
-import TextToSpeech from './TextToSpeech';
-import { useSession } from 'next-auth/react';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useEReaderStore } from "@/stores/ereaderStore";
+import {
+  Book,
+  Settings,
+  Bookmark,
+  StickyNote,
+  X,
+  Menu,
+  ChevronLeft,
+  ChevronRight,
+  Highlighter,
+} from "lucide-react";
+import LeftDrawer from "./LeftDrawer";
+import RightDrawer from "./RightDrawer";
+import ProgressBar from "./ProgressBar";
+import TextToSpeech from "./TextToSpeech";
+import HighlightRenderer from "./HighlightRenderer";
+import FloatingNoteModal from "./FloatingNoteModal";
+import HighlightModal from "./HighlightModal";
+import { useSession } from "next-auth/react";
 
 interface EReaderProps {
   bookId: string;
@@ -35,9 +48,21 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
   } = useEReaderStore();
 
   const [isScrolling, setIsScrolling] = useState(false);
-  const [scrollTimeout, setScrollTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [scrollTimeout, setScrollTimeout] = useState<NodeJS.Timeout | null>(
+    null,
+  );
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [showHighlightModal, setShowHighlightModal] = useState(false);
+  const [selectionPosition, setSelectionPosition] = useState({ x: 0, y: 0 });
+  const [textSelectionData, setTextSelectionData] = useState<{
+    text: string;
+    startOffset: number;
+    endOffset: number;
+  } | null>(null);
+
   const contentRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
 
   // Load book on mount
   useEffect(() => {
@@ -46,12 +71,75 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
     }
   }, [bookId, session?.user?.id, loadBook]);
 
+  // Setup intersection observer for reading progress
+  useEffect(() => {
+    if (!contentRef.current) return;
+
+    // Clean up previous observer
+    if (intersectionObserverRef.current) {
+      intersectionObserverRef.current.disconnect();
+    }
+
+    // Create new observer for tracking reading sections
+    intersectionObserverRef.current = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const element = entry.target as HTMLElement;
+            const rect = element.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+
+            // Calculate reading progress based on visible elements
+            if (rect.top < viewportHeight * 0.3) {
+              const scrollTop = containerRef.current?.scrollTop || 0;
+              const scrollHeight = containerRef.current?.scrollHeight || 1;
+              const clientHeight = containerRef.current?.clientHeight || 1;
+              const progress = Math.min(
+                100,
+                Math.max(0, (scrollTop / (scrollHeight - clientHeight)) * 100),
+              );
+
+              // Update reading time tracking
+              const now = Date.now();
+              const timeSpent = now - (lastTimeUpdate.current || now);
+              lastTimeUpdate.current = now;
+
+              saveProgress({
+                currentPosition: scrollTop,
+                percentage: progress,
+                timeSpent: timeSpent / 1000, // Convert to seconds
+              });
+            }
+          }
+        });
+      },
+      {
+        root: containerRef.current,
+        threshold: [0.1, 0.3, 0.5, 0.7, 0.9],
+      },
+    );
+
+    // Observe all paragraphs and headings for reading progress
+    const elements = contentRef.current.querySelectorAll(
+      "p, h1, h2, h3, h4, h5, h6",
+    );
+    elements.forEach((el) => intersectionObserverRef.current?.observe(el));
+
+    return () => {
+      if (intersectionObserverRef.current) {
+        intersectionObserverRef.current.disconnect();
+      }
+    };
+  }, [contentRef.current, saveProgress]);
+
+  const lastTimeUpdate = useRef<number>(Date.now());
+
   // Handle scroll events for progress tracking
   const handleScroll = useCallback(() => {
     if (!contentRef.current || !containerRef.current) return;
 
     setIsScrolling(true);
-    
+
     // Clear existing timeout
     if (scrollTimeout) {
       clearTimeout(scrollTimeout);
@@ -61,7 +149,10 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
     const scrollTop = containerRef.current.scrollTop;
     const scrollHeight = containerRef.current.scrollHeight;
     const clientHeight = containerRef.current.clientHeight;
-    const progress = Math.min(100, Math.max(0, (scrollTop / (scrollHeight - clientHeight)) * 100));
+    const progress = Math.min(
+      100,
+      Math.max(0, (scrollTop / (scrollHeight - clientHeight)) * 100),
+    );
 
     // Save progress
     saveProgress({
@@ -86,43 +177,105 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
     };
   }, [scrollTimeout]);
 
-  // Handle text selection
+  // Enhanced text selection handling
   const handleTextSelection = useCallback(() => {
     const selection = window.getSelection();
-    if (selection && selection.toString().trim()) {
-      setSelectedText(selection.toString().trim());
+    if (selection && selection.toString().trim() && selection.rangeCount > 0) {
+      const selectedText = selection.toString().trim();
+      const range = selection.getRangeAt(0);
+
+      // Calculate text offsets
+      const startOffset = getTextOffset(
+        contentRef.current!,
+        range.startContainer,
+        range.startOffset,
+      );
+      const endOffset = getTextOffset(
+        contentRef.current!,
+        range.endContainer,
+        range.endOffset,
+      );
+
+      // Get selection position for modal placement
+      const rect = range.getBoundingClientRect();
+      const selectionPos = {
+        x: rect.left + rect.width / 2,
+        y: rect.bottom + window.scrollY,
+      };
+
+      setSelectedText(selectedText);
+      setTextSelectionData({
+        text: selectedText,
+        startOffset,
+        endOffset,
+      });
+      setSelectionPosition(selectionPos);
     } else {
       setSelectedText(null);
+      setTextSelectionData(null);
     }
   }, [setSelectedText]);
 
-  // Handle keyboard shortcuts
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    switch (e.key) {
-      case 'Escape':
-        onClose();
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        toggleDrawer('left', true);
-        break;
-      case 'ArrowRight':
-        e.preventDefault();
-        toggleDrawer('right', true);
-        break;
-      case 't':
-      case 'T':
-        if (e.ctrlKey) {
-          e.preventDefault();
-          if (isTextToSpeechPlaying) {
-            stopTextToSpeech();
-          } else {
-            startTextToSpeech();
-          }
-        }
-        break;
+  // Helper function to calculate text offset
+  const getTextOffset = (
+    container: Node,
+    node: Node,
+    offset: number,
+  ): number => {
+    let textOffset = 0;
+    const walker = document.createTreeWalker(
+      container,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false,
+    );
+
+    let currentNode;
+    while ((currentNode = walker.nextNode())) {
+      if (currentNode === node) {
+        return textOffset + offset;
+      }
+      textOffset += currentNode.textContent?.length || 0;
     }
-  }, [onClose, toggleDrawer, isTextToSpeechPlaying, startTextToSpeech, stopTextToSpeech]);
+    return textOffset;
+  };
+
+  // Handle keyboard shortcuts
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      switch (e.key) {
+        case "Escape":
+          onClose();
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          toggleDrawer("left", true);
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          toggleDrawer("right", true);
+          break;
+        case "t":
+        case "T":
+          if (e.ctrlKey) {
+            e.preventDefault();
+            if (isTextToSpeechPlaying) {
+              stopTextToSpeech();
+            } else {
+              startTextToSpeech();
+            }
+          }
+          break;
+      }
+    },
+    [
+      onClose,
+      toggleDrawer,
+      isTextToSpeechPlaying,
+      startTextToSpeech,
+      stopTextToSpeech,
+    ],
+  );
 
   // Handle swipe gestures
   const handleTouchStart = useRef<{ x: number; y: number } | null>(null);
@@ -135,37 +288,43 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     if (!handleTouchStart.current) return;
-    
+
     const touch = e.touches[0];
     handleTouchMove.current = { x: touch.clientX, y: touch.clientY };
   }, []);
 
-  const onTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (!handleTouchStart.current || !handleTouchMove.current) return;
+  const onTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (!handleTouchStart.current || !handleTouchMove.current) return;
 
-    const startX = handleTouchStart.current.x;
-    const startY = handleTouchStart.current.y;
-    const endX = handleTouchMove.current.x;
-    const endY = handleTouchMove.current.y;
+      const startX = handleTouchStart.current.x;
+      const startY = handleTouchStart.current.y;
+      const endX = handleTouchMove.current.x;
+      const endY = handleTouchMove.current.y;
 
-    const deltaX = endX - startX;
-    const deltaY = endY - startY;
-    const minSwipeDistance = 50;
+      const deltaX = endX - startX;
+      const deltaY = endY - startY;
+      const minSwipeDistance = 50;
 
-    // Check if it's a horizontal swipe
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
-      if (deltaX > 0) {
-        // Swipe right - open left drawer
-        toggleDrawer('left', true);
-      } else {
-        // Swipe left - open right drawer
-        toggleDrawer('right', true);
+      // Check if it's a horizontal swipe
+      if (
+        Math.abs(deltaX) > Math.abs(deltaY) &&
+        Math.abs(deltaX) > minSwipeDistance
+      ) {
+        if (deltaX > 0) {
+          // Swipe right - open left drawer
+          toggleDrawer("left", true);
+        } else {
+          // Swipe left - open right drawer
+          toggleDrawer("right", true);
+        }
       }
-    }
 
-    handleTouchStart.current = null;
-    handleTouchMove.current = null;
-  }, [toggleDrawer]);
+      handleTouchStart.current = null;
+      handleTouchMove.current = null;
+    },
+    [toggleDrawer],
+  );
 
   if (isLoading) {
     return (
@@ -211,7 +370,7 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center space-x-3">
             <button
-              onClick={() => toggleDrawer('left')}
+              onClick={() => toggleDrawer("left")}
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               <Menu className="w-5 h-5" />
@@ -225,7 +384,7 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             {settings.showProgressBar && readingProgress && (
               <div className="hidden sm:block text-xs text-gray-500 dark:text-gray-400">
@@ -233,7 +392,7 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
               </div>
             )}
             <button
-              onClick={() => toggleDrawer('right')}
+              onClick={() => toggleDrawer("right")}
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               <Settings className="w-5 h-5" />
@@ -246,7 +405,7 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
             </button>
           </div>
         </div>
-        
+
         {/* Progress Bar */}
         {settings.showProgressBar && readingProgress && (
           <ProgressBar progress={readingProgress.percentage} />
@@ -268,10 +427,8 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
           <div
             ref={contentRef}
             className={`prose prose-lg max-w-none ${
-              settings.theme === 'dark' ? 'prose-invert' : ''
-            } ${
-              settings.theme === 'sepia' ? 'prose-amber' : ''
-            }`}
+              settings.theme === "dark" ? "prose-invert" : ""
+            } ${settings.theme === "sepia" ? "prose-amber" : ""}`}
             style={{
               fontSize: `${settings.fontSize}px`,
               fontFamily: settings.fontFamily,
@@ -279,9 +436,13 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
               fontWeight: settings.fontWeight,
               margin: `${settings.margins}px`,
               padding: `${settings.padding}px`,
-              textAlign: settings.justifyText ? 'justify' : 'left',
-              maxWidth: settings.readingWidth === 'narrow' ? '600px' : 
-                        settings.readingWidth === 'wide' ? 'none' : '800px',
+              textAlign: settings.justifyText ? "justify" : "left",
+              maxWidth:
+                settings.readingWidth === "narrow"
+                  ? "600px"
+                  : settings.readingWidth === "wide"
+                    ? "none"
+                    : "800px",
             }}
             onMouseUp={handleTextSelection}
             onTouchEnd={handleTextSelection}
@@ -292,7 +453,7 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
 
       {/* Floating Action Buttons */}
       <AnimatePresence>
-        {selectedText && (
+        {selectedText && textSelectionData && (
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -300,20 +461,16 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
             className="fixed bottom-4 right-4 flex flex-col space-y-2 z-50"
           >
             <button
-              onClick={() => {
-                // Add highlight logic
-                console.log('Add highlight for:', selectedText);
-              }}
-              className="p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700"
+              onClick={() => setShowHighlightModal(true)}
+              className="p-3 bg-yellow-500 text-white rounded-full shadow-lg hover:bg-yellow-600 transition-colors"
+              title="Create Highlight"
             >
-              <Bookmark className="w-5 h-5" />
+              <Highlighter className="w-5 h-5" />
             </button>
             <button
-              onClick={() => {
-                // Add note logic
-                console.log('Add note for:', selectedText);
-              }}
-              className="p-3 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700"
+              onClick={() => setShowNoteModal(true)}
+              className="p-3 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 transition-colors"
+              title="Create Note"
             >
               <StickyNote className="w-5 h-5" />
             </button>
@@ -321,13 +478,63 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
         )}
       </AnimatePresence>
 
+      {/* Highlight Renderer */}
+      <HighlightRenderer
+        highlights={highlights}
+        contentRef={contentRef}
+        onHighlightClick={(highlight) => {
+          // Navigate to highlight or show details
+          console.log("Highlight clicked:", highlight);
+        }}
+        onHighlightHover={(highlight) => {
+          // Show highlight preview or tooltip
+          console.log("Highlight hovered:", highlight);
+        }}
+      />
+
       {/* Drawers */}
       <LeftDrawer />
       <RightDrawer />
 
       {/* Text-to-Speech */}
-      {settings.textToSpeech.enabled && (
-        <TextToSpeech />
+      {settings.textToSpeech.enabled && <TextToSpeech />}
+
+      {/* Note Creation Modal */}
+      {showNoteModal && selectedText && textSelectionData && (
+        <FloatingNoteModal
+          isOpen={showNoteModal}
+          onClose={() => {
+            setShowNoteModal(false);
+            setSelectedText(null);
+            setTextSelectionData(null);
+            window.getSelection()?.removeAllRanges();
+          }}
+          selectedText={selectedText}
+          position={selectionPosition}
+          bookId={bookId}
+          currentPosition={readingProgress?.currentPosition || 0}
+        />
+      )}
+
+      {/* Highlight Creation Modal */}
+      {showHighlightModal && selectedText && textSelectionData && (
+        <HighlightModal
+          isOpen={showHighlightModal}
+          onClose={() => {
+            setShowHighlightModal(false);
+            setSelectedText(null);
+            setTextSelectionData(null);
+            window.getSelection()?.removeAllRanges();
+          }}
+          selectedText={selectedText}
+          position={selectionPosition}
+          bookId={bookId}
+          currentPosition={readingProgress?.currentPosition || 0}
+          textRange={{
+            startOffset: textSelectionData.startOffset,
+            endOffset: textSelectionData.endOffset,
+          }}
+        />
       )}
     </div>
   );

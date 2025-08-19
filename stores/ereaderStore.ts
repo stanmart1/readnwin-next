@@ -1,43 +1,43 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { 
-  EReaderState, 
-  Book, 
-  ReadingProgress, 
-  Highlight, 
-  Note, 
-  ReaderSettings, 
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import {
+  EReaderState,
+  Book,
+  ReadingProgress,
+  Highlight,
+  Note,
+  ReaderSettings,
   ReadingAnalytics,
   ReadingSession,
-  DrawerState
-} from '@/types/ereader';
+  DrawerState,
+} from "@/types/ereader";
 
 const defaultSettings: ReaderSettings = {
   // Typography
   fontSize: 18,
-  fontFamily: 'serif',
+  fontFamily: "serif",
   lineHeight: 1.6,
   fontWeight: 400,
-  
+
   // Display
-  theme: 'light',
-  readingWidth: 'medium',
+  theme: "light",
+  readingWidth: "medium",
   margins: 20,
   padding: 16,
-  
+
   // Layout
   justifyText: true,
   showProgressBar: true,
   showChapterNumbers: true,
-  
+
   // Audio
   textToSpeech: {
     enabled: false,
-    voice: '',
+    voice: "",
     speed: 1.0,
     autoPlay: false,
   },
-  
+
   // Accessibility
   highContrast: false,
   reduceMotion: false,
@@ -47,11 +47,11 @@ const defaultSettings: ReaderSettings = {
 const defaultDrawerState: DrawerState = {
   leftDrawer: {
     isOpen: false,
-    activeTab: 'notes',
+    activeTab: "notes",
   },
   rightDrawer: {
     isOpen: false,
-    activeSection: 'typography',
+    activeSection: "typography",
   },
 };
 
@@ -79,9 +79,9 @@ export const useEReaderStore = create<EReaderState>()(
           // Load book from API
           const response = await fetch(`/api/books/${bookId}/content`);
           if (!response.ok) {
-            throw new Error('Failed to load book');
+            throw new Error("Failed to load book");
           }
-          
+
           const data = await response.json();
           const book: Book = {
             id: bookId,
@@ -96,88 +96,151 @@ export const useEReaderStore = create<EReaderState>()(
             updatedAt: new Date(data.updatedAt),
           };
 
-          // Load user data for this book
-          const userId = 'current-user'; // Replace with actual user ID
-          const userData = get().loadUserData(bookId, userId);
-          
-          set({
-            currentBook: book,
-            readingProgress: userData.progress,
-            highlights: userData.highlights,
-            notes: userData.notes,
-            isLoading: false,
-          });
+          // Load user data for this book (progress, highlights, notes)
+          try {
+            const [progressResponse, highlightsResponse, notesResponse] =
+              await Promise.all([
+                fetch(`/api/books/${bookId}/progress`),
+                fetch(`/api/books/${bookId}/highlights`),
+                fetch(`/api/books/${bookId}/notes`),
+              ]);
 
-          // Start new reading session
-          const session: ReadingSession = {
-            id: `session-${Date.now()}`,
-            bookId,
-            userId,
-            startTime: new Date(),
-            duration: 0,
-            wordsRead: 0,
-            progress: 0,
-          };
-          set({ currentSession: session });
+            const progressData = progressResponse.ok
+              ? await progressResponse.json()
+              : null;
+            const highlightsData = highlightsResponse.ok
+              ? await highlightsResponse.json()
+              : [];
+            const notesData = notesResponse.ok
+              ? await notesResponse.json()
+              : [];
 
+            set({
+              currentBook: book,
+              readingProgress: progressData,
+              highlights: highlightsData,
+              notes: notesData,
+              isLoading: false,
+            });
+
+            // Start new reading session
+            const session: ReadingSession = {
+              id: `session-${Date.now()}`,
+              bookId,
+              userId,
+              startTime: new Date(),
+              duration: 0,
+              wordsRead: 0,
+              progress: 0,
+            };
+            set({ currentSession: session });
+          } catch (userDataError) {
+            console.warn("Failed to load user data:", userDataError);
+            // Continue with book loading even if user data fails
+            const session: ReadingSession = {
+              id: `session-${Date.now()}`,
+              bookId,
+              userId,
+              startTime: new Date(),
+              duration: 0,
+              wordsRead: 0,
+              progress: 0,
+            };
+            set({
+              currentBook: book,
+              readingProgress: null,
+              highlights: [],
+              notes: [],
+              isLoading: false,
+              currentSession: session,
+            });
+          }
         } catch (error) {
           set({
-            error: error instanceof Error ? error.message : 'Failed to load book',
+            error:
+              error instanceof Error ? error.message : "Failed to load book",
             isLoading: false,
           });
         }
       },
 
-      saveProgress: (progress: Partial<ReadingProgress>) => {
+      saveProgress: async (progress: Partial<ReadingProgress>) => {
         const currentProgress = get().readingProgress;
         const currentSession = get().currentSession;
-        
-        if (!currentProgress || !currentSession) return;
+        const currentBook = get().currentBook;
+
+        if (!currentBook) return;
 
         const updatedProgress: ReadingProgress = {
-          ...currentProgress,
-          ...progress,
+          bookId: currentBook.id,
+          userId: "current-user", // Replace with actual user ID from session
+          currentPosition:
+            progress.currentPosition || currentProgress?.currentPosition || 0,
+          percentage: progress.percentage || currentProgress?.percentage || 0,
+          timeSpent:
+            (currentProgress?.timeSpent || 0) + (progress.timeSpent || 0),
           lastReadAt: new Date(),
+          sessionStartTime: currentProgress?.sessionStartTime || new Date(),
+          wordsRead: progress.wordsRead || currentProgress?.wordsRead || 0,
+          chaptersCompleted:
+            progress.chaptersCompleted ||
+            currentProgress?.chaptersCompleted ||
+            0,
         };
 
-        // Update session
-        const updatedSession: ReadingSession = {
-          ...currentSession,
-          endTime: new Date(),
-          duration: currentSession.startTime ? 
-            Math.floor((new Date().getTime() - currentSession.startTime.getTime()) / 1000) : 0,
-          wordsRead: progress.wordsRead || currentSession.wordsRead,
-          progress: progress.percentage || currentSession.progress,
-        };
+        // Update session if exists
+        let updatedSession = currentSession;
+        if (currentSession) {
+          updatedSession = {
+            ...currentSession,
+            endTime: new Date(),
+            duration: currentSession.startTime
+              ? Math.floor(
+                  (new Date().getTime() - currentSession.startTime.getTime()) /
+                    1000,
+                )
+              : 0,
+            wordsRead: progress.wordsRead || currentSession.wordsRead,
+            progress: progress.percentage || currentSession.progress,
+          };
+        }
 
         set({
           readingProgress: updatedProgress,
           currentSession: updatedSession,
         });
 
-        // Save to localStorage (handled by persist middleware)
-        // In a real app, you'd also save to the server
+        // Save to server
+        try {
+          await fetch(`/api/books/${currentBook.id}/progress`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatedProgress),
+          });
+        } catch (error) {
+          console.warn("Failed to save progress to server:", error);
+        }
       },
 
-      addHighlight: (highlight: Omit<Highlight, 'id' | 'createdAt'>) => {
+      addHighlight: (highlight: Omit<Highlight, "id" | "createdAt">) => {
         const newHighlight: Highlight = {
           ...highlight,
           id: `highlight-${Date.now()}`,
           createdAt: new Date(),
         };
 
-        set(state => ({
+        set((state) => ({
           highlights: [...state.highlights, newHighlight],
         }));
       },
 
       removeHighlight: (highlightId: string) => {
-        set(state => ({
-          highlights: state.highlights.filter(h => h.id !== highlightId),
+        set((state) => ({
+          highlights: state.highlights.filter((h) => h.id !== highlightId),
         }));
       },
 
-      addNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => {
+      addNote: (note: Omit<Note, "id" | "createdAt" | "updatedAt">) => {
         const newNote: Note = {
           ...note,
           id: `note-${Date.now()}`,
@@ -185,48 +248,55 @@ export const useEReaderStore = create<EReaderState>()(
           updatedAt: new Date(),
         };
 
-        set(state => ({
+        set((state) => ({
           notes: [...state.notes, newNote],
         }));
       },
 
       updateNote: (noteId: string, updates: Partial<Note>) => {
-        set(state => ({
-          notes: state.notes.map(note =>
+        set((state) => ({
+          notes: state.notes.map((note) =>
             note.id === noteId
               ? { ...note, ...updates, updatedAt: new Date() }
-              : note
+              : note,
           ),
         }));
       },
 
       removeNote: (noteId: string) => {
-        set(state => ({
-          notes: state.notes.filter(n => n.id !== noteId),
+        set((state) => ({
+          notes: state.notes.filter((n) => n.id !== noteId),
         }));
       },
 
       updateSettings: (settings: Partial<ReaderSettings>) => {
-        set(state => ({
+        set((state) => ({
           settings: { ...state.settings, ...settings },
         }));
       },
 
-      toggleDrawer: (drawer: 'left' | 'right', isOpen?: boolean) => {
-        set(state => ({
+      toggleDrawer: (drawer: "left" | "right", isOpen?: boolean) => {
+        set((state) => ({
           drawerState: {
             ...state.drawerState,
-            [drawer === 'left' ? 'leftDrawer' : 'rightDrawer']: {
-              ...state.drawerState[drawer === 'left' ? 'leftDrawer' : 'rightDrawer'],
-              isOpen: isOpen !== undefined ? isOpen : !state.drawerState[drawer === 'left' ? 'leftDrawer' : 'rightDrawer'].isOpen,
+            [drawer === "left" ? "leftDrawer" : "rightDrawer"]: {
+              ...state.drawerState[
+                drawer === "left" ? "leftDrawer" : "rightDrawer"
+              ],
+              isOpen:
+                isOpen !== undefined
+                  ? isOpen
+                  : !state.drawerState[
+                      drawer === "left" ? "leftDrawer" : "rightDrawer"
+                    ].isOpen,
             },
           },
         }));
       },
 
-      setDrawerTab: (drawer: 'left', tab: 'notes' | 'highlights') => {
-        if (drawer !== 'left') return;
-        set(state => ({
+      setDrawerTab: (drawer: "left", tab: "notes" | "highlights") => {
+        if (drawer !== "left") return;
+        set((state) => ({
           drawerState: {
             ...state.drawerState,
             leftDrawer: {
@@ -237,9 +307,9 @@ export const useEReaderStore = create<EReaderState>()(
         }));
       },
 
-      setDrawerSection: (drawer: 'right', section: string) => {
-        if (drawer !== 'right') return;
-        set(state => ({
+      setDrawerSection: (drawer: "right", section: string) => {
+        if (drawer !== "right") return;
+        set((state) => ({
           drawerState: {
             ...state.drawerState,
             rightDrawer: {
@@ -264,20 +334,9 @@ export const useEReaderStore = create<EReaderState>()(
         set({ selectedText: text });
       },
 
-      // Helper functions
-      loadUserData: (bookId: string, userId: string) => {
-        // In a real app, this would load from the server
-        // For now, return empty data
-        return {
-          progress: null,
-          highlights: [],
-          notes: [],
-        };
-      },
-
       // Analytics functions
       updateAnalytics: (analytics: ReadingAnalytics) => {
-        set(state => ({
+        set((state) => ({
           analytics: [...state.analytics, analytics],
         }));
       },
@@ -296,11 +355,11 @@ export const useEReaderStore = create<EReaderState>()(
 
       // Utility functions
       getHighlightsForBook: (bookId: string) => {
-        return get().highlights.filter(h => h.bookId === bookId);
+        return get().highlights.filter((h) => h.bookId === bookId);
       },
 
       getNotesForBook: (bookId: string) => {
-        return get().notes.filter(n => n.bookId === bookId);
+        return get().notes.filter((n) => n.bookId === bookId);
       },
 
       getReadingProgressForBook: (bookId: string) => {
@@ -309,7 +368,7 @@ export const useEReaderStore = create<EReaderState>()(
       },
     }),
     {
-      name: 'ereader-storage',
+      name: "ereader-storage",
       partialize: (state) => ({
         highlights: state.highlights,
         notes: state.notes,
@@ -317,6 +376,6 @@ export const useEReaderStore = create<EReaderState>()(
         analytics: state.analytics,
         drawerState: state.drawerState,
       }),
-    }
-  )
+    },
+  ),
 );

@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import toast from 'react-hot-toast';
+import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 
 interface PaymentGateway {
   id: string;
@@ -25,7 +25,7 @@ interface PaymentGateway {
   };
   supportedCurrencies: string[];
   features: string[];
-  status: 'active' | 'inactive' | 'error' | 'testing';
+  status: "active" | "inactive" | "error" | "testing";
 }
 
 interface PaymentSettings {
@@ -50,293 +50,192 @@ export default function PaymentGatewayManagement() {
   const [isSaving, setIsSaving] = useState(false);
   const [savingGateway, setSavingGateway] = useState<string | null>(null);
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
-  const [validationErrors, setValidationErrors] = useState<{[gatewayId: string]: {[field: string]: string}}>({});
+  const [validationErrors, setValidationErrors] = useState<{
+    [gatewayId: string]: { [field: string]: string };
+  }>({});
   const [showConfirmDialog, setShowConfirmDialog] = useState<{
     show: boolean;
     action: string;
     gatewayId: string;
     message: string;
-  }>({ show: false, action: '', gatewayId: '', message: '' });
+  }>({ show: false, action: "", gatewayId: "", message: "" });
 
   const [paymentGateways, setPaymentGateways] = useState<PaymentGateway[]>([
     {
-      id: 'flutterwave',
-      name: 'Flutterwave',
-      description: 'Leading payment technology company in Africa',
-      icon: 'ri-global-line',
-      enabled: true,
-      testMode: false, // Set to false for live mode
-      apiKeys: {
-        publicKey: 'FLWPUBK-9856cdb89cb82f5ce5de30877c7b3a89-X',
-        secretKey: 'FLWSECK-19415f8daa7a8fd3f74b0d71874cfad1-197781a61d6vt-X',
-        webhookSecret: '',
-        hash: '19415f8daa7ad132cd7680f7',
-      },
-      supportedCurrencies: ['NGN'],
-      features: ['Mobile Money', 'Bank Transfers', 'Credit Cards', 'USSD', 'QR Payments'],
-      status: 'active',
-    },
-    {
-      id: 'bank_transfer',
-      name: 'Bank Transfer',
-      description: 'Direct bank transfer with proof of payment upload',
-      icon: 'ri-bank-line',
+      id: "flutterwave",
+      name: "Flutterwave",
+      description: "Leading payment technology company in Africa",
+      icon: "ri-global-line",
       enabled: true,
       testMode: false,
       apiKeys: {
-        publicKey: '',
-        secretKey: '',
-        webhookSecret: '',
+        publicKey: "FLWPUBK-9856cdb89cb82f5ce5de30877c7b3a89-X",
+        secretKey: "FLWSECK-19415f8daa7a8fd3f74b0d71874cfad1-197781a61d6vt-X",
+        webhookSecret: "",
+        hash: "19415f8daa7ad132cd7680f7",
+      },
+      supportedCurrencies: ["NGN", "USD", "EUR", "GBP"],
+      features: [
+        "Mobile Money",
+        "Bank Transfers",
+        "Credit Cards",
+        "USSD",
+        "QR Payments",
+      ],
+      status: "active",
+    },
+    {
+      id: "bank_transfer",
+      name: "Bank Transfer",
+      description: "Direct bank transfer with proof of payment upload",
+      icon: "ri-bank-line",
+      enabled: true,
+      testMode: false,
+      apiKeys: {
+        publicKey: "",
+        secretKey: "",
+        webhookSecret: "",
       },
       bankAccount: {
-        bankName: 'Access Bank',
-        accountNumber: '0101234567',
-        accountName: 'Lagsale Online Resources',
-        accountType: 'Current',
-        instructions: 'Please include your order number as payment reference',
+        bankName: "Access Bank",
+        accountNumber: "0101234567",
+        accountName: "Lagsale Online Resources",
+        accountType: "Current",
+        instructions: "Please include your order number as payment reference",
       },
-      supportedCurrencies: ['NGN'],
-      features: ['Bank Transfers', 'Proof of Payment', 'Manual Verification'],
-      status: 'active',
+      supportedCurrencies: ["NGN"],
+      features: ["Bank Transfers", "Proof of Payment", "Manual Verification"],
+      status: "active",
     },
   ]);
 
-  const [settings, setSettings] = useState<PaymentSettings>({
-    defaultGateway: 'flutterwave',
-    supportedGateways: ['flutterwave', 'bank_transfer'],
-    currency: 'NGN',
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>({
+    defaultGateway: "flutterwave",
+    supportedGateways: ["flutterwave", "bank_transfer"],
+    currency: "NGN",
     taxRate: 7.5,
-    shippingCost: 500,
-    freeShippingThreshold: 5000,
-    webhookUrl: '',
-    testMode: true,
+    shippingCost: 2000,
+    freeShippingThreshold: 50000,
+    webhookUrl: "",
+    testMode: false,
   });
 
-  // Validation functions
-  const validateApiKey = (key: string, keyType: string): string => {
-    if (!key.trim()) {
-      return `${keyType} is required`;
-    }
-    
-    // Flutterwave specific validation
-    if (keyType === 'publicKey' && !key.startsWith('FLWPUBK-')) {
-      return 'Public key should start with FLWPUBK-';
-    }
-    
-    if (keyType === 'secretKey' && !key.startsWith('FLWSECK-')) {
-      return 'Secret key should start with FLWSECK-';
-    }
-    
-    if (keyType === 'hash' && key.length < 20) {
-      return 'Hash should be at least 20 characters long';
-    }
-    
-    if (keyType === 'webhookSecret' && key.length < 16) {
-      return 'Webhook secret should be at least 16 characters long';
-    }
-    
-    return '';
-  };
-
-  const validateBankAccount = (gatewayId: string, field: string, value: string): string => {
-    if (!value.trim()) {
-      return `${field.replace(/([A-Z])/g, ' $1').toLowerCase()} is required`;
-    }
-    
-    if (field === 'accountNumber') {
-      if (!/^\d{10}$/.test(value.replace(/\s/g, ''))) {
-        return 'Account number should be 10 digits';
-      }
-    }
-    
-    if (field === 'bankName' && value.length < 2) {
-      return 'Bank name should be at least 2 characters';
-    }
-    
-    if (field === 'accountName' && value.length < 3) {
-      return 'Account name should be at least 3 characters';
-    }
-    
-    return '';
-  };
-
-  const validateGateway = (gateway: PaymentGateway): boolean => {
-    const errors: { [field: string]: string } = {};
-    
-    if (gateway.id === 'flutterwave') {
-          const publicKeyError = validateApiKey(gateway.apiKeys.publicKey, 'publicKey');
-    const secretKeyError = validateApiKey(gateway.apiKeys.secretKey, 'secretKey');
-    const hashError = gateway.id === 'flutterwave' ? validateApiKey(gateway.apiKeys.hash || '', 'hash') : '';
-      
-              if (publicKeyError) errors.publicKey = publicKeyError;
-        if (secretKeyError) errors.secretKey = secretKeyError;
-        if (hashError) errors.hash = hashError;
-      
-      if (gateway.apiKeys.hash) {
-        const hashError = validateApiKey(gateway.apiKeys.hash, 'hash');
-        if (hashError) errors.hash = hashError;
-      }
-      
-      if (gateway.apiKeys.webhookSecret) {
-        const webhookError = validateApiKey(gateway.apiKeys.webhookSecret, 'webhookSecret');
-        if (webhookError) errors.webhookSecret = webhookError;
-      }
-    }
-    
-    if (gateway.id === 'bank_transfer' && gateway.bankAccount) {
-      const bankNameError = validateBankAccount(gateway.id, 'bankName', gateway.bankAccount.bankName);
-      const accountNumberError = validateBankAccount(gateway.id, 'accountNumber', gateway.bankAccount.accountNumber);
-      const accountNameError = validateBankAccount(gateway.id, 'accountName', gateway.bankAccount.accountName);
-      const accountTypeError = validateBankAccount(gateway.id, 'accountType', gateway.bankAccount.accountType);
-      
-      if (bankNameError) errors.bankName = bankNameError;
-      if (accountNumberError) errors.accountNumber = accountNumberError;
-      if (accountNameError) errors.accountName = accountNameError;
-      if (accountTypeError) errors.accountType = accountTypeError;
-    }
-    
-    setValidationErrors(prev => ({
-      ...prev,
-      [gateway.id]: errors
-    }));
-    
-    return Object.keys(errors).length === 0;
-  };
-
-  // Load settings on component mount
   useEffect(() => {
-    loadPaymentSettings();
+    loadPaymentGateways();
   }, []);
 
-  const loadPaymentSettings = async () => {
+  const loadPaymentGateways = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/admin/payment-settings');
+      const response = await fetch("/api/admin/payment-settings");
       if (response.ok) {
         const data = await response.json();
-        setPaymentGateways(data.gateways || paymentGateways);
-        setSettings(data.settings || settings);
+        if (data.gateways) {
+          setPaymentGateways(data.gateways);
+        }
+        if (data.settings) {
+          setPaymentSettings(data.settings);
+        }
       }
     } catch (error) {
-      console.error('Error loading payment settings:', error);
-      toast.error('Failed to load payment settings');
+      console.error("Error loading payment gateways:", error);
+      toast.error("Failed to load payment gateway settings");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const savePaymentSettings = async () => {
-    setIsSaving(true);
-    try {
-      const response = await fetch('/api/admin/payment-settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          gateways: paymentGateways,
-          settings,
-        }),
-      });
+  const validateApiKey = (value: string, type: string): string => {
+    if (!value) return `${type} is required`;
 
-      if (response.ok) {
-        toast.success('Payment settings saved successfully!');
-        await loadPaymentSettings(); // Reload to get updated status
-      } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to save payment settings');
-      }
-    } catch (error) {
-      console.error('Error saving payment settings:', error);
-      toast.error('Failed to save payment settings');
-    } finally {
-      setIsSaving(false);
+    switch (type) {
+      case "publicKey":
+        if (value.length < 10)
+          return "Public key must be at least 10 characters";
+        break;
+      case "secretKey":
+        if (value.length < 10)
+          return "Secret key must be at least 10 characters";
+        break;
+      case "hash":
+        if (value && value.length < 8)
+          return "Hash must be at least 8 characters";
+        break;
     }
+    return "";
   };
 
-  const saveGatewaySettings = async (gatewayId: string) => {
-    const gateway = paymentGateways.find(g => g.id === gatewayId);
-    if (!gateway) {
-      toast.error('Gateway not found');
-      return;
+  const validateGateway = (gateway: PaymentGateway): boolean => {
+    const errors: { [field: string]: string } = {};
+
+    if (gateway.id === "flutterwave") {
+      const publicKeyError = validateApiKey(
+        gateway.apiKeys.publicKey,
+        "publicKey",
+      );
+      const secretKeyError = validateApiKey(
+        gateway.apiKeys.secretKey,
+        "secretKey",
+      );
+      const hashError = validateApiKey(gateway.apiKeys.hash || "", "hash");
+
+      if (publicKeyError) errors.publicKey = publicKeyError;
+      if (secretKeyError) errors.secretKey = secretKeyError;
+      if (hashError) errors.hash = hashError;
     }
 
-    // Validate gateway before saving
+    if (gateway.id === "bank_transfer" && gateway.bankAccount) {
+      if (!gateway.bankAccount.bankName)
+        errors.bankName = "Bank name is required";
+      if (!gateway.bankAccount.accountNumber)
+        errors.accountNumber = "Account number is required";
+      if (!gateway.bankAccount.accountName)
+        errors.accountName = "Account name is required";
+    }
+
+    setValidationErrors((prev) => ({ ...prev, [gateway.id]: errors }));
+    return Object.keys(errors).length === 0;
+  };
+
+  const saveGateway = async (gateway: PaymentGateway) => {
     if (!validateGateway(gateway)) {
-      toast.error('Please fix validation errors before saving');
+      toast.error("Please fix validation errors before saving");
       return;
     }
 
-    setSavingGateway(gatewayId);
+    setSavingGateway(gateway.id);
     try {
-      const response = await fetch('/api/admin/payment-settings/gateway', {
-        method: 'POST',
+      const response = await fetch("/api/admin/payment-settings/gateway", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          gateway,
-        }),
+        body: JSON.stringify(gateway),
       });
 
       if (response.ok) {
-        toast.success(`${gateway.name} settings saved successfully!`);
-        await loadPaymentSettings(); // Reload to get updated status
+        toast.success(`${gateway.name} configuration saved successfully!`);
+        // Update the gateway status to active if save was successful
+        setPaymentGateways((prev) =>
+          prev.map((g) =>
+            g.id === gateway.id ? { ...g, status: "active" } : g,
+          ),
+        );
       } else {
         const error = await response.json();
-        toast.error(`${gateway.name} save failed: ${error.details || error.error || 'Unknown error'}`);
+        toast.error(`Failed to save ${gateway.name}: ${error.message}`);
       }
     } catch (error) {
-      console.error('Error saving gateway settings:', error);
-      toast.error('Failed to save gateway settings');
+      console.error("Error saving gateway:", error);
+      toast.error(`Failed to save ${gateway.name} configuration`);
     } finally {
       setSavingGateway(null);
     }
   };
 
-  const toggleGateway = async (gatewayId: string, enabled: boolean) => {
-    const gateway = paymentGateways.find(g => g.id === gatewayId);
-    
-    if (enabled) {
-      // Validate gateway before enabling
-      if (!validateGateway(gateway!)) {
-        toast.error('Please configure the gateway properly before enabling');
-        return;
-      }
-    }
-
-    const updatedGateways = paymentGateways.map(gateway =>
-      gateway.id === gatewayId ? { ...gateway, enabled } : gateway
-    );
-    setPaymentGateways(updatedGateways);
-
-    // Update supported gateways list
-    const enabledGateways = updatedGateways.filter(g => g.enabled).map(g => g.id);
-    setSettings(prev => ({
-      ...prev,
-      supportedGateways: enabledGateways,
-      defaultGateway: enabledGateways.includes(prev.defaultGateway) ? prev.defaultGateway : enabledGateways[0] || 'stripe',
-    }));
-
-    toast.success(`${gateway?.name} ${enabled ? 'enabled' : 'disabled'} successfully`);
-  };
-
-  const toggleTestMode = (gatewayId: string) => {
-    const gateway = paymentGateways.find(g => g.id === gatewayId);
-    const newTestMode = !gateway?.testMode;
-    
-    setPaymentGateways(prev =>
-      prev.map(gateway =>
-        gateway.id === gatewayId ? { ...gateway, testMode: newTestMode } : gateway
-      )
-    );
-
-    toast.success(`${gateway?.name} ${newTestMode ? 'test mode enabled' : 'test mode disabled'}`);
-  };
-
   const updateApiKey = (gatewayId: string, keyType: string, value: string) => {
-    setPaymentGateways(prev =>
-      prev.map(gateway =>
+    setPaymentGateways((prev) =>
+      prev.map((gateway) =>
         gateway.id === gatewayId
           ? {
               ...gateway,
@@ -345,172 +244,181 @@ export default function PaymentGatewayManagement() {
                 [keyType]: value,
               },
             }
-          : gateway
-      )
+          : gateway,
+      ),
     );
 
     // Clear validation error for this field
-    setValidationErrors(prev => ({
+    setValidationErrors((prev) => ({
       ...prev,
       [gatewayId]: {
         ...prev[gatewayId],
-        [keyType]: ''
-      }
+        [keyType]: "",
+      },
     }));
   };
 
-  const updateBankAccount = (gatewayId: string, field: string, value: string) => {
-    setPaymentGateways(prev =>
-      prev.map(gateway =>
+  const updateBankAccount = (
+    gatewayId: string,
+    field: string,
+    value: string,
+  ) => {
+    setPaymentGateways((prev) =>
+      prev.map((gateway) =>
         gateway.id === gatewayId
           ? {
               ...gateway,
               bankAccount: {
-                bankName: gateway.bankAccount?.bankName || '',
-                accountNumber: gateway.bankAccount?.accountNumber || '',
-                accountName: gateway.bankAccount?.accountName || '',
-                accountType: gateway.bankAccount?.accountType || '',
-                instructions: gateway.bankAccount?.instructions || '',
+                ...gateway.bankAccount!,
                 [field]: value,
               },
             }
-          : gateway
-      )
+          : gateway,
+      ),
     );
 
     // Clear validation error for this field
-    setValidationErrors(prev => ({
+    setValidationErrors((prev) => ({
       ...prev,
       [gatewayId]: {
         ...prev[gatewayId],
-        [field]: ''
-      }
+        [field]: "",
+      },
     }));
   };
 
-  const quickUpdateFlutterwave = async () => {
-    const flutterwaveGateway = paymentGateways.find(g => g.id === 'flutterwave');
-    if (!flutterwaveGateway) return;
-
-    // Update with the new configuration
-    const updatedGateway: PaymentGateway = {
-      ...flutterwaveGateway,
-      enabled: true,
-      testMode: false,
-      apiKeys: {
-        publicKey: 'FLWPUBK-9856cdb89cb82f5ce5de30877c7b3a89-X',
-        secretKey: 'FLWSECK-19415f8daa7a8fd3f74b0d71874cfad1-197781a61d6vt-X',
-        webhookSecret: '',
-        hash: '19415f8daa7ad132cd7680f7',
-      },
-      status: 'active' as const,
-    };
-
-    setPaymentGateways(prev =>
-      prev.map(g =>
-        g.id === 'flutterwave' ? updatedGateway : g
-      )
+  const toggleGateway = (gatewayId: string, enabled: boolean) => {
+    setPaymentGateways((prev) =>
+      prev.map((gateway) =>
+        gateway.id === gatewayId ? { ...gateway, enabled } : gateway,
+      ),
     );
+  };
 
-    toast.success('Flutterwave configuration updated with new keys!');
+  const toggleTestMode = (gatewayId: string) => {
+    setPaymentGateways((prev) =>
+      prev.map((gateway) =>
+        gateway.id === gatewayId
+          ? { ...gateway, testMode: !gateway.testMode }
+          : gateway,
+      ),
+    );
+  };
+
+  const setAsDefault = (gatewayId: string) => {
+    setPaymentSettings((prev) => ({ ...prev, defaultGateway: gatewayId }));
   };
 
   const testGatewayConnection = async (gatewayId: string) => {
-    const gateway = paymentGateways.find(g => g.id === gatewayId);
+    const gateway = paymentGateways.find((g) => g.id === gatewayId);
     if (!gateway) return;
 
     // Validate gateway before testing
     if (!validateGateway(gateway)) {
-      toast.error('Please fix validation errors before testing connection');
+      toast.error("Please fix validation errors before testing connection");
       return;
     }
 
     // For manual gateways like Bank Transfer, just update status
-    if (gatewayId === 'bank_transfer') {
-      setPaymentGateways(prev =>
-        prev.map(g =>
-          g.id === gatewayId ? { ...g, status: 'active' } : g
-        )
+    if (gatewayId === "bank_transfer") {
+      setPaymentGateways((prev) =>
+        prev.map((g) => (g.id === gatewayId ? { ...g, status: "active" } : g)),
       );
       toast.success(`${gateway.name} is ready for manual payment processing!`);
       return;
     }
 
     try {
-      const response = await fetch('/api/admin/payment-settings/test-connection', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        "/api/admin/payment-settings/test-connection",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            gatewayId,
+            apiKeys: gateway.apiKeys,
+            testMode: gateway.testMode,
+          }),
         },
-        body: JSON.stringify({
-          gatewayId,
-          apiKeys: gateway.apiKeys,
-          testMode: gateway.testMode,
-        }),
-      });
+      );
 
       if (response.ok) {
         toast.success(`${gateway.name} connection test successful!`);
         // Update gateway status
-        setPaymentGateways(prev =>
-          prev.map(g =>
-            g.id === gatewayId ? { ...g, status: 'active' } : g
-          )
+        setPaymentGateways((prev) =>
+          prev.map((g) =>
+            g.id === gatewayId ? { ...g, status: "active" } : g,
+          ),
         );
       } else {
         const error = await response.json();
         toast.error(`${gateway.name} connection test failed: ${error.message}`);
-        setPaymentGateways(prev =>
-          prev.map(g =>
-            g.id === gatewayId ? { ...g, status: 'error' } : g
-          )
+        setPaymentGateways((prev) =>
+          prev.map((g) => (g.id === gatewayId ? { ...g, status: "error" } : g)),
         );
       }
     } catch (error) {
-      console.error('Error testing gateway connection:', error);
+      console.error("Error testing gateway connection:", error);
       toast.error(`Failed to test ${gateway.name} connection`);
-      setPaymentGateways(prev =>
-        prev.map(g =>
-          g.id === gatewayId ? { ...g, status: 'error' } : g
-        )
+      setPaymentGateways((prev) =>
+        prev.map((g) => (g.id === gatewayId ? { ...g, status: "error" } : g)),
       );
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'inactive': return 'bg-gray-100 text-gray-800';
-      case 'error': return 'bg-red-100 text-red-800';
-      case 'testing': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "active":
+        return "bg-green-100 text-green-800";
+      case "inactive":
+        return "bg-gray-100 text-gray-800";
+      case "error":
+        return "bg-red-100 text-red-800";
+      case "testing":
+        return "bg-yellow-100 text-yellow-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'active': return 'ri-check-line';
-      case 'inactive': return 'ri-close-line';
-      case 'error': return 'ri-error-warning-line';
-      case 'testing': return 'ri-loader-4-line';
-      default: return 'ri-close-line';
+      case "active":
+        return "ri-check-line";
+      case "inactive":
+        return "ri-close-line";
+      case "error":
+        return "ri-error-warning-line";
+      case "testing":
+        return "ri-loader-4-line";
+      default:
+        return "ri-close-line";
     }
   };
 
   const renderGatewayCard = (gateway: PaymentGateway) => (
-    <div key={gateway.id} className="bg-white border border-gray-200 rounded-lg p-6">
+    <div
+      key={gateway.id}
+      className="bg-white border border-gray-200 rounded-lg p-6"
+    >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3">
           <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
             <i className={`${gateway.icon} text-2xl text-blue-600`}></i>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">{gateway.name}</h3>
+            <h3 className="text-lg font-semibold text-gray-900">
+              {gateway.name}
+            </h3>
             <p className="text-sm text-gray-600">{gateway.description}</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(gateway.status)}`}>
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(gateway.status)}`}
+          >
             <i className={`${getStatusIcon(gateway.status)} mr-1`}></i>
             {gateway.status}
           </span>
@@ -528,10 +436,15 @@ export default function PaymentGatewayManagement() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Supported Currencies</h4>
+          <h4 className="text-sm font-medium text-gray-700 mb-2">
+            Supported Currencies
+          </h4>
           <div className="flex flex-wrap gap-1">
-            {gateway.supportedCurrencies.map(currency => (
-              <span key={currency} className="px-2 py-1 bg-gray-100 text-xs rounded">
+            {gateway.supportedCurrencies.map((currency) => (
+              <span
+                key={currency}
+                className="px-2 py-1 bg-gray-100 text-xs rounded"
+              >
                 {currency}
               </span>
             ))}
@@ -540,8 +453,11 @@ export default function PaymentGatewayManagement() {
         <div>
           <h4 className="text-sm font-medium text-gray-700 mb-2">Features</h4>
           <div className="flex flex-wrap gap-1">
-            {gateway.features.map(feature => (
-              <span key={feature} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+            {gateway.features.map((feature) => (
+              <span
+                key={feature}
+                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded"
+              >
                 {feature}
               </span>
             ))}
@@ -553,7 +469,9 @@ export default function PaymentGatewayManagement() {
         <div className="flex items-center justify-between">
           <div>
             <h4 className="text-sm font-medium text-gray-700">Test Mode</h4>
-            <p className="text-xs text-gray-500">Use test API keys for development</p>
+            <p className="text-xs text-gray-500">
+              Use test API keys for development
+            </p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
@@ -568,28 +486,45 @@ export default function PaymentGatewayManagement() {
 
         <div className="space-y-3">
           {/* Only show API keys for card-based payment gateways */}
-          {gateway.id !== 'bank_transfer' && (
+          {gateway.id !== "bank_transfer" && (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Public Key {gateway.testMode && '(Test)'} *
+                  Public Key {gateway.testMode && "(Test)"} *
                 </label>
                 <div className="relative">
                   <input
-                    type={showApiKeys[`${gateway.id}_public`] ? 'text' : 'password'}
+                    type={
+                      showApiKeys[`${gateway.id}_public`] ? "text" : "password"
+                    }
                     value={gateway.apiKeys.publicKey}
-                    onChange={(e) => updateApiKey(gateway.id, 'publicKey', e.target.value)}
+                    onChange={(e) =>
+                      updateApiKey(gateway.id, "publicKey", e.target.value)
+                    }
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10 ${
-                      validationErrors[gateway.id]?.publicKey ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                      validationErrors[gateway.id]?.publicKey
+                        ? "border-red-300 focus:ring-red-500"
+                        : "border-gray-300"
                     }`}
                     placeholder={`${gateway.name} Public Key`}
                   />
                   <button
                     type="button"
-                    onClick={() => setShowApiKeys(prev => ({ ...prev, [`${gateway.id}_public`]: !prev[`${gateway.id}_public`] }))}
+                    onClick={() =>
+                      setShowApiKeys((prev) => ({
+                        ...prev,
+                        [`${gateway.id}_public`]: !prev[`${gateway.id}_public`],
+                      }))
+                    }
                     className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
                   >
-                    <i className={showApiKeys[`${gateway.id}_public`] ? 'ri-eye-off-line' : 'ri-eye-line'}></i>
+                    <i
+                      className={
+                        showApiKeys[`${gateway.id}_public`]
+                          ? "ri-eye-off-line"
+                          : "ri-eye-line"
+                      }
+                    ></i>
                   </button>
                 </div>
                 {validationErrors[gateway.id]?.publicKey && (
@@ -602,24 +537,41 @@ export default function PaymentGatewayManagement() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Secret Key {gateway.testMode && '(Test)'} *
+                  Secret Key {gateway.testMode && "(Test)"} *
                 </label>
                 <div className="relative">
                   <input
-                    type={showApiKeys[`${gateway.id}_secret`] ? 'text' : 'password'}
+                    type={
+                      showApiKeys[`${gateway.id}_secret`] ? "text" : "password"
+                    }
                     value={gateway.apiKeys.secretKey}
-                    onChange={(e) => updateApiKey(gateway.id, 'secretKey', e.target.value)}
+                    onChange={(e) =>
+                      updateApiKey(gateway.id, "secretKey", e.target.value)
+                    }
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10 ${
-                      validationErrors[gateway.id]?.secretKey ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                      validationErrors[gateway.id]?.secretKey
+                        ? "border-red-300 focus:ring-red-500"
+                        : "border-gray-300"
                     }`}
                     placeholder={`${gateway.name} Secret Key`}
                   />
                   <button
                     type="button"
-                    onClick={() => setShowApiKeys(prev => ({ ...prev, [`${gateway.id}_secret`]: !prev[`${gateway.id}_secret`] }))}
+                    onClick={() =>
+                      setShowApiKeys((prev) => ({
+                        ...prev,
+                        [`${gateway.id}_secret`]: !prev[`${gateway.id}_secret`],
+                      }))
+                    }
                     className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
                   >
-                    <i className={showApiKeys[`${gateway.id}_secret`] ? 'ri-eye-off-line' : 'ri-eye-line'}></i>
+                    <i
+                      className={
+                        showApiKeys[`${gateway.id}_secret`]
+                          ? "ri-eye-off-line"
+                          : "ri-eye-line"
+                      }
+                    ></i>
                   </button>
                 </div>
                 {validationErrors[gateway.id]?.secretKey && (
@@ -630,28 +582,48 @@ export default function PaymentGatewayManagement() {
                 )}
               </div>
 
-              {/* Flutterwave Hash Field */}
-              {gateway.id === 'flutterwave' && (
+              {/* Flutterwave Hash Field - Only one instance */}
+              {gateway.id === "flutterwave" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Hash Key {gateway.testMode && '(Test)'} *
+                    Hash Key {gateway.testMode && "(Test)"} *
+                    <span className="text-xs text-gray-500 ml-1">
+                      (Required for webhook verification)
+                    </span>
                   </label>
                   <div className="relative">
                     <input
-                      type={showApiKeys[`${gateway.id}_hash`] ? 'text' : 'password'}
-                      value={gateway.apiKeys.hash || ''}
-                      onChange={(e) => updateApiKey(gateway.id, 'hash', e.target.value)}
+                      type={
+                        showApiKeys[`${gateway.id}_hash`] ? "text" : "password"
+                      }
+                      value={gateway.apiKeys.hash || ""}
+                      onChange={(e) =>
+                        updateApiKey(gateway.id, "hash", e.target.value)
+                      }
                       className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10 ${
-                        validationErrors[gateway.id]?.hash ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                        validationErrors[gateway.id]?.hash
+                          ? "border-red-300 focus:ring-red-500"
+                          : "border-gray-300"
                       }`}
                       placeholder="Flutterwave Hash Key"
                     />
                     <button
                       type="button"
-                      onClick={() => setShowApiKeys(prev => ({ ...prev, [`${gateway.id}_hash`]: !prev[`${gateway.id}_hash`] }))}
+                      onClick={() =>
+                        setShowApiKeys((prev) => ({
+                          ...prev,
+                          [`${gateway.id}_hash`]: !prev[`${gateway.id}_hash`],
+                        }))
+                      }
                       className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
                     >
-                      <i className={showApiKeys[`${gateway.id}_hash`] ? 'ri-eye-off-line' : 'ri-eye-line'}></i>
+                      <i
+                        className={
+                          showApiKeys[`${gateway.id}_hash`]
+                            ? "ri-eye-off-line"
+                            : "ri-eye-line"
+                        }
+                      ></i>
                     </button>
                   </div>
                   {validationErrors[gateway.id]?.hash && (
@@ -662,33 +634,94 @@ export default function PaymentGatewayManagement() {
                   )}
                 </div>
               )}
+
+              {/* Webhook Secret for Flutterwave */}
+              {gateway.id === "flutterwave" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Webhook Secret {gateway.testMode && "(Test)"}
+                    <span className="text-gray-500 text-xs ml-1">
+                      (Optional)
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={
+                        showApiKeys[`${gateway.id}_webhook`]
+                          ? "text"
+                          : "password"
+                      }
+                      value={gateway.apiKeys.webhookSecret || ""}
+                      onChange={(e) =>
+                        updateApiKey(
+                          gateway.id,
+                          "webhookSecret",
+                          e.target.value,
+                        )
+                      }
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10 ${
+                        validationErrors[gateway.id]?.webhookSecret
+                          ? "border-red-300 focus:ring-red-500"
+                          : "border-gray-300"
+                      }`}
+                      placeholder="Webhook Secret (Optional)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowApiKeys((prev) => ({
+                          ...prev,
+                          [`${gateway.id}_webhook`]:
+                            !prev[`${gateway.id}_webhook`],
+                        }))
+                      }
+                      className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
+                    >
+                      <i
+                        className={
+                          showApiKeys[`${gateway.id}_webhook`]
+                            ? "ri-eye-off-line"
+                            : "ri-eye-line"
+                        }
+                      ></i>
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
           {/* Show manual gateway configuration for Bank Transfer */}
-          {gateway.id === 'bank_transfer' && (
+          {gateway.id === "bank_transfer" && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start space-x-3">
+              <div className="flex items-start space-x-3 mb-4">
                 <i className="ri-information-line text-blue-600 text-lg mt-0.5"></i>
                 <div>
-                  <h4 className="text-sm font-medium text-blue-900 mb-1">Manual Payment Gateway</h4>
+                  <h4 className="text-sm font-medium text-blue-900 mb-1">
+                    Manual Payment Gateway
+                  </h4>
                   <p className="text-sm text-blue-700">
-                    Bank Transfer is a manual payment gateway that doesn't require API keys. 
-                    Customers will upload proof of payment for manual verification by administrators.
+                    Bank Transfer is a manual payment gateway that doesn't
+                    require API keys. Customers will upload proof of payment for
+                    manual verification by administrators.
                   </p>
                 </div>
               </div>
-              <div className="mt-4 space-y-3">
+              <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Bank Name *
                   </label>
                   <input
                     type="text"
-                    value={gateway.bankAccount?.bankName || ''}
-                    onChange={(e) => updateBankAccount(gateway.id, 'bankName', e.target.value)}
+                    value={gateway.bankAccount?.bankName || ""}
+                    onChange={(e) =>
+                      updateBankAccount(gateway.id, "bankName", e.target.value)
+                    }
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      validationErrors[gateway.id]?.bankName ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                      validationErrors[gateway.id]?.bankName
+                        ? "border-red-300 focus:ring-red-500"
+                        : "border-gray-300"
                     }`}
                     placeholder="Enter Bank Name"
                   />
@@ -699,19 +732,27 @@ export default function PaymentGatewayManagement() {
                     </p>
                   )}
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Account Number *
                   </label>
                   <input
                     type="text"
-                    value={gateway.bankAccount?.accountNumber || ''}
-                    onChange={(e) => updateBankAccount(gateway.id, 'accountNumber', e.target.value)}
+                    value={gateway.bankAccount?.accountNumber || ""}
+                    onChange={(e) =>
+                      updateBankAccount(
+                        gateway.id,
+                        "accountNumber",
+                        e.target.value,
+                      )
+                    }
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      validationErrors[gateway.id]?.accountNumber ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                      validationErrors[gateway.id]?.accountNumber
+                        ? "border-red-300 focus:ring-red-500"
+                        : "border-gray-300"
                     }`}
-                    placeholder="Enter 10-digit Account Number"
-                    maxLength={10}
+                    placeholder="Enter Account Number"
                   />
                   {validationErrors[gateway.id]?.accountNumber && (
                     <p className="mt-1 text-sm text-red-600 flex items-center">
@@ -720,16 +761,25 @@ export default function PaymentGatewayManagement() {
                     </p>
                   )}
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Account Name *
                   </label>
                   <input
                     type="text"
-                    value={gateway.bankAccount?.accountName || ''}
-                    onChange={(e) => updateBankAccount(gateway.id, 'accountName', e.target.value)}
+                    value={gateway.bankAccount?.accountName || ""}
+                    onChange={(e) =>
+                      updateBankAccount(
+                        gateway.id,
+                        "accountName",
+                        e.target.value,
+                      )
+                    }
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      validationErrors[gateway.id]?.accountName ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                      validationErrors[gateway.id]?.accountName
+                        ? "border-red-300 focus:ring-red-500"
+                        : "border-gray-300"
                     }`}
                     placeholder="Enter Account Name"
                   />
@@ -740,223 +790,84 @@ export default function PaymentGatewayManagement() {
                     </p>
                   )}
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Account Type *
-                  </label>
-                  <select
-                    value={gateway.bankAccount?.accountType || ''}
-                    onChange={(e) => updateBankAccount(gateway.id, 'accountType', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      validationErrors[gateway.id]?.accountType ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                    }`}
-                  >
-                    <option value="">Select Account Type</option>
-                    <option value="Savings">Savings</option>
-                    <option value="Current">Current</option>
-                    <option value="Domiciliary">Domiciliary</option>
-                  </select>
-                  {validationErrors[gateway.id]?.accountType && (
-                    <p className="mt-1 text-sm text-red-600 flex items-center">
-                      <i className="ri-error-warning-line mr-1"></i>
-                      {validationErrors[gateway.id].accountType}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Editable Instructions Area for Bank Transfer */}
-          {gateway.id === 'bank_transfer' && (
-            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-start space-x-3 mb-3">
-                <i className="ri-file-text-line text-green-600 text-lg mt-0.5"></i>
-                <div>
-                  <h4 className="text-sm font-medium text-green-900 mb-1">Customer Instructions</h4>
-                  <p className="text-sm text-green-700">
-                    These instructions will be displayed to customers during checkout when they select Bank Transfer payment.
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-green-800 mb-1">
-                    Transfer Instructions
+                    Payment Instructions
                   </label>
                   <textarea
-                    value={gateway.bankAccount?.instructions || ''}
-                    onChange={(e) => updateBankAccount(gateway.id, 'instructions', e.target.value)}
-                    className="w-full px-3 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-                    rows={4}
-                    placeholder="Enter detailed instructions for customers on how to complete the bank transfer..."
+                    value={gateway.bankAccount?.instructions || ""}
+                    onChange={(e) =>
+                      updateBankAccount(
+                        gateway.id,
+                        "instructions",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows={3}
+                    placeholder="Instructions for customers making bank transfers"
                   />
-                  <p className="text-xs text-green-600 mt-1">
-                    Include account details, reference format, and any specific requirements.
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2 text-xs text-green-600">
-                  <i className="ri-information-line"></i>
-                  <span>These instructions will appear on the checkout page for Bank Transfer payments.</span>
+                  <div className="mt-1 text-xs text-gray-500 flex items-start">
+                    <i className="ri-information-line mr-1 mt-0.5"></i>
+                    <span>
+                      These instructions will appear on the checkout page for
+                      Bank Transfer payments.
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Show additional fields for specific gateways */}
-          {(gateway.id === 'stripe' || gateway.id === 'paystack') && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Webhook Secret {gateway.testMode && '(Test)'} <span className="text-gray-500 text-xs">(Optional)</span>
-              </label>
-              <div className="relative">
-                <input
-                  type={showApiKeys[`${gateway.id}_webhook`] ? 'text' : 'password'}
-                  value={gateway.apiKeys.webhookSecret || ''}
-                  onChange={(e) => updateApiKey(gateway.id, 'webhookSecret', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10 ${
-                    validationErrors[gateway.id]?.webhookSecret ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Webhook Secret (Optional)"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKeys(prev => ({ ...prev, [`${gateway.id}_webhook`]: !prev[`${gateway.id}_webhook`] }))}
-                  className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
-                >
-                  <i className={showApiKeys[`${gateway.id}_webhook`] ? 'ri-eye-off-line' : 'ri-eye-line'}></i>
-                </button>
-              </div>
-              {validationErrors[gateway.id]?.webhookSecret && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
-                  <i className="ri-error-warning-line mr-1"></i>
-                  {validationErrors[gateway.id].webhookSecret}
-                </p>
-              )}
-            </div>
-          )}
-
-          {gateway.id === 'flutterwave' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Hash {gateway.testMode && '(Test)'} <span className="text-gray-500 text-xs">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showApiKeys[`${gateway.id}_hash`] ? 'text' : 'password'}
-                    value={gateway.apiKeys.hash || ''}
-                    onChange={(e) => updateApiKey(gateway.id, 'hash', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10 ${
-                      validationErrors[gateway.id]?.hash ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Flutterwave Hash"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKeys(prev => ({ ...prev, [`${gateway.id}_hash`]: !prev[`${gateway.id}_hash`] }))}
-                    className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
-                  >
-                    <i className={showApiKeys[`${gateway.id}_hash`] ? 'ri-eye-off-line' : 'ri-eye-line'}></i>
-                  </button>
-                </div>
-                {validationErrors[gateway.id]?.hash && (
-                  <p className="mt-1 text-sm text-red-600 flex items-center">
-                    <i className="ri-error-warning-line mr-1"></i>
-                    {validationErrors[gateway.id].hash}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Webhook Secret {gateway.testMode && '(Test)'} <span className="text-gray-500 text-xs">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showApiKeys[`${gateway.id}_webhook`] ? 'text' : 'password'}
-                    value={gateway.apiKeys.webhookSecret || ''}
-                    onChange={(e) => updateApiKey(gateway.id, 'webhookSecret', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10 ${
-                      validationErrors[gateway.id]?.webhookSecret ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Webhook Secret (Optional)"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKeys(prev => ({ ...prev, [`${gateway.id}_webhook`]: !prev[`${gateway.id}_webhook`] }))}
-                    className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
-                  >
-                    <i className={showApiKeys[`${gateway.id}_webhook`] ? 'ri-eye-off-line' : 'ri-eye-line'}></i>
-                  </button>
-                </div>
-                {validationErrors[gateway.id]?.webhookSecret && (
-                  <p className="mt-1 text-sm text-red-600 flex items-center">
-                    <i className="ri-error-warning-line mr-1"></i>
-                    {validationErrors[gateway.id].webhookSecret}
-                  </p>
-                )}
-              </div>
-            </>
           )}
         </div>
 
-        <div className="flex space-x-2">
-          {/* Quick Update Button for Flutterwave */}
-          {gateway.id === 'flutterwave' && (
-            <button
-              onClick={quickUpdateFlutterwave}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-              title="Quick update with new Flutterwave configuration"
-            >
-              <i className="ri-refresh-line mr-2"></i>
-              Quick Update
-            </button>
-          )}
-          <button
-            onClick={() => testGatewayConnection(gateway.id)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <i className="ri-plug-line mr-2"></i>
-            {gateway.id === 'bank_transfer' ? 'Verify Setup' : 'Test Connection'}
-          </button>
-          <button
-            onClick={() => {
-              const dashboardUrls = {
-                flutterwave: 'https://dashboard.flutterwave.com/',
-                bank_transfer: '#',
-              };
-              window.open(dashboardUrls[gateway.id as keyof typeof dashboardUrls] || '#', '_blank');
-            }}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <i className="ri-external-link-line mr-2"></i>
-            Dashboard
-          </button>
-          <button
-            onClick={() => saveGatewaySettings(gateway.id)}
-            disabled={savingGateway === gateway.id}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {savingGateway === gateway.id ? (
-              <>
-                <i className="ri-loader-4-line animate-spin mr-2"></i>
-                Saving...
-              </>
-            ) : (
-              <>
-                <i className="ri-save-line mr-2"></i>
-                Save Settings
-              </>
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+          <div className="flex items-center space-x-2">
+            {paymentSettings.defaultGateway === gateway.id && (
+              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                <i className="ri-star-fill mr-1"></i>
+                Default
+              </span>
             )}
-          </button>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => testGatewayConnection(gateway.id)}
+              className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 flex items-center"
+            >
+              <i className="ri-wifi-line mr-1"></i>
+              Test Connection
+            </button>
+            <button
+              onClick={() => setAsDefault(gateway.id)}
+              disabled={paymentSettings.defaultGateway === gateway.id}
+              className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              <i className="ri-star-line mr-1"></i>
+              Set Default
+            </button>
+            <button
+              onClick={() => saveGateway(gateway)}
+              disabled={savingGateway === gateway.id}
+              className="px-3 py-1 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              {savingGateway === gateway.id ? (
+                <>
+                  <i className="ri-loader-4-line animate-spin mr-1"></i>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <i className="ri-save-line mr-1"></i>
+                  Save
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
-
-  const tabs = [
-    { id: 'gateways', label: 'Payment Gateways', icon: 'ri-bank-card-line' },
-  ];
 
   if (isLoading) {
     return (
@@ -970,34 +881,96 @@ export default function PaymentGatewayManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Payment Gateway Management</h3>
-          <p className="text-sm text-gray-600">Configure payment gateways and processing settings</p>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Payment Gateway Management
+          </h3>
+          <p className="text-sm text-gray-600">
+            Configure payment gateways and processing settings
+          </p>
         </div>
-        <button
-          onClick={savePaymentSettings}
-          disabled={isSaving}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {isSaving ? (
-            <>
-              <i className="ri-loader-4-line animate-spin mr-2"></i>
-              Saving...
-            </>
-          ) : (
-            <>
-              <i className="ri-save-line mr-2"></i>
-              Save Settings
-            </>
-          )}
-        </button>
       </div>
 
-      {/* Content */}
-      <div className="max-w-4xl">
-        <div className="space-y-6">
-          {paymentGateways.map(renderGatewayCard)}
+      {/* Payment Settings Summary */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h4 className="text-lg font-medium text-gray-900 mb-4">
+          Payment Configuration
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Default Gateway
+            </label>
+            <select
+              value={paymentSettings.defaultGateway}
+              onChange={(e) =>
+                setPaymentSettings((prev) => ({
+                  ...prev,
+                  defaultGateway: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {paymentGateways
+                .filter((g) => g.enabled)
+                .map((gateway) => (
+                  <option key={gateway.id} value={gateway.id}>
+                    {gateway.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Currency
+            </label>
+            <select
+              value={paymentSettings.currency}
+              onChange={(e) =>
+                setPaymentSettings((prev) => ({
+                  ...prev,
+                  currency: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="NGN">Nigerian Naira (NGN)</option>
+              <option value="USD">US Dollar (USD)</option>
+              <option value="EUR">Euro (EUR)</option>
+              <option value="GBP">British Pound (GBP)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tax Rate (%)
+            </label>
+            <input
+              type="number"
+              step="0.1"
+              value={paymentSettings.taxRate}
+              onChange={(e) =>
+                setPaymentSettings((prev) => ({
+                  ...prev,
+                  taxRate: parseFloat(e.target.value) || 0,
+                }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="7.5"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Payment Gateways */}
+      <div className="space-y-6">
+        <div>
+          <h4 className="text-lg font-medium text-gray-900 mb-4">
+            Payment Gateways
+          </h4>
+          <div className="space-y-6">
+            {paymentGateways.map(renderGatewayCard)}
+          </div>
         </div>
       </div>
     </div>
   );
-} 
+}

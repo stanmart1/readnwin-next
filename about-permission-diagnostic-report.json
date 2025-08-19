@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-08-19T16:30:19.747Z",
+  "checks": {
+    "databaseConnection": true,
+    "permissionExists": false,
+    "rolesExist": true,
+    "permissionAssigned": false,
+    "permissionRetrievable": false,
+    "frontendConfiguration": true
+  },
+  "actions": [],
+  "recommendations": [
+    "Create content.aboutus permission in database",
+    "Assign content.aboutus permission to admin roles",
+    "Fix permission retrieval query or user role assignments"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-08-19T16:34:05.764Z",
+  "score": 80,
+  "results": {
+    "aboutPage": true,
+    "apiRoutes": true,
+    "adminComponents": true,
+    "contentStructure": true,
+    "syncMechanism": true,
+    "assetDirectories": true,
+    "databaseConnectivity": false,
+    "securityFeatures": true,
+    "performanceOptimizations": true,
+    "buildTest": false
+  },
+  "duration": "150.37",
+  "recommendations": [
+    {
+      "priority": "high",
+      "category": "build",
+      "message": "Fix build errors",
+      "action": "Resolve TypeScript and compilation issues"
+    }
+  ]
+}

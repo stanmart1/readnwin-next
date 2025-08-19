@@ -1,11 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { toast } from 'react-hot-toast';
-import AboutManagement from './AboutManagement';
-import AboutUsSectionsManagement from './AboutUsSectionsManagement';
+import React, { useState, useEffect } from "react";
+import AboutManagement from "./AboutManagement";
+import AboutUsSectionsManagement from "./AboutUsSectionsManagement";
 
-type TabType = 'page' | 'sections';
+type TabType = "page" | "sections";
 
 interface TabConfig {
   id: TabType;
@@ -16,22 +15,21 @@ interface TabConfig {
 
 const TABS: TabConfig[] = [
   {
-    id: 'page',
-    label: 'About Page',
-    icon: 'ri-file-text-line',
-    description: 'Manage the main about page layout and content'
+    id: "page",
+    label: "About Page",
+    icon: "ri-file-text-line",
+    description: "Manage the main about page layout and content",
   },
   {
-    id: 'sections',
-    label: 'About Sections',
-    icon: 'ri-list-check-line',
-    description: 'Manage individual about us sections'
-  }
+    id: "sections",
+    label: "About Sections",
+    icon: "ri-list-check-line",
+    description: "Manage individual about us sections",
+  },
 ];
 
 export default function EnhancedAboutManagement() {
-  const [activeTab, setActiveTab] = useState<TabType>('page');
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>("page");
 
   // Check if user has proper permissions for about management
   const [hasPermission, setHasPermission] = useState(true);
@@ -47,8 +45,12 @@ export default function EnhancedAboutManagement() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <i className="ri-lock-line text-4xl text-gray-400 mb-4"></i>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Access Denied</h3>
-          <p className="text-gray-500">You don't have permission to manage about content.</p>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Access Denied
+          </h3>
+          <p className="text-gray-500">
+            You don&apos;t have permission to manage about content.
+          </p>
         </div>
       </div>
     );
@@ -60,9 +62,11 @@ export default function EnhancedAboutManagement() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">About Management</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              About Management
+            </h1>
             <p className="text-gray-600 mt-1">
-              Manage your website's about page content and sections
+              Manage your website&apos;s about page content and sections
             </p>
           </div>
 
@@ -83,9 +87,10 @@ export default function EnhancedAboutManagement() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`
                   flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                  ${activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ${
+                    activeTab === tab.id
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   }
                 `}
               >
@@ -99,30 +104,32 @@ export default function EnhancedAboutManagement() {
         {/* Tab Descriptions */}
         <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
           <p className="text-sm text-gray-600">
-            {TABS.find(tab => tab.id === activeTab)?.description}
+            {TABS.find((tab) => tab.id === activeTab)?.description}
           </p>
         </div>
 
         {/* Tab Content */}
         <div className="p-6">
-          {activeTab === 'page' && (
+          {activeTab === "page" && (
             <div className="space-y-6">
               <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">
                 <i className="ri-information-line"></i>
                 <span>
-                  This manages the overall about page layout, hero sections, and structured content.
+                  This manages the overall about page layout, hero sections, and
+                  structured content.
                 </span>
               </div>
               <AboutManagement />
             </div>
           )}
 
-          {activeTab === 'sections' && (
+          {activeTab === "sections" && (
             <div className="space-y-6">
               <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg">
                 <i className="ri-information-line"></i>
                 <span>
-                  This manages individual about us sections like mission, vision, team, etc.
+                  This manages individual about us sections like mission,
+                  vision, team, etc.
                 </span>
               </div>
               <AboutUsSectionsManagement />
@@ -140,7 +147,9 @@ export default function EnhancedAboutManagement() {
             </div>
             <div>
               <h3 className="font-medium text-gray-900">About Page</h3>
-              <p className="text-sm text-gray-500">Main page content & layout</p>
+              <p className="text-sm text-gray-500">
+                Main page content & layout
+              </p>
             </div>
           </div>
         </div>
@@ -163,16 +172,24 @@ export default function EnhancedAboutManagement() {
         <div className="flex items-start gap-3">
           <i className="ri-lightbulb-line text-xl text-blue-600 mt-0.5"></i>
           <div>
-            <h3 className="font-medium text-blue-900 mb-2">About Management Guide</h3>
+            <h3 className="font-medium text-blue-900 mb-2">
+              About Management Guide
+            </h3>
             <div className="space-y-2 text-sm text-blue-800">
               <p>
-                <strong>About Page:</strong> Manage the overall page structure, hero sections, mission grids, statistics, and team layouts. This controls the main about page appearance.
+                <strong>About Page:</strong> Manage the overall page structure,
+                hero sections, mission grids, statistics, and team layouts. This
+                controls the main about page appearance.
               </p>
               <p>
-                <strong>About Sections:</strong> Manage individual content sections like mission, vision, story, team info, and values. These are displayed as structured content blocks.
+                <strong>About Sections:</strong> Manage individual content
+                sections like mission, vision, story, team info, and values.
+                These are displayed as structured content blocks.
               </p>
               <p>
-                <strong>Best Practices:</strong> Keep content concise, update sections regularly, and ensure consistency between page layout and individual sections.
+                <strong>Best Practices:</strong> Keep content concise, update
+                sections regularly, and ensure consistency between page layout
+                and individual sections.
               </p>
             </div>
           </div>

@@ -1,36 +1,39 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]/route';
-import { rbacService } from '@/lib/rbac';
-import { query } from '@/utils/database';
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { rbacService } from "@/utils/rbac-service";
+import { query } from "@/utils/database";
 
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check permission
     const hasPermission = await rbacService.hasPermission(
       parseInt(session.user.id),
-      'content.aboutus'
+      "content.aboutus",
     );
 
     if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Insufficient permissions" },
+        { status: 403 },
+      );
     }
 
     const result = await query(
-      'SELECT * FROM about_us ORDER BY sort_order, id'
+      "SELECT * FROM about_us ORDER BY sort_order, id",
     );
 
     return NextResponse.json(result.rows);
   } catch (error) {
-    console.error('Error fetching about us content:', error);
+    console.error("Error fetching about us content:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch about us content' },
-      { status: 500 }
+      { error: "Failed to fetch about us content" },
+      { status: 500 },
     );
   }
 }
@@ -39,26 +42,36 @@ export async function POST(request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check permission
     const hasPermission = await rbacService.hasPermission(
       parseInt(session.user.id),
-      'content.aboutus'
+      "content.aboutus",
     );
 
     if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Insufficient permissions" },
+        { status: 403 },
+      );
     }
 
     const body = await request.json();
-    const { section, title, content, image_url, sort_order = 0, is_active = true } = body;
+    const {
+      section,
+      title,
+      content,
+      image_url,
+      sort_order = 0,
+      is_active = true,
+    } = body;
 
     if (!section || !title || !content) {
       return NextResponse.json(
-        { error: 'Section, title, and content are required' },
-        { status: 400 }
+        { error: "Section, title, and content are required" },
+        { status: 400 },
       );
     }
 
@@ -66,21 +79,29 @@ export async function POST(request) {
       `INSERT INTO about_us (section, title, content, image_url, sort_order, is_active, created_by, updated_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
        RETURNING *`,
-      [section, title, content, image_url, sort_order, is_active, session.user.id]
+      [
+        section,
+        title,
+        content,
+        image_url,
+        sort_order,
+        is_active,
+        session.user.id,
+      ],
     );
 
     return NextResponse.json(result.rows[0]);
   } catch (error) {
-    console.error('Error creating about us content:', error);
-    if (error.code === '23505') {
+    console.error("Error creating about us content:", error);
+    if (error.code === "23505") {
       return NextResponse.json(
-        { error: 'Section already exists' },
-        { status: 409 }
+        { error: "Section already exists" },
+        { status: 409 },
       );
     }
     return NextResponse.json(
-      { error: 'Failed to create about us content' },
-      { status: 500 }
+      { error: "Failed to create about us content" },
+      { status: 500 },
     );
   }
 }
@@ -89,26 +110,30 @@ export async function PUT(request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check permission
     const hasPermission = await rbacService.hasPermission(
       parseInt(session.user.id),
-      'content.aboutus'
+      "content.aboutus",
     );
 
     if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Insufficient permissions" },
+        { status: 403 },
+      );
     }
 
     const body = await request.json();
-    const { id, section, title, content, image_url, sort_order, is_active } = body;
+    const { id, section, title, content, image_url, sort_order, is_active } =
+      body;
 
     if (!id) {
       return NextResponse.json(
-        { error: 'ID is required for updates' },
-        { status: 400 }
+        { error: "ID is required for updates" },
+        { status: 400 },
       );
     }
 
@@ -124,22 +149,31 @@ export async function PUT(request) {
            updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
-      [id, section, title, content, image_url, sort_order, is_active, session.user.id]
+      [
+        id,
+        section,
+        title,
+        content,
+        image_url,
+        sort_order,
+        is_active,
+        session.user.id,
+      ],
     );
 
     if (result.rows.length === 0) {
       return NextResponse.json(
-        { error: 'About us section not found' },
-        { status: 404 }
+        { error: "About us section not found" },
+        { status: 404 },
       );
     }
 
     return NextResponse.json(result.rows[0]);
   } catch (error) {
-    console.error('Error updating about us content:', error);
+    console.error("Error updating about us content:", error);
     return NextResponse.json(
-      { error: 'Failed to update about us content' },
-      { status: 500 }
+      { error: "Failed to update about us content" },
+      { status: 500 },
     );
   }
 }
@@ -148,47 +182,49 @@ export async function DELETE(request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check permission
     const hasPermission = await rbacService.hasPermission(
       parseInt(session.user.id),
-      'content.aboutus'
+      "content.aboutus",
     );
 
     if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-
-    if (!id) {
       return NextResponse.json(
-        { error: 'ID is required' },
-        { status: 400 }
+        { error: "Insufficient permissions" },
+        { status: 403 },
       );
     }
 
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "ID is required" }, { status: 400 });
+    }
+
     const result = await query(
-      'DELETE FROM about_us WHERE id = $1 RETURNING *',
-      [id]
+      "DELETE FROM about_us WHERE id = $1 RETURNING *",
+      [id],
     );
 
     if (result.rows.length === 0) {
       return NextResponse.json(
-        { error: 'About us section not found' },
-        { status: 404 }
+        { error: "About us section not found" },
+        { status: 404 },
       );
     }
 
-    return NextResponse.json({ message: 'About us section deleted successfully' });
+    return NextResponse.json({
+      message: "About us section deleted successfully",
+    });
   } catch (error) {
-    console.error('Error deleting about us content:', error);
+    console.error("Error deleting about us content:", error);
     return NextResponse.json(
-      { error: 'Failed to delete about us content' },
-      { status: 500 }
+      { error: "Failed to delete about us content" },
+      { status: 500 },
     );
   }
 }

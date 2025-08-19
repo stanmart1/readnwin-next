@@ -1,27 +1,27 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Plus, 
-  Highlighter, 
-  StickyNote, 
-  Bookmark, 
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Plus,
+  Highlighter,
+  StickyNote,
+  Bookmark,
   Volume2,
   VolumeX,
   Play,
   Pause,
   ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
-import { useReaderStore } from '@/stores/readerStore';
+  ChevronRight,
+} from "lucide-react";
+import { useReaderStore } from "@/stores/readerStore";
 
 export default function FloatingActionButtons() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [selectedText, setSelectedText] = useState('');
+  const [selectedText, setSelectedText] = useState("");
   const [isTextToSpeechActive, setIsTextToSpeechActive] = useState(false);
-  
-  const { 
+
+  const {
     currentBook,
     addHighlight,
     addNote,
@@ -31,7 +31,7 @@ export default function FloatingActionButtons() {
     navigateToPreviousPage,
     navigateToNextPage,
     getCurrentPage,
-    getTotalPages
+    getTotalPages,
   } = useReaderStore();
 
   // Get current page and total pages
@@ -39,13 +39,14 @@ export default function FloatingActionButtons() {
   const totalPages = getTotalPages();
 
   // Handle text selection
-  const handleTextSelection = () => {
-    const selection = window.getSelection();
-    if (selection && selection.toString().trim()) {
-      setSelectedText(selection.toString().trim());
-      setIsExpanded(true);
-    }
-  };
+  // Text selection handler (currently unused but kept for future implementation)
+  // const handleTextSelection = () => {
+  //   const selection = window.getSelection();
+  //   if (selection && selection.toString().trim()) {
+  //     setSelectedText(selection.toString().trim());
+  //     setIsExpanded(true);
+  //   }
+  // };
 
   // Add highlight from selected text
   const handleAddHighlight = () => {
@@ -53,15 +54,15 @@ export default function FloatingActionButtons() {
 
     addHighlight({
       bookId: currentBook.id,
-      userId: '', // Will be set by the store
+      userId: "", // Will be set by the store
       startOffset: 0, // Would be calculated from selection
       endOffset: selectedText.length,
-      selectedText,
-      color: 'yellow',
-      pageNumber: Math.floor(currentPosition / 1000), // Approximate page
+      text: selectedText,
+      color: "yellow",
+      position: currentPosition,
     });
 
-    setSelectedText('');
+    setSelectedText("");
     setIsExpanded(false);
     window.getSelection()?.removeAllRanges();
   };
@@ -70,17 +71,17 @@ export default function FloatingActionButtons() {
   const handleAddNote = () => {
     if (!currentBook) return;
 
-    const noteContent = selectedText || 'Quick note';
+    const noteContent = selectedText || "Quick note";
     addNote({
       bookId: currentBook.id,
-      userId: '', // Will be set by the store
+      userId: "", // Will be set by the store
+      title: "Reading Note",
       content: noteContent,
-      type: 'general',
+      tags: [],
       position: currentPosition,
-      pageNumber: Math.floor(currentPosition / 1000), // Approximate page
     });
 
-    setSelectedText('');
+    setSelectedText("");
     setIsExpanded(false);
     window.getSelection()?.removeAllRanges();
   };
@@ -91,14 +92,14 @@ export default function FloatingActionButtons() {
 
     addBookmark({
       bookId: currentBook.id,
-      userId: '', // Will be set by the store
+      userId: "", // Will be set by the store
       title: `Page ${currentPage}`,
       description: `Bookmark for page ${currentPage}`,
       position: currentPosition,
       pageNumber: currentPage,
     });
 
-    setSelectedText('');
+    setSelectedText("");
     setIsExpanded(false);
     window.getSelection()?.removeAllRanges();
   };
@@ -115,18 +116,18 @@ export default function FloatingActionButtons() {
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0, scale: 0.8 },
-    visible: { opacity: 1, scale: 1 }
+    visible: { opacity: 1, scale: 1 },
   };
 
   const buttonVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
+    visible: { opacity: 1, y: 0 },
   };
 
   const themeClasses = {
-    light: 'bg-white text-gray-800 shadow-lg',
-    dark: 'bg-gray-800 text-gray-200 shadow-lg',
-    sepia: 'bg-amber-100 text-amber-800 shadow-lg',
+    light: "bg-white text-gray-800 shadow-lg",
+    dark: "bg-gray-800 text-gray-200 shadow-lg",
+    sepia: "bg-amber-100 text-amber-800 shadow-lg",
   };
 
   return (
@@ -234,9 +235,11 @@ export default function FloatingActionButtons() {
       </motion.button>
 
       {/* Page Indicator */}
-      <div className={`absolute -top-12 right-0 ${themeClasses[settings.theme]} px-3 py-1 rounded-lg text-sm font-medium shadow-lg`}>
+      <div
+        className={`absolute -top-12 right-0 ${themeClasses[settings.theme]} px-3 py-1 rounded-lg text-sm font-medium shadow-lg`}
+      >
         {currentPage} / {totalPages}
       </div>
     </div>
   );
-} 
+}

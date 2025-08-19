@@ -1,24 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { rbacService } from '@/utils/rbac-service';
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { rbacService } from "@/utils/rbac-service";
 
 export async function GET(request: NextRequest) {
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check permission
     const hasPermission = await rbacService.hasPermission(
       parseInt(session.user.id),
-      'permissions.read'
+      "permissions.read",
     );
-    
+
     if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Insufficient permissions" },
+        { status: 403 },
+      );
     }
 
     // Get permissions
@@ -27,24 +30,23 @@ export async function GET(request: NextRequest) {
     // Log audit event
     await rbacService.logAuditEvent(
       parseInt(session.user.id),
-      'permissions.list',
-      'permissions',
+      "permissions.list",
+      "permissions",
       undefined,
       undefined,
-      request.headers.get('x-forwarded-for') || request.ip,
-      request.headers.get('user-agent')
+      request.headers.get("x-forwarded-for") || request.ip || undefined,
+      request.headers.get("user-agent") || undefined,
     );
 
     return NextResponse.json({
       success: true,
-      permissions
+      permissions,
     });
-
   } catch (error) {
-    console.error('Error fetching permissions:', error);
+    console.error("Error fetching permissions:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }
@@ -54,17 +56,20 @@ export async function POST(request: NextRequest) {
     // Verify authentication
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check permission
     const hasPermission = await rbacService.hasPermission(
       parseInt(session.user.id),
-      'permissions.create'
+      "permissions.create",
     );
-    
+
     if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Insufficient permissions" },
+        { status: 403 },
+      );
     }
 
     // Get request body
@@ -74,8 +79,8 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!name || !display_name || !resource || !action) {
       return NextResponse.json(
-        { error: 'Name, display name, resource, and action are required' },
-        { status: 400 }
+        { error: "Name, display name, resource, and action are required" },
+        { status: 400 },
       );
     }
 
@@ -86,31 +91,30 @@ export async function POST(request: NextRequest) {
       description,
       resource,
       action,
-      scope: scope || 'global'
+      scope: scope || "global",
     });
 
     // Log audit event
     await rbacService.logAuditEvent(
       parseInt(session.user.id),
-      'permissions.create',
-      'permissions',
+      "permissions.create",
+      "permissions",
       permission.id,
       { name, display_name, resource, action, scope },
-      request.headers.get('x-forwarded-for') || request.ip,
-      request.headers.get('user-agent')
+      request.headers.get("x-forwarded-for") || request.ip || undefined,
+      request.headers.get("user-agent") || undefined,
     );
 
     return NextResponse.json({
       success: true,
       permission,
-      message: 'Permission created successfully'
+      message: "Permission created successfully",
     });
-
   } catch (error) {
-    console.error('Error creating permission:', error);
+    console.error("Error creating permission:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
-} 
+}

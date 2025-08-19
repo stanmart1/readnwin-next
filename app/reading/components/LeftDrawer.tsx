@@ -1,20 +1,20 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useEReaderStore } from '@/stores/ereaderStore';
-import { 
-  StickyNote, 
-  Bookmark, 
-  Search, 
-  Filter, 
-  Download, 
-  X, 
-  Edit3, 
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useEReaderStore } from "@/stores/ereaderStore";
+import {
+  StickyNote,
+  Bookmark,
+  Search,
+  Filter,
+  Download,
+  X,
+  Edit3,
   Trash2,
   Calendar,
-  Tag
-} from 'lucide-react';
+  Tag,
+} from "lucide-react";
 
 export default function LeftDrawer() {
   const {
@@ -29,43 +29,53 @@ export default function LeftDrawer() {
     updateNote,
   } = useEReaderStore();
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'recent' | 'favorites'>('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState<"all" | "recent" | "favorites">(
+    "all",
+  );
   const [editingNote, setEditingNote] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState('');
+  const [editContent, setEditContent] = useState("");
 
   const isOpen = drawerState.leftDrawer.isOpen;
   const activeTab = drawerState.leftDrawer.activeTab;
 
   // Filter notes and highlights based on search and filter
   const filteredNotes = notes
-    .filter(note => note.bookId === currentBook?.id)
-    .filter(note => 
-      note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchTerm.toLowerCase())
+    .filter((note) => note.bookId === currentBook?.id)
+    .filter(
+      (note) =>
+        note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        note.content.toLowerCase().includes(searchTerm.toLowerCase()),
     )
-    .filter(note => {
-      if (filterType === 'recent') {
+    .filter((note) => {
+      if (filterType === "recent") {
         const oneWeekAgo = new Date();
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
         return new Date(note.createdAt) > oneWeekAgo;
       }
       return true;
     })
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
 
   const filteredHighlights = highlights
-    .filter(highlight => highlight.bookId === currentBook?.id)
-    .filter(highlight => 
-      highlight.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      highlight.note?.toLowerCase().includes(searchTerm.toLowerCase())
+    .filter((highlight) => highlight.bookId === currentBook?.id)
+    .filter(
+      (highlight) =>
+        highlight.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        highlight.note?.toLowerCase().includes(searchTerm.toLowerCase()),
     )
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
 
   const handleNoteEdit = (noteId: string, content: string) => {
     updateNote(noteId, { content });
     setEditingNote(null);
-    setEditContent('');
+    setEditContent("");
   };
 
   const handleExport = () => {
@@ -74,12 +84,14 @@ export default function LeftDrawer() {
       highlights: filteredHighlights,
       exportDate: new Date().toISOString(),
     };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `${currentBook?.title || 'book'}-notes-highlights.json`;
+    a.download = `${currentBook?.title || "book"}-notes-highlights.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -94,15 +106,15 @@ export default function LeftDrawer() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black bg-opacity-50 z-40"
-            onClick={() => toggleDrawer('left', false)}
+            onClick={() => toggleDrawer("left", false)}
           />
-          
+
           {/* Drawer */}
           <motion.div
             initial={{ x: -400 }}
             animate={{ x: 0 }}
             exit={{ x: -400 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className="fixed left-0 top-0 h-full w-80 max-w-[90vw] bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 z-50 flex flex-col"
           >
             {/* Header */}
@@ -111,7 +123,7 @@ export default function LeftDrawer() {
                 Notes & Highlights
               </h2>
               <button
-                onClick={() => toggleDrawer('left', false)}
+                onClick={() => toggleDrawer("left", false)}
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 <X className="w-5 h-5" />
@@ -130,24 +142,24 @@ export default function LeftDrawer() {
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div className="flex space-x-2">
                 <button
-                  onClick={() => setFilterType('all')}
+                  onClick={() => setFilterType("all")}
                   className={`px-3 py-1 rounded-md text-sm ${
-                    filterType === 'all'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    filterType === "all"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                   }`}
                 >
                   All
                 </button>
                 <button
-                  onClick={() => setFilterType('recent')}
+                  onClick={() => setFilterType("recent")}
                   className={`px-3 py-1 rounded-md text-sm ${
-                    filterType === 'recent'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    filterType === "recent"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                   }`}
                 >
                   Recent
@@ -158,11 +170,11 @@ export default function LeftDrawer() {
             {/* Tabs */}
             <div className="flex border-b border-gray-200 dark:border-gray-700">
               <button
-                onClick={() => setDrawerTab('left', 'notes')}
+                onClick={() => setDrawerTab("left", "notes")}
                 className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 ${
-                  activeTab === 'notes'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                  activeTab === "notes"
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
                 <div className="flex items-center justify-center space-x-2">
@@ -171,11 +183,11 @@ export default function LeftDrawer() {
                 </div>
               </button>
               <button
-                onClick={() => setDrawerTab('left', 'highlights')}
+                onClick={() => setDrawerTab("left", "highlights")}
                 className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 ${
-                  activeTab === 'highlights'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                  activeTab === "highlights"
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
                 <div className="flex items-center justify-center space-x-2">
@@ -187,7 +199,7 @@ export default function LeftDrawer() {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto">
-              {activeTab === 'notes' && (
+              {activeTab === "notes" && (
                 <div className="p-4 space-y-4">
                   {filteredNotes.length === 0 ? (
                     <div className="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -212,7 +224,9 @@ export default function LeftDrawer() {
                             />
                             <div className="flex space-x-2">
                               <button
-                                onClick={() => handleNoteEdit(note.id, editContent)}
+                                onClick={() =>
+                                  handleNoteEdit(note.id, editContent)
+                                }
                                 className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm"
                               >
                                 Save
@@ -220,7 +234,7 @@ export default function LeftDrawer() {
                               <button
                                 onClick={() => {
                                   setEditingNote(null);
-                                  setEditContent('');
+                                  setEditContent("");
                                 }}
                                 className="px-3 py-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md text-sm"
                               >
@@ -256,7 +270,9 @@ export default function LeftDrawer() {
                               {note.content}
                             </p>
                             <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                              <span>{new Date(note.createdAt).toLocaleDateString()}</span>
+                              <span>
+                                {new Date(note.createdAt).toLocaleDateString()}
+                              </span>
                               {note.tags.length > 0 && (
                                 <div className="flex space-x-1">
                                   {note.tags.slice(0, 2).map((tag) => (
@@ -278,13 +294,15 @@ export default function LeftDrawer() {
                 </div>
               )}
 
-              {activeTab === 'highlights' && (
+              {activeTab === "highlights" && (
                 <div className="p-4 space-y-4">
                   {filteredHighlights.length === 0 ? (
                     <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                       <Bookmark className="w-12 h-12 mx-auto mb-3 opacity-50" />
                       <p>No highlights yet</p>
-                      <p className="text-sm">Select text to create a highlight</p>
+                      <p className="text-sm">
+                        Select text to create a highlight
+                      </p>
                     </div>
                   ) : (
                     filteredHighlights.map((highlight) => (
@@ -296,16 +314,23 @@ export default function LeftDrawer() {
                           <div
                             className="w-4 h-4 rounded-full mr-3 mt-1"
                             style={{
-                              backgroundColor: highlight.color === 'yellow' ? '#fbbf24' :
-                                              highlight.color === 'green' ? '#34d399' :
-                                              highlight.color === 'blue' ? '#60a5fa' :
-                                              highlight.color === 'pink' ? '#f472b6' :
-                                              highlight.color === 'purple' ? '#a78bfa' : '#fbbf24'
+                              backgroundColor:
+                                highlight.color === "yellow"
+                                  ? "#fbbf24"
+                                  : highlight.color === "green"
+                                    ? "#34d399"
+                                    : highlight.color === "blue"
+                                      ? "#60a5fa"
+                                      : highlight.color === "pink"
+                                        ? "#f472b6"
+                                        : highlight.color === "purple"
+                                          ? "#a78bfa"
+                                          : "#fbbf24",
                             }}
                           />
                           <div className="flex-1">
                             <p className="text-sm text-gray-900 dark:text-white mb-2">
-                              "{highlight.text}"
+                              &quot;{highlight.text}&quot;
                             </p>
                             {highlight.note && (
                               <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">
@@ -313,7 +338,11 @@ export default function LeftDrawer() {
                               </p>
                             )}
                             <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                              <span>{new Date(highlight.createdAt).toLocaleDateString()}</span>
+                              <span>
+                                {new Date(
+                                  highlight.createdAt,
+                                ).toLocaleDateString()}
+                              </span>
                               <button
                                 onClick={() => removeHighlight(highlight.id)}
                                 className="p-1 text-gray-400 hover:text-red-600"
@@ -345,4 +374,4 @@ export default function LeftDrawer() {
       )}
     </AnimatePresence>
   );
-} 
+}

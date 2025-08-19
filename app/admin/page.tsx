@@ -135,7 +135,7 @@ export default function AdminDashboard() {
               Access Denied
             </h2>
             <p className="text-gray-600">
-              You don't have permission to access this section.
+              You don&apos;t have permission to access this section.
             </p>
           </div>
         </div>

@@ -33,6 +33,7 @@ export default function UserLibrary() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
 
   // Fetch user's library
   useEffect(() => {

@@ -1,15 +1,9 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useEReaderStore } from '@/stores/ereaderStore';
-import {
-  Highlighter,
-  X,
-  Save,
-  Palette,
-  MessageSquare
-} from 'lucide-react';
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useEReaderStore } from "@/stores/ereaderStore";
+import { Highlighter, X, Save, Palette, MessageSquare } from "lucide-react";
 
 interface HighlightModalProps {
   isOpen: boolean;
@@ -31,30 +25,57 @@ export default function HighlightModal({
   position,
   bookId,
   currentPosition,
-  textRange
+  textRange,
 }: HighlightModalProps) {
   const { addHighlight, currentBook } = useEReaderStore();
 
-  const [selectedColor, setSelectedColor] = useState<'yellow' | 'green' | 'blue' | 'pink' | 'purple'>('yellow');
-  const [note, setNote] = useState('');
+  const [selectedColor, setSelectedColor] = useState<
+    "yellow" | "green" | "blue" | "pink" | "purple"
+  >("yellow");
+  const [note, setNote] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Color options for highlights
   const highlightColors = [
-    { id: 'yellow', name: 'Yellow', color: '#fbbf24', bgColor: 'rgba(251, 191, 36, 0.3)' },
-    { id: 'green', name: 'Green', color: '#34d399', bgColor: 'rgba(52, 211, 153, 0.3)' },
-    { id: 'blue', name: 'Blue', color: '#60a5fa', bgColor: 'rgba(96, 165, 250, 0.3)' },
-    { id: 'pink', name: 'Pink', color: '#f472b6', bgColor: 'rgba(244, 114, 182, 0.3)' },
-    { id: 'purple', name: 'Purple', color: '#a78bfa', bgColor: 'rgba(167, 139, 250, 0.3)' }
+    {
+      id: "yellow",
+      name: "Yellow",
+      color: "#fbbf24",
+      bgColor: "rgba(251, 191, 36, 0.3)",
+    },
+    {
+      id: "green",
+      name: "Green",
+      color: "#34d399",
+      bgColor: "rgba(52, 211, 153, 0.3)",
+    },
+    {
+      id: "blue",
+      name: "Blue",
+      color: "#60a5fa",
+      bgColor: "rgba(96, 165, 250, 0.3)",
+    },
+    {
+      id: "pink",
+      name: "Pink",
+      color: "#f472b6",
+      bgColor: "rgba(244, 114, 182, 0.3)",
+    },
+    {
+      id: "purple",
+      name: "Purple",
+      color: "#a78bfa",
+      bgColor: "rgba(167, 139, 250, 0.3)",
+    },
   ] as const;
 
   // Initialize form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setSelectedColor('yellow');
-      setNote('');
+      setSelectedColor("yellow");
+      setNote("");
       setIsSaving(false);
     }
   }, [isOpen]);
@@ -62,13 +83,13 @@ export default function HighlightModal({
   // Handle escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === "Escape" && isOpen) {
         onClose();
       }
     };
 
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
   }, [isOpen, onClose]);
 
   // Handle click outside modal
@@ -80,8 +101,9 @@ export default function HighlightModal({
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [isOpen, onClose]);
 
@@ -94,7 +116,7 @@ export default function HighlightModal({
     try {
       const highlightData = {
         bookId: currentBook.id,
-        userId: 'current-user', // Will be set by store
+        userId: "current-user", // Will be set by store
         text: selectedText.trim(),
         startOffset: textRange.startOffset,
         endOffset: textRange.endOffset,
@@ -109,14 +131,14 @@ export default function HighlightModal({
 
       // Save to server
       await fetch(`/api/books/${bookId}/highlights`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(highlightData)
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(highlightData),
       });
 
       onClose();
     } catch (error) {
-      console.error('Failed to save highlight:', error);
+      console.error("Failed to save highlight:", error);
     } finally {
       setIsSaving(false);
     }
@@ -129,11 +151,11 @@ export default function HighlightModal({
     try {
       const highlightData = {
         bookId: currentBook.id,
-        userId: 'current-user',
+        userId: "current-user",
         text: selectedText.trim(),
         startOffset: textRange.startOffset,
         endOffset: textRange.endOffset,
-        color: 'yellow' as const,
+        color: "yellow" as const,
         position: currentPosition,
         chapterIndex: 0,
       };
@@ -141,14 +163,14 @@ export default function HighlightModal({
       addHighlight(highlightData);
 
       await fetch(`/api/books/${bookId}/highlights`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(highlightData)
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(highlightData),
       });
 
       onClose();
     } catch (error) {
-      console.error('Failed to save quick highlight:', error);
+      console.error("Failed to save quick highlight:", error);
     }
   };
 
@@ -200,13 +222,13 @@ export default function HighlightModal({
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
             style={{
               left: modalPosition.x,
               top: modalPosition.y,
               width: 300,
-              maxHeight: 350
+              maxHeight: 350,
             }}
           >
             {/* Header */}
@@ -230,7 +252,11 @@ export default function HighlightModal({
               {/* Selected Text Preview */}
               <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
                 <p className="text-sm text-gray-700 dark:text-gray-300 italic">
-                  "{selectedText.length > 100 ? selectedText.substring(0, 100) + '...' : selectedText}"
+                  &quot;
+                  {selectedText.length > 100
+                    ? selectedText.substring(0, 100) + "..."
+                    : selectedText}
+                  &quot;
                 </p>
               </div>
 
@@ -249,8 +275,8 @@ export default function HighlightModal({
                       onClick={() => setSelectedColor(color.id)}
                       className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${
                         selectedColor === color.id
-                          ? 'border-gray-400 dark:border-gray-300 scale-110'
-                          : 'border-gray-200 dark:border-gray-600 hover:scale-105'
+                          ? "border-gray-400 dark:border-gray-300 scale-110"
+                          : "border-gray-200 dark:border-gray-600 hover:scale-105"
                       }`}
                       style={{ backgroundColor: color.color }}
                       title={color.name}
@@ -307,7 +333,7 @@ export default function HighlightModal({
                   ) : (
                     <Save className="w-4 h-4" />
                   )}
-                  <span>{isSaving ? 'Saving...' : 'Save'}</span>
+                  <span>{isSaving ? "Saving..." : "Save"}</span>
                 </button>
               </div>
             </div>

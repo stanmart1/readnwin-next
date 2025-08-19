@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React, { useEffect, useRef, RefObject } from 'react';
-import { Highlight } from '@/types/ereader';
+import React, { useEffect, useRef, RefObject } from "react";
+import { Highlight } from "@/types/ereader";
 
 interface HighlightRendererProps {
   highlights: Highlight[];
@@ -21,18 +21,18 @@ export default function HighlightRenderer({
   highlights,
   contentRef,
   onHighlightClick,
-  onHighlightHover
+  onHighlightHover,
 }: HighlightRendererProps) {
   const highlightElementsRef = useRef<Map<string, HTMLElement[]>>(new Map());
 
   // Color mapping for highlight types
   const getHighlightColor = (color: string) => {
     const colors = {
-      yellow: 'rgba(255, 255, 0, 0.3)',
-      green: 'rgba(34, 197, 94, 0.3)',
-      blue: 'rgba(59, 130, 246, 0.3)',
-      pink: 'rgba(236, 72, 153, 0.3)',
-      purple: 'rgba(147, 51, 234, 0.3)',
+      yellow: "rgba(255, 255, 0, 0.3)",
+      green: "rgba(34, 197, 94, 0.3)",
+      blue: "rgba(59, 130, 246, 0.3)",
+      pink: "rgba(236, 72, 153, 0.3)",
+      purple: "rgba(147, 51, 234, 0.3)",
     };
     return colors[color as keyof typeof colors] || colors.yellow;
   };
@@ -40,12 +40,7 @@ export default function HighlightRenderer({
   // Find text nodes within a container
   const getTextNodes = (container: Node): Text[] => {
     const textNodes: Text[] = [];
-    const walker = document.createTreeWalker(
-      container,
-      NodeFilter.SHOW_TEXT,
-      null,
-      false
-    );
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
 
     let node;
     while ((node = walker.nextNode())) {
@@ -74,13 +69,21 @@ export default function HighlightRenderer({
       const nodeEndOffset = currentOffset + nodeLength;
 
       // Check if highlight starts in this node
-      if (!startContainer && highlight.startOffset >= nodeStartOffset && highlight.startOffset <= nodeEndOffset) {
+      if (
+        !startContainer &&
+        highlight.startOffset >= nodeStartOffset &&
+        highlight.startOffset <= nodeEndOffset
+      ) {
         startContainer = textNode;
         startOffset = highlight.startOffset - nodeStartOffset;
       }
 
       // Check if highlight ends in this node
-      if (!endContainer && highlight.endOffset >= nodeStartOffset && highlight.endOffset <= nodeEndOffset) {
+      if (
+        !endContainer &&
+        highlight.endOffset >= nodeStartOffset &&
+        highlight.endOffset <= nodeEndOffset
+      ) {
         endContainer = textNode;
         endOffset = highlight.endOffset - nodeStartOffset;
         break;
@@ -94,7 +97,7 @@ export default function HighlightRenderer({
         startContainer,
         startOffset,
         endContainer,
-        endOffset
+        endOffset,
       };
     }
 
@@ -103,31 +106,34 @@ export default function HighlightRenderer({
 
   // Create highlight span element
   const createHighlightSpan = (highlight: Highlight): HTMLSpanElement => {
-    const span = document.createElement('span');
-    span.className = 'highlight-span';
+    const span = document.createElement("span");
+    span.className = "highlight-span";
     span.style.backgroundColor = getHighlightColor(highlight.color);
-    span.style.cursor = 'pointer';
-    span.style.borderRadius = '2px';
-    span.style.padding = '1px 2px';
-    span.style.margin = '0 1px';
-    span.style.transition = 'background-color 0.2s ease';
+    span.style.cursor = "pointer";
+    span.style.borderRadius = "2px";
+    span.style.padding = "1px 2px";
+    span.style.margin = "0 1px";
+    span.style.transition = "background-color 0.2s ease";
     span.dataset.highlightId = highlight.id;
     span.dataset.highlightColor = highlight.color;
 
     // Add event listeners
-    span.addEventListener('click', (e) => {
+    span.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       onHighlightClick(highlight);
     });
 
     if (onHighlightHover) {
-      span.addEventListener('mouseenter', () => {
+      span.addEventListener("mouseenter", () => {
         onHighlightHover(highlight);
-        span.style.backgroundColor = getHighlightColor(highlight.color).replace('0.3', '0.5');
+        span.style.backgroundColor = getHighlightColor(highlight.color).replace(
+          "0.3",
+          "0.5",
+        );
       });
 
-      span.addEventListener('mouseleave', () => {
+      span.addEventListener("mouseleave", () => {
         onHighlightHover(null);
         span.style.backgroundColor = getHighlightColor(highlight.color);
       });
@@ -161,21 +167,24 @@ export default function HighlightRenderer({
         domRange.insertNode(highlightSpan);
 
         // Store reference to the highlight element
-        const existingElements = highlightElementsRef.current.get(highlight.id) || [];
-        highlightElementsRef.current.set(highlight.id, [...existingElements, highlightSpan]);
-
+        const existingElements =
+          highlightElementsRef.current.get(highlight.id) || [];
+        highlightElementsRef.current.set(highlight.id, [
+          ...existingElements,
+          highlightSpan,
+        ]);
       } catch (error) {
-        console.warn('Failed to apply highlight:', error);
+        console.warn("Failed to apply highlight:", error);
       }
     } catch (error) {
-      console.warn('Failed to create range for highlight:', error);
+      console.warn("Failed to create range for highlight:", error);
     }
   };
 
   // Remove all highlights
   const removeAllHighlights = () => {
     highlightElementsRef.current.forEach((elements, highlightId) => {
-      elements.forEach(element => {
+      elements.forEach((element) => {
         try {
           if (element.parentNode) {
             // Move children back to parent
@@ -186,7 +195,7 @@ export default function HighlightRenderer({
             element.parentNode.removeChild(element);
           }
         } catch (error) {
-          console.warn('Failed to remove highlight element:', error);
+          console.warn("Failed to remove highlight element:", error);
         }
       });
     });
@@ -202,7 +211,7 @@ export default function HighlightRenderer({
   const removeHighlight = (highlightId: string) => {
     const elements = highlightElementsRef.current.get(highlightId);
     if (elements) {
-      elements.forEach(element => {
+      elements.forEach((element) => {
         try {
           if (element.parentNode) {
             while (element.firstChild) {
@@ -211,7 +220,7 @@ export default function HighlightRenderer({
             element.parentNode.removeChild(element);
           }
         } catch (error) {
-          console.warn('Failed to remove highlight element:', error);
+          console.warn("Failed to remove highlight element:", error);
         }
       });
       highlightElementsRef.current.delete(highlightId);
@@ -223,9 +232,11 @@ export default function HighlightRenderer({
     if (!contentRef.current || !highlights.length) return;
 
     // Sort highlights by start position to avoid conflicts
-    const sortedHighlights = [...highlights].sort((a, b) => a.startOffset - b.startOffset);
+    const sortedHighlights = [...highlights].sort(
+      (a, b) => a.startOffset - b.startOffset,
+    );
 
-    sortedHighlights.forEach(highlight => {
+    sortedHighlights.forEach((highlight) => {
       applyHighlight(highlight);
     });
   };
@@ -249,9 +260,9 @@ export default function HighlightRenderer({
   // Function to get highlight at position (for external use)
   const getHighlightAtPosition = (x: number, y: number): Highlight | null => {
     const element = document.elementFromPoint(x, y);
-    if (element && element.classList.contains('highlight-span')) {
-      const highlightId = element.dataset.highlightId;
-      return highlights.find(h => h.id === highlightId) || null;
+    if (element && element.classList.contains("highlight-span")) {
+      const highlightId = (element as HTMLElement).dataset.highlightId;
+      return highlights.find((h) => h.id === highlightId) || null;
     }
     return null;
   };
@@ -262,14 +273,17 @@ export default function HighlightRenderer({
     if (elements && elements.length > 0) {
       const firstElement = elements[0];
       firstElement.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-        inline: 'nearest'
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
       });
 
       // Add temporary visual emphasis
       const originalBg = firstElement.style.backgroundColor;
-      firstElement.style.backgroundColor = getHighlightColor('blue').replace('0.3', '0.7');
+      firstElement.style.backgroundColor = getHighlightColor("blue").replace(
+        "0.3",
+        "0.7",
+      );
 
       setTimeout(() => {
         firstElement.style.backgroundColor = originalBg;
@@ -278,12 +292,21 @@ export default function HighlightRenderer({
   };
 
   // Expose methods for parent component
-  React.useImperativeHandle(contentRef, () => ({
-    getHighlightAtPosition,
-    scrollToHighlight,
-    removeHighlight,
-    removeAllHighlights
-  }), [highlights]);
+  React.useImperativeHandle(
+    contentRef,
+    () => ({
+      getHighlightAtPosition,
+      scrollToHighlight,
+      removeHighlight,
+      removeAllHighlights,
+    }),
+    [
+      highlights,
+      getHighlightAtPosition,
+      scrollToHighlight,
+      removeAllHighlights,
+    ],
+  );
 
   // This component doesn't render anything directly
   // It manipulates the DOM of the content element

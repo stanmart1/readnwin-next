@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
+import jwt from "jsonwebtoken";
 import { query } from "./database";
 import { emailTemplateService } from "./email-template-service";
 
@@ -607,7 +608,6 @@ export const sendWelcomeEmail = async (
     // Generate welcome token if userId is provided
     let welcomeToken = "";
     if (userId) {
-      const jwt = require("jsonwebtoken");
       welcomeToken = jwt.sign(
         { userId, type: "welcome" },
         process.env.JWT_SECRET || "fallback-secret",
@@ -809,13 +809,14 @@ export const sendOrderStatusUpdateEmail = async (
     };
 
     const statusInfo =
-      statusMessages[orderDetails.status] || statusMessages.pending;
+      statusMessages[orderDetails.status as keyof typeof statusMessages] ||
+      statusMessages.pending;
 
     // Format order items for email
     const itemsList = Array.isArray(orderDetails.items)
       ? orderDetails.items
           .map(
-            (item) =>
+            (item: any) =>
               `• ${item.title || item.name} - ₦${item.price || item.total}`,
           )
           .join("\n")
@@ -1179,23 +1180,7 @@ export const sendSecurityAlertEmail = async (
   }
 };
 
-// Helper function to get status descriptions
-const getStatusDescription = (status: string): string => {
-  const descriptions: { [key: string]: string } = {
-    pending: "Your order is being reviewed and will be processed soon.",
-    payment_processing:
-      "We are processing your payment. This usually takes a few minutes.",
-    paid: "Payment has been confirmed and your order is being prepared.",
-    processing: "Your order is being prepared for shipping.",
-    shipped: "Your order has been shipped and is on its way to you.",
-    delivered: "Your order has been successfully delivered.",
-    cancelled: "Your order has been cancelled as requested.",
-    refunded:
-      "Your order has been refunded and the amount will be returned to your payment method.",
-  };
-
-  return descriptions[status] || "Your order status has been updated.";
-};
+// Helper function to get status descriptions - removed as unused
 
 // Send email using template
 export const sendTemplateEmail = async (

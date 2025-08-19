@@ -73,7 +73,7 @@ export const useEReaderStore = create<EReaderState>()(
       selectedText: null,
 
       // Actions
-      loadBook: async (bookId: string) => {
+      loadBook: async (bookId: string, userId?: string) => {
         set({ isLoading: true, error: null });
         try {
           // Load book from API
@@ -123,42 +123,42 @@ export const useEReaderStore = create<EReaderState>()(
               isLoading: false,
             });
 
-            // Start new reading session
-            const session: ReadingSession = {
-              id: `session-${Date.now()}`,
-              bookId,
-              userId,
-              startTime: new Date(),
-              duration: 0,
-              wordsRead: 0,
-              progress: 0,
-            };
-            set({ currentSession: session });
+            // Start new reading session if userId is provided
+            if (userId) {
+              const session: ReadingSession = {
+                id: `session-${Date.now()}`,
+                bookId,
+                userId: userId,
+                startTime: new Date(),
+                duration: 0,
+                wordsRead: 0,
+                progress: 0,
+              };
+              set({ currentSession: session });
+            }
           } catch (userDataError) {
             console.warn("Failed to load user data:", userDataError);
             // Continue with book loading even if user data fails
-            const session: ReadingSession = {
-              id: `session-${Date.now()}`,
-              bookId,
-              userId,
-              startTime: new Date(),
-              duration: 0,
-              wordsRead: 0,
-              progress: 0,
-            };
+            if (userId) {
+              const session: ReadingSession = {
+                id: `session-${Date.now()}`,
+                bookId,
+                userId: userId,
+                startTime: new Date(),
+                duration: 0,
+                wordsRead: 0,
+                progress: 0,
+              };
+              set({ currentSession: session });
+            }
             set({
               currentBook: book,
-              readingProgress: null,
-              highlights: [],
-              notes: [],
               isLoading: false,
-              currentSession: session,
             });
           }
         } catch (error) {
           set({
-            error:
-              error instanceof Error ? error.message : "Failed to load book",
+            error: error instanceof Error ? error.message : "Unknown error",
             isLoading: false,
           });
         }

@@ -5,7 +5,7 @@ export interface Book {
   title: string;
   author: string;
   content: string;
-  contentType: 'markdown' | 'html' | 'epub';
+  contentType: "markdown" | "html" | "epub";
   wordCount: number;
   filePath: string;
   coverImage?: string;
@@ -32,7 +32,7 @@ export interface Highlight {
   text: string;
   startOffset: number;
   endOffset: number;
-  color: 'yellow' | 'green' | 'blue' | 'pink' | 'purple';
+  color: "yellow" | "green" | "blue" | "pink" | "purple";
   note?: string;
   createdAt: Date;
   chapterIndex?: number;
@@ -60,18 +60,18 @@ export interface ReaderSettings {
   fontFamily: string;
   lineHeight: number; // 1.2-2.0
   fontWeight: number; // 300-700
-  
+
   // Display
-  theme: 'light' | 'dark' | 'sepia';
-  readingWidth: 'narrow' | 'medium' | 'wide';
+  theme: "light" | "dark" | "sepia";
+  readingWidth: "narrow" | "medium" | "wide";
   margins: number; // 0-100px
   padding: number; // 0-50px
-  
+
   // Layout
   justifyText: boolean;
   showProgressBar: boolean;
   showChapterNumbers: boolean;
-  
+
   // Audio
   textToSpeech: {
     enabled: boolean;
@@ -79,7 +79,7 @@ export interface ReaderSettings {
     speed: number; // 0.5-2.0
     autoPlay: boolean;
   };
-  
+
   // Accessibility
   highContrast: boolean;
   reduceMotion: boolean;
@@ -113,11 +113,16 @@ export interface ReadingSession {
 export interface DrawerState {
   leftDrawer: {
     isOpen: boolean;
-    activeTab: 'notes' | 'highlights';
+    activeTab: "notes" | "highlights";
   };
   rightDrawer: {
     isOpen: boolean;
-    activeSection: 'typography' | 'display' | 'layout' | 'audio' | 'accessibility';
+    activeSection:
+      | "typography"
+      | "display"
+      | "layout"
+      | "audio"
+      | "accessibility";
   };
 }
 
@@ -126,34 +131,34 @@ export interface EReaderState {
   currentBook: Book | null;
   isLoading: boolean;
   error: string | null;
-  
+
   // Reading progress
   readingProgress: ReadingProgress | null;
   currentSession: ReadingSession | null;
-  
+
   // User data
   highlights: Highlight[];
   notes: Note[];
   settings: ReaderSettings;
   analytics: ReadingAnalytics[];
-  
+
   // UI state
   drawerState: DrawerState;
   isTextToSpeechPlaying: boolean;
   selectedText: string | null;
-  
+
   // Actions
-  loadBook: (bookId: string) => Promise<void>;
+  loadBook: (bookId: string, userId?: string) => Promise<void>;
   saveProgress: (progress: Partial<ReadingProgress>) => void;
-  addHighlight: (highlight: Omit<Highlight, 'id' | 'createdAt'>) => void;
+  addHighlight: (highlight: Omit<Highlight, "id" | "createdAt">) => void;
   removeHighlight: (highlightId: string) => void;
-  addNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addNote: (note: Omit<Note, "id" | "createdAt" | "updatedAt">) => void;
   updateNote: (noteId: string, updates: Partial<Note>) => void;
   removeNote: (noteId: string) => void;
   updateSettings: (settings: Partial<ReaderSettings>) => void;
-  toggleDrawer: (drawer: 'left' | 'right', isOpen?: boolean) => void;
-  setDrawerTab: (drawer: 'left', tab: 'notes' | 'highlights') => void;
-  setDrawerSection: (drawer: 'right', section: string) => void;
+  toggleDrawer: (drawer: "left" | "right", isOpen?: boolean) => void;
+  setDrawerTab: (drawer: "left", tab: "notes" | "highlights") => void;
+  setDrawerSection: (drawer: "right", section: string) => void;
   startTextToSpeech: () => void;
   stopTextToSpeech: () => void;
   setSelectedText: (text: string | null) => void;
@@ -192,7 +197,7 @@ export interface TTSState {
 
 // Gesture and interaction interfaces
 export interface SwipeGesture {
-  direction: 'left' | 'right' | 'up' | 'down';
+  direction: "left" | "right" | "up" | "down";
   distance: number;
   velocity: number;
 }
@@ -213,10 +218,10 @@ export interface ExportData {
 }
 
 export interface ExportOptions {
-  format: 'json' | 'csv' | 'txt';
+  format: "json" | "csv" | "txt";
   includeHighlights: boolean;
   includeNotes: boolean;
   includeProgress: boolean;
   includeSettings: boolean;
   includeAnalytics: boolean;
-} 
+}

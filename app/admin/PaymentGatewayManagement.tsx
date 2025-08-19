@@ -39,26 +39,15 @@ interface PaymentSettings {
   testMode: boolean;
 }
 
-interface ValidationErrors {
-  [gatewayId: string]: {
-    [field: string]: string;
-  };
-}
+// Removed unused ValidationErrors interface
 
 export default function PaymentGatewayManagement() {
   const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [savingGateway, setSavingGateway] = useState<string | null>(null);
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
   const [validationErrors, setValidationErrors] = useState<{
     [gatewayId: string]: { [field: string]: string };
   }>({});
-  const [showConfirmDialog, setShowConfirmDialog] = useState<{
-    show: boolean;
-    action: string;
-    gatewayId: string;
-    message: string;
-  }>({ show: false, action: "", gatewayId: "", message: "" });
 
   const [paymentGateways, setPaymentGateways] = useState<PaymentGateway[]>([
     {
@@ -701,7 +690,7 @@ export default function PaymentGatewayManagement() {
                     Manual Payment Gateway
                   </h4>
                   <p className="text-sm text-blue-700">
-                    Bank Transfer is a manual payment gateway that doesn't
+                    Bank Transfer is a manual payment gateway that doesn&apos;t
                     require API keys. Customers will upload proof of payment for
                     manual verification by administrators.
                   </p>

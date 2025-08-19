@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { formatDate } from "@/utils/dateUtils";
-import { Book as EReaderBook } from "@/types/ereader";
+import { toast } from "react-hot-toast";
 
 interface Book {
   id: string;
@@ -26,7 +27,7 @@ interface Book {
 
 export default function UserLibrary() {
   const { data: session } = useSession();
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [books, setBooks] = useState<Book[]>([]);
@@ -148,27 +149,32 @@ export default function UserLibrary() {
     }
   };
 
-  const handleBookClick = (book: Book) => {
-    setSelectedBook(book);
-  };
+  const handleBookClick = async (book: Book) => {
+    if (book.ebook_file_url) {
+      // Track reading activity if not already started
+      if (book.status === "unread" || !book.progress || book.progress === 0) {
+        try {
+          await fetch("/api/dashboard/activity", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              activity_type: "started",
+              title: `Started reading "${book.title}"`,
+              book_id: parseInt(book.id),
+              metadata: { action: "book_started" },
+            }),
+          });
+        } catch (error) {
+          console.error("Error tracking reading activity:", error);
+        }
+      }
 
-  const handleCloseReader = () => {
-    setSelectedBook(null);
+      // Navigate to the dedicated reading page
+      router.push(`/reading/${book.id}`);
+    } else {
+      toast.error("Book file not available for reading");
+    }
   };
-
-  // Convert Book to EReaderBook format
-  const convertToEReaderBook = (book: Book): EReaderBook => ({
-    id: book.id,
-    title: book.title,
-    author: book.author,
-    cover: book.cover,
-    contentType: "markdown" as const, // Default to markdown, could be determined from book data
-    format: book.format,
-    fileUrl: book.ebook_file_url,
-    category: book.category,
-    description: "",
-    totalPages: book.totalPages,
-  });
 
   // Check for book in sessionStorage (from BookCard)
   useEffect(() => {
@@ -185,45 +191,7 @@ export default function UserLibrary() {
     }
   }, []);
 
-  // Show E-Reader when a book is selected
-  if (selectedBook) {
-    console.log("🔍 UserLibrary: Book selection debug:", {
-      id: selectedBook.id,
-      title: selectedBook.title,
-      format: selectedBook.format,
-      ebook_file_url: selectedBook.ebook_file_url,
-    });
-
-    console.log(
-      "🔍 UserLibrary: Using placeholder reader for book:",
-      selectedBook.title,
-    );
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg max-w-4xl w-full p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold">
-              Reading: {selectedBook.title}
-            </h3>
-            <button
-              onClick={handleCloseReader}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <i className="ri-close-line text-2xl"></i>
-            </button>
-          </div>
-          <p className="text-gray-600 mb-4">
-            E-reader component not yet implemented.
-          </p>
-          <p className="text-sm text-gray-500">
-            Book ID: {selectedBook.id}
-            <br />
-            Author: {selectedBook.author}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // E-Reader integration removed - now navigates to dedicated reading page
 
   if (loading) {
     return (

@@ -40,7 +40,7 @@ export default function LibrarySection() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState("all"); // all, favorites, recent
-  const [selectedBook, setSelectedBook] = useState<EReaderBook | null>(null);
+  // Removed selectedBook state as we'll navigate to reading page instead
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedBookForReview, setSelectedBookForReview] =
     useState<UserLibraryItem | null>(null);
@@ -102,27 +102,11 @@ export default function LibrarySection() {
     }
   };
 
-  // Convert library item to e-reader book format
-  const convertToEReaderBook = (item: UserLibraryItem): EReaderBook => ({
-    id: item.book_id.toString(),
-    title: item.book?.title || "",
-    author: item.book?.author_name || "",
-    cover: item.book?.cover_image_url || "",
-    contentType: "markdown" as const, // Default to markdown, could be determined from book data
-    category: item.book?.category_name || "",
-    description: item.book?.description || "",
-    totalPages: 0, // Would be calculated from content
-  });
-
-  // Handle book click to open e-reader
+  // Handle book click to navigate to reading page
   const handleBookClick = async (item: UserLibraryItem) => {
     console.log("handleBookClick called for:", item.book?.title);
 
     if (item.book?.ebook_file_url) {
-      const eReaderBook = convertToEReaderBook(item);
-      console.log("Setting selected book:", eReaderBook);
-      setSelectedBook(eReaderBook);
-
       // Track book reading activity if user hasn't started reading yet
       const progress = item.readingProgress?.progressPercentage;
       if (!progress || progress === 0) {
@@ -139,20 +123,16 @@ export default function LibrarySection() {
               metadata: { action: "book_started" },
             }),
           });
-        } catch (activityError) {
-          console.error("Error tracking book start activity:", activityError);
+        } catch (error) {
+          console.error("Error tracking reading activity:", error);
         }
       }
-    } else {
-      // If no ebook file, redirect to book details or show message
-      console.log("No ebook file, redirecting to book details");
-      router.push(`/books/${item.book_id}`);
-    }
-  };
 
-  // Close e-reader
-  const handleCloseReader = () => {
-    setSelectedBook(null);
+      // Navigate to the dedicated reading page
+      router.push(`/reading/${item.book_id}`);
+    } else {
+      toast.error("Book file not available for reading");
+    }
   };
 
   // Review modal functions
@@ -532,27 +512,7 @@ export default function LibrarySection() {
         </div>
       )}
 
-      {/* E-Reader placeholder - component needs to be implemented */}
-      {selectedBook && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-4xl w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">
-                Reading: {selectedBook.title}
-              </h3>
-              <button
-                onClick={handleCloseReader}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <p className="text-gray-600">
-              E-reader component not yet implemented.
-            </p>
-          </div>
-        </div>
-      )}
+      {/* E-Reader integration removed - now navigates to dedicated reading page */}
 
       {/* Review Modal */}
       {showReviewModal && selectedBookForReview && (

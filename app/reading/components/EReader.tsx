@@ -3,17 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEReaderStore } from "@/stores/ereaderStore";
-import {
-  Book,
-  Settings,
-  Bookmark,
-  StickyNote,
-  X,
-  Menu,
-  ChevronLeft,
-  ChevronRight,
-  Highlighter,
-} from "lucide-react";
+import { Settings, StickyNote, X, Menu, Highlighter } from "lucide-react";
 import LeftDrawer from "./LeftDrawer";
 import RightDrawer from "./RightDrawer";
 import ProgressBar from "./ProgressBar";
@@ -36,7 +26,7 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
     error,
     readingProgress,
     settings,
-    drawerState,
+    highlights,
     isTextToSpeechPlaying,
     selectedText,
     loadBook,
@@ -47,7 +37,6 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
     stopTextToSpeech,
   } = useEReaderStore();
 
-  const [isScrolling, setIsScrolling] = useState(false);
   const [scrollTimeout, setScrollTimeout] = useState<NodeJS.Timeout | null>(
     null,
   );
@@ -67,7 +56,7 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
   // Load book on mount
   useEffect(() => {
     if (bookId && session?.user?.id) {
-      loadBook(bookId);
+      loadBook(bookId, session.user.id);
     }
   }, [bookId, session?.user?.id, loadBook]);
 
@@ -130,15 +119,13 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
         intersectionObserverRef.current.disconnect();
       }
     };
-  }, [contentRef.current, saveProgress]);
+  }, [saveProgress]);
 
   const lastTimeUpdate = useRef<number>(Date.now());
 
   // Handle scroll events for progress tracking
   const handleScroll = useCallback(() => {
     if (!contentRef.current || !containerRef.current) return;
-
-    setIsScrolling(true);
 
     // Clear existing timeout
     if (scrollTimeout) {
@@ -160,9 +147,9 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
       percentage: progress,
     });
 
-    // Set timeout to mark scrolling as stopped
+    // Set timeout for scroll cleanup
     const timeout = setTimeout(() => {
-      setIsScrolling(false);
+      // Scroll ended
     }, 1000);
 
     setScrollTimeout(timeout);
@@ -227,7 +214,6 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
       container,
       NodeFilter.SHOW_TEXT,
       null,
-      false,
     );
 
     let currentNode;
@@ -294,7 +280,7 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
   }, []);
 
   const onTouchEnd = useCallback(
-    (e: React.TouchEvent) => {
+    (_e: React.TouchEvent) => {
       if (!handleTouchStart.current || !handleTouchMove.current) return;
 
       const startX = handleTouchStart.current.x;

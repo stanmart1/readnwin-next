@@ -31,7 +31,7 @@ export class EnhancedFileUploadService {
   constructor() {
     // Use environment-specific paths - maintain compatibility with existing system
     const baseDir = process.env.NODE_ENV === 'production' 
-      ? '/app/book-files' 
+      ? '/app/storage/books' 
       : join(process.cwd(), 'book-files');
     
     this.config = {
@@ -42,7 +42,7 @@ export class EnhancedFileUploadService {
     };
     
     this.uploadDir = process.env.NODE_ENV === 'production' 
-      ? '/uploads' 
+      ? '/app/storage' 
       : join(process.cwd(), 'public', 'uploads');
     
     console.log('📁 EnhancedFileUploadService initialized with paths:', {
@@ -168,7 +168,7 @@ export class EnhancedFileUploadService {
 
       const uploadedFile: UploadedFile = {
         filename,
-        path: `/book-files/${filename}`,
+        path: `/storage/books/${filename}`,
         size: buffer.length,
         mimetype: file.type,
         originalName

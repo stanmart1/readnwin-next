@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     // Construct the file path using the storage location
-    const basePath = process.env.NODE_ENV === 'production' ? '/app/storage' : join(process.cwd(), 'public', 'uploads');
+    const basePath = process.env.NODE_ENV === 'production' ? '/app/storage' : join(process.cwd(), 'storage');
     const filePath = join(basePath, ...params.path);
     
     // Check if file exists
@@ -58,15 +58,15 @@ export async function GET(
     return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable', // Cache for 1 year
+        'Cache-Control': 'public, max-age=31536000, immutable',
         'Access-Control-Allow-Origin': '*',
       },
     });
   } catch (error) {
-    console.error('Error serving uploaded file:', error);
+    console.error('Error serving storage file:', error);
     return NextResponse.json(
       { error: 'Failed to serve file' },
       { status: 500 }
     );
   }
-} 
+}

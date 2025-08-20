@@ -17,7 +17,7 @@ export class FileUploadService {
     if (uploadDir) {
       this.uploadDir = uploadDir;
     } else if (process.env.NODE_ENV === 'production') {
-      this.uploadDir = '/uploads';
+      this.uploadDir = '/app/storage';
     } else {
       // Development: use public/uploads
       this.uploadDir = join(process.cwd(), 'public', 'uploads');
@@ -90,7 +90,7 @@ export class FileUploadService {
       // Special handling for book-files directory
       if (this.uploadDir.includes('book-files')) {
         // For book files, use a relative path from the project root
-        returnPath = `/book-files/${filename}`;
+        returnPath = `/storage/books/${filename}`;
       } else {
         // For other uploads, use the standard path
         const pathPrefix = process.env.NODE_ENV === 'production' ? '/uploads' : '/uploads';
@@ -143,7 +143,7 @@ export class FileUploadService {
     // Use the dedicated book-files directory in the current project directory
     // In production, this will be /app/book-files, in development it will be ./book-files
     const bookFilesDir = process.env.NODE_ENV === 'production' 
-      ? '/app/book-files' 
+      ? '/app/storage/books' 
       : join(process.cwd(), 'book-files');
     const customUploadService = new FileUploadService(bookFilesDir);
     return customUploadService.uploadFile(file, '');

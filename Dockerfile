@@ -74,9 +74,9 @@ RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
 # Copy the public folder
 COPY --from=builder /app/public ./public
 
-# Create necessary directories for file uploads (for local development)
-RUN mkdir -p /uploads/books/html /uploads/books/originals /uploads/books/assets/images /uploads/books/assets/fonts /uploads/temp /uploads/covers /uploads/book-files
-RUN chown -R pptruser:pptruser /uploads
+# Create storage directory
+RUN mkdir -p /app/storage
+RUN chown -R pptruser:pptruser /app/storage
 
 # Set the correct permission for prerender cache
 RUN mkdir .next

@@ -1,4 +1,4 @@
-import { DOMParser } from 'xmldom';
+import { DOMParser } from '@xmldom/xmldom';
 import StorageService from './StorageService';
 import path from 'path';
 import fs from 'fs/promises';

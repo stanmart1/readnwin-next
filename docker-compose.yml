@@ -32,6 +32,8 @@ services:
       - SMTP_PASS=${SMTP_PASS}
       # Timezone
       - TZ=${TZ:-Africa/Lagos}
+    volumes:
+      - /home/readnwin-store:/app/storage:rw
     env_file:
       - .env.production
     restart: unless-stopped

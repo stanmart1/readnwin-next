@@ -178,7 +178,7 @@ const nextConfig = {
 
   // Rewrites (if needed)
   async rewrites() {
-    const rewrites = [
+    return [
       // Serve uploaded files from the uploads directory
       {
         source: '/uploads/:path*',
@@ -205,8 +205,6 @@ const nextConfig = {
         destination: '/api/images/:path*',
       },
     ];
-
-    return rewrites;
   },
 
   // Compiler options

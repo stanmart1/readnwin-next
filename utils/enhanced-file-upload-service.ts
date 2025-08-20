@@ -32,10 +32,10 @@ export class EnhancedFileUploadService {
   private bookParser: EnhancedBookParser;
 
   constructor() {
-    // Use /uploads as the persistent storage directory (works for both Vercel and local)
+    // Use consistent storage directory structure
     this.mediaRootDir = process.env.NODE_ENV === 'production' 
-      ? '/uploads' 
-      : join(process.cwd(), 'uploads');
+      ? '/app/uploads' 
+      : join(process.cwd(), 'public', 'uploads');
     
     this.booksDir = join(this.mediaRootDir, 'books');
     this.tempDir = join(this.booksDir, 'temp');
@@ -103,6 +103,8 @@ export class EnhancedFileUploadService {
         // Cover images go to uploads/covers for web access
         targetDir = this.coversDir;
         relativePath = `/uploads/covers/${secureFilename}`;
+        console.log(`📁 Cover image will be stored at: ${targetDir}/${secureFilename}`);
+        console.log(`📁 Cover image URL will be: ${relativePath}`);
       } else {
         // Book files go to book-specific directory
         targetDir = bookDir;

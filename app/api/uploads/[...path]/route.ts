@@ -8,23 +8,64 @@ export async function GET(
   { params }: { params: { path: string[] } }
 ) {
   try {
+    // Handle both array and string path formats
+    const pathArray = Array.isArray(params.path) ? params.path : [params.path];
+    console.log('📁 Uploads API called with path:', pathArray);
     // Construct the file path using the storage location
-    const basePath = process.env.NODE_ENV === 'production' ? '/app/storage' : join(process.cwd(), 'public', 'uploads');
-    const filePath = join(basePath, ...params.path);
+    let basePath;
+    if (process.env.NODE_ENV === 'production') {
+      // In production, try multiple possible locations
+      const possiblePaths = [
+        '/app/uploads',
+        '/app/storage',
+        join(process.cwd(), 'uploads'),
+        join(process.cwd(), 'public', 'uploads')
+      ];
+      basePath = possiblePaths.find(path => existsSync(path)) || '/app/uploads';
+      console.log(`📁 Production: Using base path: ${basePath}`);
+    } else {
+      basePath = join(process.cwd(), 'public', 'uploads');
+      console.log(`📁 Development: Using base path: ${basePath}`);
+    }
     
-    // Check if file exists
+    const filePath = join(basePath, ...pathArray);
+    
+    // Check if file exists, try alternative paths if not found
+    let finalFilePath = filePath;
     if (!existsSync(filePath)) {
-      return NextResponse.json(
-        { error: 'File not found' },
-        { status: 404 }
-      );
+      // Try alternative storage locations
+      const alternativePaths = [
+        join(process.cwd(), 'public', 'uploads', ...pathArray),
+        join(process.cwd(), 'uploads', ...pathArray),
+        join(process.cwd(), 'storage', ...pathArray),
+        join('/app', 'uploads', ...pathArray)
+      ];
+      
+      finalFilePath = alternativePaths.find(path => existsSync(path)) || filePath;
+      
+      if (!existsSync(finalFilePath)) {
+        console.log('❌ File not found at any location:', {
+          requested: pathArray,
+          tried: [filePath, ...alternativePaths],
+          cwd: process.cwd(),
+          nodeEnv: process.env.NODE_ENV
+        });
+        return NextResponse.json(
+          { error: 'File not found' },
+          { status: 404 }
+        );
+      } else {
+        console.log('✅ File found at:', finalFilePath);
+      }
+    } else {
+      console.log('✅ File found at primary location:', finalFilePath);
     }
 
     // Read the file
-    const fileBuffer = await readFile(filePath);
+    const fileBuffer = await readFile(finalFilePath);
     
     // Determine content type based on file extension
-    const extension = filePath.split('.').pop()?.toLowerCase();
+    const extension = finalFilePath.split('.').pop()?.toLowerCase();
     let contentType = 'application/octet-stream';
     
     switch (extension) {

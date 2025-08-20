@@ -22,16 +22,21 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || '';
 
-    const filters: any = {};
+    const filters: any = { page, limit };
+    if (search) filters.search = search;
     if (status) filters.status = status;
 
-    const authors = await ecommerceService.getAuthors(filters);
+    const result = await ecommerceService.getAuthors(filters);
 
     return NextResponse.json({
       success: true,
-      authors
+      authors: result.authors || result,
+      pagination: result.pagination
     });
 
   } catch (error) {

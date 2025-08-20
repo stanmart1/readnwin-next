@@ -21,11 +21,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    const categories = await ecommerceService.getCategories();
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const search = searchParams.get('search') || '';
+    const status = searchParams.get('status') || '';
+
+    const filters: any = { page, limit };
+    if (search) filters.search = search;
+    if (status) filters.status = status;
+
+    const result = await ecommerceService.getCategories(filters);
 
     return NextResponse.json({
       success: true,
-      categories
+      categories: result.categories || result,
+      pagination: result.pagination
     });
 
   } catch (error) {

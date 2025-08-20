@@ -562,18 +562,76 @@ class EcommerceService {
   }
 
   // Category Management
-  async getCategories(): Promise<Category[]> {
-    const result = await query(`
+  async getCategories(filters: any = {}): Promise<Category[] | { categories: Category[], pagination: any }> {
+    // If no pagination requested, return simple array for backward compatibility
+    if (!filters.page && !filters.limit) {
+      const result = await query(`
+        SELECT 
+          c.*,
+          COUNT(b.id) as book_count
+        FROM categories c
+        LEFT JOIN books b ON c.id = b.category_id AND b.status = 'published'
+        WHERE c.is_active = true
+        GROUP BY c.id
+        ORDER BY c.sort_order, c.name
+      `);
+      return result.rows;
+    }
+
+    // Paginated version
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const offset = (page - 1) * limit;
+
+    let whereClause = 'WHERE 1=1';
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (filters.search) {
+      whereClause += ` AND (c.name ILIKE $${paramIndex} OR c.description ILIKE $${paramIndex})`;
+      params.push(`%${filters.search}%`);
+      paramIndex++;
+    }
+
+    if (filters.status === 'active') {
+      whereClause += ` AND c.is_active = true`;
+    } else if (filters.status === 'inactive') {
+      whereClause += ` AND c.is_active = false`;
+    }
+
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM categories c
+      ${whereClause}
+    `;
+
+    const categoriesQuery = `
       SELECT 
         c.*,
         COUNT(b.id) as book_count
       FROM categories c
       LEFT JOIN books b ON c.id = b.category_id AND b.status = 'published'
-      WHERE c.is_active = true
+      ${whereClause}
       GROUP BY c.id
       ORDER BY c.sort_order, c.name
-    `);
-    return result.rows;
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    const countParams = params;
+    const categoriesParams = [...params, limit, offset];
+
+    const [countResult, categoriesResult] = await Promise.all([
+      query(countQuery, countParams),
+      query(categoriesQuery, categoriesParams)
+    ]);
+
+    const total = parseInt(countResult.rows[0].total);
+    const pages = Math.ceil(total / limit);
+
+    return {
+      categories: categoriesResult.rows,
+      pagination: { page, limit, total, pages }
+    };
   }
 
   async createCategory(categoryData: Partial<Category>): Promise<Category> {
@@ -617,16 +675,63 @@ class EcommerceService {
   }
 
   // Author Management
-  async getAuthors(filters: any = {}): Promise<Author[]> {
-    let whereClause = 'WHERE 1=1';
-    const params: any[] = [];
+  async getAuthors(filters: any = {}): Promise<Author[] | { authors: Author[], pagination: any }> {
+    // If no pagination requested, return simple array for backward compatibility
+    if (!filters.page && !filters.limit) {
+      let whereClause = 'WHERE 1=1';
+      const params: any[] = [];
 
-    if (filters.status) {
-      whereClause += ` AND a.status = $${params.length + 1}`;
-      params.push(filters.status);
+      if (filters.status) {
+        whereClause += ` AND a.status = $${params.length + 1}`;
+        params.push(filters.status);
+      }
+
+      const result = await query(`
+        SELECT 
+          a.*,
+          COUNT(b.id) as books_count,
+          COALESCE(SUM(oi.total_price), 0) as total_sales,
+          COALESCE(SUM(oi.total_price * 0.7), 0) as revenue
+        FROM authors a
+        LEFT JOIN books b ON a.id = b.author_id
+        LEFT JOIN order_items oi ON b.id = oi.book_id
+        LEFT JOIN orders o ON oi.order_id = o.id AND o.status IN ('confirmed', 'processing', 'shipped', 'delivered')
+        ${whereClause}
+        GROUP BY a.id
+        ORDER BY a.name
+      `, params);
+
+      return result.rows;
     }
 
-    const result = await query(`
+    // Paginated version
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const offset = (page - 1) * limit;
+
+    let whereClause = 'WHERE 1=1';
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (filters.search) {
+      whereClause += ` AND (a.name ILIKE $${paramIndex} OR a.email ILIKE $${paramIndex})`;
+      params.push(`%${filters.search}%`);
+      paramIndex++;
+    }
+
+    if (filters.status) {
+      whereClause += ` AND a.status = $${paramIndex}`;
+      params.push(filters.status);
+      paramIndex++;
+    }
+
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM authors a
+      ${whereClause}
+    `;
+
+    const authorsQuery = `
       SELECT 
         a.*,
         COUNT(b.id) as books_count,
@@ -639,9 +744,24 @@ class EcommerceService {
       ${whereClause}
       GROUP BY a.id
       ORDER BY a.name
-    `, params);
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
 
-    return result.rows;
+    const countParams = params;
+    const authorsParams = [...params, limit, offset];
+
+    const [countResult, authorsResult] = await Promise.all([
+      query(countQuery, countParams),
+      query(authorsQuery, authorsParams)
+    ]);
+
+    const total = parseInt(countResult.rows[0].total);
+    const pages = Math.ceil(total / limit);
+
+    return {
+      authors: authorsResult.rows,
+      pagination: { page, limit, total, pages }
+    };
   }
 
   async createAuthor(authorData: Partial<Author>): Promise<Author> {

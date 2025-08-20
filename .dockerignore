@@ -105,6 +105,7 @@ database-dumps/
 
 # Scripts
 scripts/
+!scripts/verify-node-version.js
 *.sh
 
 # Build scripts

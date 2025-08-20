@@ -11,7 +11,6 @@
     "start:production": "NODE_ENV=production node server.js",
     "lint": "next lint",
     "verify-node": "node scripts/verify-node-version.js",
-    "preinstall": "node scripts/verify-node-version.js",
     "email-retry": "node scripts/email-retry-job.js",
     "fix-emails": "node scripts/fix-email-issue.js",
     "send-welcome": "node scripts/send-missing-welcome-email.js",

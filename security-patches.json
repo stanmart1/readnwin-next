@@ -1,0 +1,40 @@
+{
+  "vulnerabilities": {
+    "critical": [
+      {
+        "package": "form-data",
+        "issue": "Unsafe random function",
+        "action": "Replace epub-parser with secure alternative",
+        "status": "pending"
+      }
+    ],
+    "high": [
+      {
+        "package": "axios",
+        "issue": "CSRF and SSRF vulnerabilities", 
+        "action": "Update to secure version",
+        "status": "pending"
+      },
+      {
+        "package": "mime",
+        "issue": "ReDoS vulnerability",
+        "action": "Update to patched version",
+        "status": "pending"
+      }
+    ],
+    "moderate": [
+      {
+        "package": "jszip",
+        "issue": "Prototype pollution",
+        "action": "Update to secure version",
+        "status": "pending"
+      },
+      {
+        "package": "quill",
+        "issue": "XSS vulnerability",
+        "action": "Replace with secure editor",
+        "status": "pending"
+      }
+    ]
+  }
+}

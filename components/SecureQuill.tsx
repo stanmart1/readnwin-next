@@ -1,171 +1,171 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-
-// Dynamically import ReactQuill to avoid SSR issues
-const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
+import { useEffect, useRef, useState } from 'react';
 
 interface SecureQuillProps {
-  value?: string;
-  onChange?: (content: string, delta: any, source: any, editor: any) => void;
+  value: string;
+  onChange: (value: string) => void;
   placeholder?: string;
   readOnly?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
 
-/**
- * Secure Quill Editor Component
- * 
- * This component wraps React Quill with security measures to prevent XSS attacks:
- * - Input sanitization
- * - Restricted toolbar options
- * - Safe HTML filtering
- * - Content validation
- */
-const SecureQuill: React.FC<SecureQuillProps> = ({
-  value = '',
+export default function SecureQuill({
+  value,
   onChange,
   placeholder = 'Start writing...',
   readOnly = false,
   className = '',
-  style = {}
-}) => {
-  const [sanitizedValue, setSanitizedValue] = useState('');
+  style
+}: SecureQuillProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [isClient, setIsClient] = useState(false);
 
-  // HTML sanitization function
-  const sanitizeHTML = (html: string): string => {
-    if (typeof html !== 'string') return '';
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const sanitizeHtml = (html: string): string => {
+    // Basic HTML sanitization
+    const allowedTags = ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 'img'];
+    const allowedAttributes = ['href', 'src', 'alt', 'title'];
     
-    return html
-      // Remove script tags and content
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      // Remove iframe tags and content
-      .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
-      // Remove object tags and content
-      .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
-      // Remove embed tags
-      .replace(/<embed[^>]*>/gi, '')
-      // Remove javascript: protocols
+    // Remove script tags and dangerous content
+    let sanitized = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
       .replace(/javascript:/gi, '')
-      // Remove event handlers
-      .replace(/on\w+\s*=/gi, '')
-      // Remove data: protocols
-      .replace(/data:/gi, '')
-      // Remove vbscript: protocols
-      .replace(/vbscript:/gi, '')
-      // Remove expression() CSS
-      .replace(/expression\s*\(/gi, '')
-      // Remove eval() calls
-      .replace(/eval\s*\(/gi, '')
-      // Remove dangerous CSS
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      // Sanitize remaining HTML tags
-      .replace(/<[^>]*>/g, (match) => {
-        const safeTags = ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre'];
-        const tagName = match.match(/<(\w+)/)?.[1]?.toLowerCase();
-        
-        if (safeTags.includes(tagName || '')) {
-          // Remove dangerous attributes from safe tags
-          return match
-            .replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '')
-            .replace(/\s+javascript\s*:/gi, '')
-            .replace(/\s+data\s*:/gi, '')
-            .replace(/\s+vbscript\s*:/gi, '')
-            .replace(/\s+expression\s*\(/gi, '')
-            .replace(/\s+eval\s*\(/gi, '')
-            .replace(/\s+style\s*=\s*["'][^"']*["']/gi, '');
+      .replace(/data:/gi, '');
+
+    // Simple tag filtering (basic implementation)
+    sanitized = sanitized.replace(/<(\/?)([\w]+)([^>]*)>/g, (match, slash, tag, attrs) => {
+      if (!allowedTags.includes(tag.toLowerCase())) {
+        return '';
+      }
+      
+      // Filter attributes
+      const cleanAttrs = attrs.replace(/(\w+)\s*=\s*["']([^"']*)["']/g, (attrMatch: string, name: string, val: string) => {
+        if (allowedAttributes.includes(name.toLowerCase())) {
+          return ` ${name}="${val}"`;
         }
-        
         return '';
       });
+      
+      return `<${slash}${tag}${cleanAttrs}>`;
+    });
+
+    return sanitized;
   };
 
-  // Validate content length
-  const validateContent = (content: string): boolean => {
-    // Limit content to 1MB to prevent DoS
-    const maxSize = 1024 * 1024; // 1MB
-    return content.length <= maxSize;
-  };
-
-  // Secure configuration for Quill
-  const secureModules = {
-    toolbar: [
-      ['bold', 'italic', 'underline'],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      [{ 'header': [1, 2, 3, false] }],
-      ['link'],
-      ['blockquote', 'code-block'],
-      ['clean']
-    ],
-    clipboard: {
-      matchVisual: false, // Disable visual matching for security
-    }
-  };
-
-  const secureFormats = [
-    'bold', 'italic', 'underline',
-    'list', 'bullet',
-    'header',
-    'link',
-    'blockquote', 'code-block'
-  ];
-
-  // Handle content changes with security validation
-  const handleChange = (content: string, delta: any, source: any, editor: any) => {
-    // Validate content length
-    if (!validateContent(content)) {
-      console.warn('Security: Content too large, truncating');
-      content = content.substring(0, 1024 * 1024);
-    }
-
-    // Sanitize the content
-    const sanitizedContent = sanitizeHTML(content);
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    const content = e.currentTarget.innerHTML;
+    const sanitized = sanitizeHtml(content);
     
-    // Update state
-    setSanitizedValue(sanitizedContent);
+    if (sanitized !== content) {
+      e.currentTarget.innerHTML = sanitized;
+    }
     
-    // Call parent onChange with sanitized content
-    if (onChange) {
-      onChange(sanitizedContent, delta, source, editor);
+    onChange(sanitized);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    const sanitized = sanitizeHtml(text);
+    
+    document.execCommand('insertHTML', false, sanitized);
+    onChange(editorRef.current?.innerHTML || '');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Prevent dangerous key combinations
+    if (e.ctrlKey || e.metaKey) {
+      const key = e.key.toLowerCase();
+      if (['u', 'shift+i', 'shift+j'].includes(key)) {
+        e.preventDefault();
+      }
     }
   };
 
-  // Sanitize initial value
-  useEffect(() => {
-    const sanitized = sanitizeHTML(value);
-    setSanitizedValue(sanitized);
-  }, [value]);
+  if (!isClient) {
+    return (
+      <div className="h-64 bg-gray-100 animate-pulse rounded-md flex items-center justify-center">
+        <span className="text-gray-500">Loading editor...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className={`secure-quill-wrapper ${className}`} style={style}>
-      <ReactQuill
-        value={sanitizedValue}
-        onChange={handleChange}
-        modules={secureModules}
-        formats={secureFormats}
-        placeholder={placeholder}
-        readOnly={readOnly}
-        theme="snow"
-        style={{
-          minHeight: '200px',
-          fontSize: '14px',
-          lineHeight: '1.6'
-        }}
-      />
-      
-      {/* Security indicator */}
-      <div className="security-indicator" style={{
-        fontSize: '10px',
-        color: '#666',
-        marginTop: '5px',
-        textAlign: 'right'
-      }}>
-        🔒 Secure Editor
+    <div className={`secure-editor ${className}`} style={style}>
+      {/* Toolbar */}
+      <div className="border border-gray-300 border-b-0 rounded-t-md bg-gray-50 p-2 flex gap-1">
+        <button
+          type="button"
+          onClick={() => document.execCommand('bold')}
+          className="px-2 py-1 text-sm border rounded hover:bg-gray-200"
+          disabled={readOnly}
+        >
+          <strong>B</strong>
+        </button>
+        <button
+          type="button"
+          onClick={() => document.execCommand('italic')}
+          className="px-2 py-1 text-sm border rounded hover:bg-gray-200"
+          disabled={readOnly}
+        >
+          <em>I</em>
+        </button>
+        <button
+          type="button"
+          onClick={() => document.execCommand('underline')}
+          className="px-2 py-1 text-sm border rounded hover:bg-gray-200"
+          disabled={readOnly}
+        >
+          <u>U</u>
+        </button>
+        <div className="border-l mx-2"></div>
+        <button
+          type="button"
+          onClick={() => document.execCommand('formatBlock', false, 'h2')}
+          className="px-2 py-1 text-sm border rounded hover:bg-gray-200"
+          disabled={readOnly}
+        >
+          H2
+        </button>
+        <button
+          type="button"
+          onClick={() => document.execCommand('formatBlock', false, 'p')}
+          className="px-2 py-1 text-sm border rounded hover:bg-gray-200"
+          disabled={readOnly}
+        >
+          P
+        </button>
       </div>
+
+      {/* Editor */}
+      <div
+        ref={editorRef}
+        contentEditable={!readOnly}
+        onInput={handleInput}
+        onPaste={handlePaste}
+        onKeyDown={handleKeyDown}
+        dangerouslySetInnerHTML={{ __html: value }}
+        className="min-h-[200px] p-3 border border-gray-300 rounded-b-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+        style={{ 
+          ...style,
+          minHeight: '200px'
+        }}
+        data-placeholder={placeholder}
+      />
+
+      <style jsx>{`
+        .secure-editor [contenteditable]:empty:before {
+          content: attr(data-placeholder);
+          color: #9ca3af;
+          pointer-events: none;
+        }
+      `}</style>
     </div>
   );
-};
-
-export default SecureQuill;
+}

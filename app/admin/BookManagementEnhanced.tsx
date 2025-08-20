@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import BulkLibraryManagement from './BulkLibraryManagement';
+import EnhancedReadingAnalytics from './EnhancedReadingAnalytics';
 import Pagination from '@/components/Pagination';
 import { useLoadingState, useSkeletonLoading } from '@/hooks/useLoadingState';
 import { EnhancedErrorDisplay } from '@/components/ui/EnhancedErrorDisplay';
 import { LoadingSpinner, CardSkeleton, TableSkeleton } from '@/components/ui/LoadingSpinner';
+import ModernBookUploadModal from '@/components/ModernBookUploadModal';
 
 interface Book {
   id: number;
@@ -44,8 +46,8 @@ interface Author {
 export default function BookManagementEnhanced() {
   const [activeSection, setActiveSection] = useState('books');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [modalType, setModalType] = useState('book');
-  const [bookType, setBookType] = useState('ebook');
+  const [showBulkLibrary, setShowBulkLibrary] = useState(false);
+  const [selectedBookForAssignment, setSelectedBookForAssignment] = useState<Book | null>(null);
   
   // Loading states
   const { loadingState, startLoading, stopLoading, updateProgress } = useLoadingState();
@@ -84,28 +86,13 @@ export default function BookManagementEnhanced() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [bookToDelete, setBookToDelete] = useState<number | null>(null);
 
-  // Form data
-  const [formData, setFormData] = useState({
-    title: '',
-    author_id: '',
-    category_id: '',
-    price: '',
-    isbn: '',
-    description: '',
-    language: 'English',
-    pages: '',
-    publication_date: '',
-    publisher: '',
-    format: 'ebook',
-    stock_quantity: '',
-    cover_image: null as File | null,
-    ebook_file: null as File | null
-  });
+
 
   // Load initial data
   useEffect(() => {
     loadData();
-  }, []);
+    loadAuthorsAndCategories();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = async () => {
     try {
@@ -138,63 +125,33 @@ export default function BookManagementEnhanced() {
       setTimeout(() => stopLoading(), 500);
       
     } catch (error) {
-      setError(error, 'loadData');
+      setError(error);
       stopLoading();
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    clearAllErrors();
-    
-    // Validate form
-    const validationErrors: Record<string, string> = {};
-    if (!formData.title.trim()) validationErrors.title = 'Title is required';
-    if (!formData.author_id) validationErrors.author_id = 'Author is required';
-    if (!formData.category_id) validationErrors.category_id = 'Category is required';
-    if (!formData.price) validationErrors.price = 'Price is required';
-    if (!formData.cover_image) validationErrors.cover_image = 'Cover image is required';
-    
-    if (Object.keys(validationErrors).length > 0) {
-      Object.entries(validationErrors).forEach(([field, message]) => {
-        setFieldError(field, message);
-      });
-      return;
-    }
-
+  const loadAuthorsAndCategories = async () => {
     try {
-      startLoading('Creating book...', 'progress');
-      updateProgress(25, 'Validating data...');
+      const [authorsResponse, categoriesResponse] = await Promise.all([
+        fetch('/api/admin/authors'),
+        fetch('/api/admin/categories')
+      ]);
       
-      const submitData = new FormData();
-      Object.entries(formData).forEach(([key, value]) => {
-        if (value !== null && value !== '') {
-          submitData.append(key, value.toString());
-        }
-      });
+      if (authorsResponse.ok) {
+        const authorsResult = await authorsResponse.json();
+        setAuthors(authorsResult.authors || []);
+      }
       
-      updateProgress(50, 'Uploading files...');
-      
-      const response = await fetch('/api/books', {
-        method: 'POST',
-        body: submitData
-      });
-      if (!response.ok) throw new Error('Failed to create book');
-      const result = await response.json();
-      
-      updateProgress(100, 'Book created successfully');
-      setTimeout(() => {
-        stopLoading();
-        setShowAddModal(false);
-        loadData();
-        toast.success('Book created successfully!');
-      }, 1000);
-      
+      if (categoriesResponse.ok) {
+        const categoriesResult = await categoriesResponse.json();
+        setCategories(categoriesResult.categories || []);
+      }
     } catch (error) {
-      setGeneralError(error);
-      stopLoading();
+      console.error('Failed to load authors/categories:', error);
     }
   };
+
+
 
   const handleDeleteBook = async (bookId: number) => {
     setBookToDelete(bookId);
@@ -218,7 +175,7 @@ export default function BookManagementEnhanced() {
       toast.success('Book deleted successfully!');
       
     } catch (error) {
-      setError(error, 'deleteBook');
+      setError(error);
       stopLoading();
     }
   };
@@ -247,7 +204,7 @@ export default function BookManagementEnhanced() {
       }, 1000);
       
     } catch (error) {
-      setError(error, 'bulkDelete');
+      setError(error);
       stopLoading();
     }
   };
@@ -257,16 +214,7 @@ export default function BookManagementEnhanced() {
     loadData();
   };
 
-  // Render loading states
-  if (loadingState.isLoading && loadingState.type === 'overlay') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex items-center justify-center py-20">
-          <LoadingSpinner size="xl" text={loadingState.message} variant="dots" />
-        </div>
-      </div>
-    );
-  }
+  // Render loading states - removed overlay check as it's handled by the loading overlay below
 
   // Render error state
   if (error) {
@@ -330,14 +278,14 @@ export default function BookManagementEnhanced() {
 
         {/* Content */}
         <div className="bg-white rounded-lg shadow">
-          {/* Tabs */}
+          {/* Tabs - Mobile Optimized */}
           <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 px-6">
-              {['books', 'categories', 'authors'].map((section) => (
+            <nav className="-mb-px flex overflow-x-auto scrollbar-hide px-4 sm:px-6">
+              {['books', 'library', 'analytics', 'categories', 'authors'].map((section) => (
                 <button
                   key={section}
                   onClick={() => setActiveSection(section)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  className={`py-4 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
                     activeSection === section
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -350,50 +298,53 @@ export default function BookManagementEnhanced() {
           </div>
 
           {/* Tab Content */}
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {activeSection === 'books' && (
               <div>
-                {/* Actions */}
-                <div className="flex justify-between items-center mb-6">
-                  <div className="flex space-x-3">
+                {/* Actions - Mobile Optimized */}
+                <div className="flex flex-col space-y-4 sm:flex-row sm:justify-between sm:items-center sm:space-y-0 mb-6">
+                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                     <button
                       onClick={() => setShowAddModal(true)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm"
                     >
+                      <i className="ri-add-line mr-2"></i>
                       Add Book
                     </button>
                     {selectedBooks.length > 0 && (
                       <button
                         onClick={handleBulkDelete}
-                        className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
+                        className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 text-sm"
                       >
-                        Delete Selected ({selectedBooks.length})
+                        <i className="ri-delete-bin-line mr-2"></i>
+                        Delete ({selectedBooks.length})
                       </button>
                     )}
                   </div>
                   
-                  <div className="flex space-x-3">
+                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                     <input
                       type="text"
                       placeholder="Search books..."
                       value={filters.search}
                       onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                      className="border border-gray-300 rounded-md px-3 py-2"
+                      className="border border-gray-300 rounded-md px-3 py-2 text-sm w-full sm:w-auto"
                     />
                     <button
                       onClick={loadData}
-                      className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+                      className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 text-sm"
                     >
+                      <i className="ri-search-line mr-2"></i>
                       Search
                     </button>
                   </div>
                 </div>
 
-                {/* Books Table */}
+                {/* Books Table - Mobile Optimized */}
                 {skeletonLoading ? (
                   <TableSkeleton rows={5} columns={6} />
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto -mx-4 sm:mx-0">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
@@ -480,12 +431,27 @@ export default function BookManagementEnhanced() {
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <button
-                                onClick={() => handleDeleteBook(book.id)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                Delete
-                              </button>
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedBookForAssignment(book);
+                                    setShowBulkLibrary(true);
+                                  }}
+                                  className="text-blue-600 hover:text-blue-900 text-xs sm:text-sm"
+                                  title="Assign to users"
+                                >
+                                  <i className="ri-user-add-line sm:hidden"></i>
+                                  <span className="hidden sm:inline">Assign</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteBook(book.id)}
+                                  className="text-red-600 hover:text-red-900 text-xs sm:text-sm"
+                                  title="Delete book"
+                                >
+                                  <i className="ri-delete-bin-line sm:hidden"></i>
+                                  <span className="hidden sm:inline">Delete</span>
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -535,6 +501,34 @@ export default function BookManagementEnhanced() {
               </div>
             )}
 
+            {activeSection === 'library' && (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900">Library Management</h3>
+                    <p className="text-sm text-gray-600">Assign ebooks to user libraries</p>
+                  </div>
+                  <button
+                    onClick={() => setShowBulkLibrary(true)}
+                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                  >
+                    Bulk Assign Books
+                  </button>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-6 text-center">
+                  <i className="ri-book-2-line text-4xl text-gray-400 mb-4"></i>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">Assign Books to Users</h4>
+                  <p className="text-gray-600 mb-4">Use the "Assign" button next to any book or click "Bulk Assign Books" to assign multiple books to multiple users at once.</p>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'analytics' && (
+              <div>
+                <EnhancedReadingAnalytics />
+              </div>
+            )}
+
             {activeSection === 'authors' && (
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Authors</h3>
@@ -571,6 +565,29 @@ export default function BookManagementEnhanced() {
             )}
           </div>
         </div>
+
+        {/* Add Book Modal */}
+        <ModernBookUploadModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={() => {
+            loadData();
+            toast.success('Book added successfully!');
+          }}
+          authors={authors}
+          categories={categories}
+        />
+
+        {/* Bulk Library Management Modal */}
+        {showBulkLibrary && (
+          <BulkLibraryManagement
+            onClose={() => {
+              setShowBulkLibrary(false);
+              setSelectedBookForAssignment(null);
+            }}
+            preSelectedBook={selectedBookForAssignment || undefined}
+          />
+        )}
 
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && (

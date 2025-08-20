@@ -105,6 +105,12 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Clear cart after successful payment verification
+        await ecommerceService.clearCartAfterPaymentSuccess(
+          bankTransfer.user_id,
+          bankTransfer.order_id
+        );
+
       } catch (error) {
         console.error('Error updating order after bank transfer verification:', error);
         // Don't fail the verification if order update fails

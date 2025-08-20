@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { addSecurityHeaders, validateRequestHeaders } from './lib/security-headers';
 
 export function middleware(request: NextRequest) {
+  // Validate request headers for security
+  if (!validateRequestHeaders(request)) {
+    return new NextResponse('Invalid request', { status: 400 });
+  }
+
   // Set timezone header for Nigerian timezone
   const response = NextResponse.next();
   response.headers.set('X-Timezone', 'Africa/Lagos');
   
-  return response;
+  return addSecurityHeaders(response);
 }
 
 export const config = {

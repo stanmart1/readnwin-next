@@ -42,8 +42,13 @@ export async function POST(request: NextRequest) {
 
       const gateway = gatewayResult.rows[0];
       
-      // Create Flutterwave service instance using environment variables
-      const flutterwaveService = new FlutterwaveService();
+      // Create Flutterwave service instance using admin-configured parameters
+      const flutterwaveService = new FlutterwaveService(
+        gateway.secret_key,
+        gateway.public_key,
+        gateway.hash,
+        gateway.test_mode
+      );
 
       // Validate webhook signature (webhook secret is optional)
       const isValid = gateway.webhook_secret 

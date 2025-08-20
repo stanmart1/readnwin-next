@@ -13,7 +13,7 @@ const OverviewStats = lazy(() => import("./OverviewStats"));
 const UserManagement = lazy(() => import("./UserManagement"));
 const RoleManagement = lazy(() => import("./RoleManagement"));
 const AuditLog = lazy(() => import("./AuditLog"));
-const BookManagement = lazy(() => import("./BookManagementEnhanced"));
+const BookManagementEnhanced = lazy(() => import("./BookManagementEnhanced"));
 const ReviewManagement = lazy(() => import("./ReviewManagement"));
 const NotificationManagement = lazy(() => import("./NotificationManagement"));
 const OrdersManagement = lazy(() => import("./OrdersManagement"));
@@ -89,7 +89,7 @@ export default function AdminDashboard() {
           "users",
           "roles",
           "audit",
-          "content",
+          "books",
           "reviews",
           "notifications",
           "orders",
@@ -100,6 +100,7 @@ export default function AdminDashboard() {
           "blog",
           "works",
           "about",
+          "faq-management",
           "contact",
           "settings",
         ];
@@ -167,16 +168,10 @@ export default function AdminDashboard() {
             <AuditLog />
           </Suspense>
         );
-      case "content":
-        return (
-          <Suspense fallback={<ComponentLoader />}>
-            <BookManagement />
-          </Suspense>
-        );
       case "books":
         return (
           <Suspense fallback={<ComponentLoader />}>
-            <BookManagement />
+            <BookManagementEnhanced />
           </Suspense>
         );
       case "reviews":

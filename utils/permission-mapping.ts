@@ -36,13 +36,6 @@ export const ADMIN_TAB_PERMISSIONS: TabPermission[] = [
     description: "View system audit logs",
   },
   {
-    id: "content",
-    label: "Content",
-    icon: "ri-folder-line",
-    requiredPermissions: ["content.read"],
-    description: "Manage content and metadata",
-  },
-  {
     id: "books",
     label: "Book Management",
     icon: "ri-book-line",

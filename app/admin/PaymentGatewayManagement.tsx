@@ -199,7 +199,7 @@ export default function PaymentGatewayManagement() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(gateway),
+        body: JSON.stringify({ gateway }),
       });
 
       if (response.ok) {

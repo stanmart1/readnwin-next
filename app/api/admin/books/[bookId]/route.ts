@@ -7,7 +7,7 @@ import ModernBookService from '@/lib/services/ModernBookService';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { bookId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -25,7 +25,7 @@ export async function GET(
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    const id = parseInt(params.id);
+    const id = parseInt(params.bookId);
     
     if (isNaN(id)) {
       return NextResponse.json(
@@ -59,10 +59,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { bookId: string } }
 ) {
   try {
-    console.log(`🔍 Book update request received for ID: ${params.id}`);
+    console.log(`🔍 Book update request received for ID: ${params.bookId}`);
     
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -83,10 +83,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    const id = parseInt(params.id);
+    const id = parseInt(params.bookId);
     
     if (isNaN(id)) {
-      console.log('❌ Invalid book ID:', params.id);
+      console.log('❌ Invalid book ID:', params.bookId);
       return NextResponse.json(
         { error: 'Invalid book ID' },
         { status: 400 }
@@ -251,7 +251,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { bookId: string } }
 ) {
   try {
     console.log('🔍 Book deletion request received');
@@ -275,11 +275,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    const id = parseInt(params.id);
+    const id = parseInt(params.bookId);
     console.log('🔍 Book ID to delete:', id);
     
     if (isNaN(id)) {
-      console.log('❌ Invalid book ID:', params.id);
+      console.log('❌ Invalid book ID:', params.bookId);
       return NextResponse.json(
         { error: 'Invalid book ID' },
         { status: 400 }

@@ -11,11 +11,11 @@ import { pipeline } from 'stream/promises';
 export class StorageService {
   // Base paths - use local storage in development, persistent volume in production
   private static readonly BASE_STORAGE_PATH = process.env.NODE_ENV === 'production' ? '/app/storage' : './storage';
-  private static readonly BOOKS_PATH = process.env.NODE_ENV === 'production' ? '/app/storage/books' : './storage/books';
-  private static readonly COVERS_PATH = process.env.NODE_ENV === 'production' ? '/app/storage/covers' : './storage/covers';
-  private static readonly ASSETS_PATH = process.env.NODE_ENV === 'production' ? '/app/storage/assets' : './storage/assets';
-  private static readonly TEMP_PATH = process.env.NODE_ENV === 'production' ? '/app/storage/temp' : './storage/temp';
-  private static readonly PROCESSED_PATH = process.env.NODE_ENV === 'production' ? '/app/storage/processed' : './storage/processed';
+  private static readonly BOOKS_PATH = `${this.BASE_STORAGE_PATH}/books`;
+  private static readonly COVERS_PATH = `${this.BASE_STORAGE_PATH}/covers`;
+  private static readonly ASSETS_PATH = `${this.BASE_STORAGE_PATH}/assets`;
+  private static readonly TEMP_PATH = `${this.BASE_STORAGE_PATH}/temp`;
+  private static readonly PROCESSED_PATH = `${this.BASE_STORAGE_PATH}/processed`;
 
   /**
    * Initialize storage directories on persistent volume

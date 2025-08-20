@@ -37,10 +37,17 @@ export const ADMIN_TAB_PERMISSIONS: TabPermission[] = [
   },
   {
     id: "content",
+    label: "Content",
+    icon: "ri-folder-line",
+    requiredPermissions: ["content.read"],
+    description: "Manage content and metadata",
+  },
+  {
+    id: "books",
     label: "Book Management",
     icon: "ri-book-line",
     requiredPermissions: ["content.read"],
-    description: "Manage book content and metadata",
+    description: "Manage books, assignments, and analytics",
   },
   {
     id: "reviews",

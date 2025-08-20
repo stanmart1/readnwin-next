@@ -172,8 +172,6 @@ export default function OrderConfirmation({
       errors.push('Please select a payment method');
     }
 
-
-
     setValidationErrors(errors);
     return errors.length === 0;
   };
@@ -517,10 +515,10 @@ export default function OrderConfirmation({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Review Your Order</h2>
-        <p className="text-gray-600">Please review your order details before placing your order</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Review Your Order</h2>
+        <p className="text-gray-600 text-sm sm:text-base">Please review your order details before placing your order</p>
       </div>
 
       {/* Validation Errors */}
@@ -554,18 +552,18 @@ export default function OrderConfirmation({
             const totalPrice = price * quantity;
             
             return (
-              <div key={index} className="flex items-center space-x-4 p-3 border border-gray-200 rounded-lg">
+              <div key={index} className="flex items-center space-x-3 sm:space-x-4 p-3 border border-gray-200 rounded-lg">
                 <img 
                   src={book.cover_image_url || book.cover} 
                   alt={book.title}
-                  className="w-16 h-20 object-cover rounded"
+                  className="w-12 h-16 sm:w-16 sm:h-20 object-cover rounded flex-shrink-0"
                 />
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900">{book.title}</h4>
-                  <p className="text-sm text-gray-600">by {book.author_name || book.author}</p>
-                  <p className="text-sm text-gray-500">Quantity: {quantity}</p>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-gray-900 text-sm sm:text-base truncate">{book.title}</h4>
+                  <p className="text-xs sm:text-sm text-gray-600 truncate">by {book.author_name || book.author}</p>
+                  <p className="text-xs sm:text-sm text-gray-500">Qty: {quantity}</p>
                   {book.format && (
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 ${
                       book.format === 'ebook' 
                         ? 'bg-green-100 text-green-800' 
                         : book.format === 'physical'
@@ -574,12 +572,12 @@ export default function OrderConfirmation({
                     }`}>
                       {book.format === 'ebook' ? 'Digital' : 
                        book.format === 'physical' ? 'Physical' : 
-                       book.format === 'both' ? 'Both Formats' : book.format}
+                       book.format === 'both' ? 'Both' : book.format}
                     </span>
                   )}
                 </div>
-                <div className="text-right">
-                  <p className="font-medium text-gray-900">{formatNaira(totalPrice)}</p>
+                <div className="text-right flex-shrink-0">
+                  <p className="font-medium text-gray-900 text-sm sm:text-base">{formatNaira(totalPrice)}</p>
                 </div>
               </div>
             );
@@ -592,20 +590,18 @@ export default function OrderConfirmation({
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Shipping Address</h3>
           <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-            <p className="font-medium text-gray-900">
+            <p className="font-medium text-gray-900 text-sm sm:text-base">
               {formData.shipping.firstName} {formData.shipping.lastName}
             </p>
-            <p className="text-gray-600">{formData.shipping.address}</p>
-            <p className="text-gray-600">
+            <p className="text-gray-600 text-sm">{formData.shipping.address}</p>
+            <p className="text-gray-600 text-sm">
               {formData.shipping.city}, {formData.shipping.state} {formData.shipping.zipCode}
             </p>
-            <p className="text-gray-600">{formData.shipping.country}</p>
-            <p className="text-gray-600 mt-2">
-              Email: {formData.shipping.email}
-            </p>
-            <p className="text-gray-600">
-              Phone: {formData.shipping.phone}
-            </p>
+            <p className="text-gray-600 text-sm">{formData.shipping.country}</p>
+            <div className="mt-2 space-y-1">
+              <p className="text-gray-600 text-sm">Email: {formData.shipping.email}</p>
+              <p className="text-gray-600 text-sm">Phone: {formData.shipping.phone}</p>
+            </div>
           </div>
         </div>
       )}
@@ -623,10 +619,10 @@ export default function OrderConfirmation({
               } text-white text-sm`}></i>
             </div>
             <div>
-              <p className="font-medium text-gray-900">
+              <p className="font-medium text-gray-900 text-sm sm:text-base">
                 {formData.payment.method === 'flutterwave' ? 'Flutterwave Payment' : 'Bank Transfer'}
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-xs sm:text-sm text-gray-600">
                 {formData.payment.method === 'flutterwave' 
                   ? 'Pay with card, bank transfer, or mobile money' 
                   : 'Pay via bank transfer with proof upload'}
@@ -636,30 +632,28 @@ export default function OrderConfirmation({
         </div>
       </div>
 
-
-
       {/* Order Summary */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h3>
         <div className="p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
-          <div className="flex justify-between">
+          <div className="flex justify-between text-sm sm:text-base">
             <span className="text-gray-600">Subtotal ({cartItems.length} items)</span>
             <span className="font-semibold text-gray-900">{formatNaira(calculateSubtotal())}</span>
           </div>
           
           {isEbookOnly() ? (
-            <div className="flex justify-between text-green-600">
+            <div className="flex justify-between text-green-600 text-sm sm:text-base">
               <span>Shipping</span>
               <span>Free (Digital)</span>
             </div>
           ) : (
-            <div className="flex justify-between">
+            <div className="flex justify-between text-sm sm:text-base">
               <span className="text-gray-600">Shipping</span>
               <span className="font-semibold text-gray-900">{formatNaira(calculateShipping())}</span>
             </div>
           )}
           
-          <div className="flex justify-between">
+          <div className="flex justify-between text-sm sm:text-base">
             <span className="text-gray-600">VAT (7.5%)</span>
             <span className="font-semibold text-gray-900">{formatNaira(calculateTax())}</span>
           </div>
@@ -690,18 +684,18 @@ export default function OrderConfirmation({
       )}
 
       {/* Navigation Buttons */}
-      <div className="flex justify-between pt-6 border-t border-gray-200">
+      <div className="flex flex-col sm:flex-row justify-between gap-3 pt-6 border-t border-gray-200">
         <button
           onClick={onBack}
           disabled={isProcessingOrder}
-          className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Back
         </button>
         <button
           onClick={handlePlaceOrder}
           disabled={isProcessingOrder || validationErrors.length > 0}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+          className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
         >
           {isProcessingOrder ? (
             <>

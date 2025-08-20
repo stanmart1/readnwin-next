@@ -173,6 +173,12 @@ export default function AdminDashboard() {
             <BookManagement />
           </Suspense>
         );
+      case "books":
+        return (
+          <Suspense fallback={<ComponentLoader />}>
+            <BookManagement />
+          </Suspense>
+        );
       case "reviews":
         return (
           <Suspense fallback={<ComponentLoader />}>

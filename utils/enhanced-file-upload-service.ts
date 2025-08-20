@@ -21,7 +21,7 @@ export interface BookFileInfo {
   fileSize: number;
   fileHash: string;
   mimeType: string;
-  fileFormat: 'epub' | 'html' | 'pdf' | 'image';
+  fileFormat: 'epub' | 'html' | 'image';
 }
 
 export class EnhancedFileUploadService {
@@ -200,15 +200,13 @@ export class EnhancedFileUploadService {
     // Check file type
     const allowedTypes = {
       cover: ['image/jpeg', 'image/png', 'image/webp'],
-      ebook: ['application/epub+zip', 'text/html'], // Only EPUB and HTML as per specification
-      sample: ['application/pdf', 'text/html']
+      ebook: ['application/epub+zip', 'text/html']
     };
 
     const fileExtension = extname(file.name).toLowerCase();
     const allowedExtensions = {
       cover: ['.jpg', '.jpeg', '.png', '.webp'],
-      ebook: ['.epub', '.html', '.htm'], // Only EPUB and HTML as per specification
-      sample: ['.pdf', '.html', '.htm']
+      ebook: ['.epub', '.html', '.htm']
     };
 
     const isValidType = allowedTypes[fileType].includes(file.type) || 
@@ -284,15 +282,13 @@ export class EnhancedFileUploadService {
   /**
    * Detect file format from filename and MIME type
    */
-  private detectFileFormat(filename: string, mimeType: string): 'epub' | 'html' | 'pdf' | 'image' {
+  private detectFileFormat(filename: string, mimeType: string): 'epub' | 'html' | 'image' {
     const extension = extname(filename).toLowerCase();
     
     if (extension === '.epub' || mimeType === 'application/epub+zip') {
       return 'epub';
     } else if (extension === '.html' || extension === '.htm' || mimeType === 'text/html') {
       return 'html';
-    } else if (extension === '.pdf' || mimeType === 'application/pdf') {
-      return 'pdf';
     } else if (mimeType.startsWith('image/')) {
       return 'image';
     }
@@ -302,7 +298,6 @@ export class EnhancedFileUploadService {
       case '.epub': return 'epub';
       case '.html':
       case '.htm': return 'html';
-      case '.pdf': return 'pdf';
       default: return 'image';
     }
   }

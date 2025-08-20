@@ -441,7 +441,7 @@ export default function BookManagementEnhanced() {
         {showAddModal && (
           <ModernBookUploadModal
             isOpen={showAddModal}
-            onClose={() => setShowAddModal(false)}
+            onClose={handleModalClose}
             onSuccess={handleModalClose}
             categories={categories}
             authors={authors}

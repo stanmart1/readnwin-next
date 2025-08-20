@@ -172,12 +172,28 @@ export default function ModernBookUploadModal({
     try {
       const submitData = new FormData();
       
-      // Add form fields
-      Object.entries(formData).forEach(([key, value]) => {
-        if (key !== 'cover_image' && key !== 'ebook_file' && value !== null) {
-          submitData.append(key, String(value));
-        }
-      });
+      // Add form fields with correct mapping for ModernBookService
+      submitData.append('title', formData.title);
+      submitData.append('author_id', formData.author_id);
+      submitData.append('category_id', formData.category_id);
+      submitData.append('price', formData.price);
+      submitData.append('book_type', formData.format); // 'ebook' or 'physical'
+      
+      if (formData.isbn) submitData.append('isbn', formData.isbn);
+      if (formData.description) submitData.append('description', formData.description);
+      if (formData.language) submitData.append('language', formData.language);
+      if (formData.pages) submitData.append('pages', formData.pages);
+      if (formData.publication_date) submitData.append('publication_date', formData.publication_date);
+      if (formData.publisher) submitData.append('publisher', formData.publisher);
+      
+      // Stock management for physical books
+      if (formData.format === 'physical') {
+        submitData.append('stock_quantity', formData.stock_quantity);
+        submitData.append('inventory_tracking', String(formData.track_inventory));
+      }
+      
+      // Set status as published by default
+      submitData.append('status', 'published');
 
       // Add files
       if (formData.cover_image) {
@@ -187,13 +203,10 @@ export default function ModernBookUploadModal({
         submitData.append('ebook_file', formData.ebook_file);
       }
 
-      // Set book type based on format
-      submitData.append('book_type', formData.format);
-
       console.log('📤 Submitting book data...');
       setUploadProgress(25);
 
-      const response = await fetch('/api/admin/books', {
+      const response = await fetch('/api/books', {
         method: 'POST',
         body: submitData,
         credentials: 'include'
@@ -210,7 +223,6 @@ export default function ModernBookUploadModal({
         // Show success for a moment then close
         setTimeout(() => {
           onSuccess();
-          onClose();
           resetForm();
         }, 1500);
       } else {

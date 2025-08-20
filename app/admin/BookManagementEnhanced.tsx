@@ -4,10 +4,9 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import BulkLibraryManagement from './BulkLibraryManagement';
 import Pagination from '@/components/Pagination';
-import { useEnhancedError, useAsyncOperation, useFormError } from '@/hooks/useEnhancedError';
 import { useLoadingState, useSkeletonLoading } from '@/hooks/useLoadingState';
 import { EnhancedErrorDisplay } from '@/components/ui/EnhancedErrorDisplay';
-import { LoadingSpinner, SkeletonLoader, CardSkeleton, TableSkeleton } from '@/components/ui/LoadingSpinner';
+import { LoadingSpinner, CardSkeleton, TableSkeleton } from '@/components/ui/LoadingSpinner';
 
 interface Book {
   id: number;
@@ -48,69 +47,23 @@ export default function BookManagementEnhanced() {
   const [modalType, setModalType] = useState('book');
   const [bookType, setBookType] = useState('ebook');
   
-  // Enhanced error handling
-  const { error, setError, clearError, retryAction, setRetryAction } = useEnhancedError();
-  const { fieldErrors, generalError, setFieldError, setGeneralError, clearAllErrors, hasErrors } = useFormError();
-  
-  // Enhanced loading states
+  // Loading states
   const { loadingState, startLoading, stopLoading, updateProgress } = useLoadingState();
-  const { isLoading: skeletonLoading, startSkeleton, stopSkeleton } = useSkeletonLoading();
+  const { isLoading: skeletonLoading } = useSkeletonLoading();
   
-  // Async operations with enhanced error handling
-  const loadBooksOperation = useAsyncOperation(
-    async (page = 1, limit = 20, search = '', status = '', category_id?: number) => {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-        search,
-        status
-      });
-      if (category_id) params.append('category_id', category_id.toString());
-      
-      const response = await fetch(`/api/admin/books?${params}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || errorData.error || 'Failed to load books');
-      }
-      return response.json();
-    },
-    'BookManagement'
-  );
-
-  const createBookOperation = useAsyncOperation(
-    async (formData: FormData) => {
-      const response = await fetch('/api/admin/books', {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || errorData.error || 'Failed to create book');
-      }
-      return response.json();
-    },
-    'BookCreation'
-  );
-
-  const deleteBookOperation = useAsyncOperation(
-    async (bookIds: number[]) => {
-      const params = new URLSearchParams({
-        ids: bookIds.join(',')
-      });
-      
-      const response = await fetch(`/api/admin/books?${params}`, {
-        method: 'DELETE'
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || errorData.error || 'Failed to delete books');
-      }
-      return response.json();
-    },
-    'BookDeletion'
-  );
+  // Error handling
+  const [error, setError] = useState<any>(null);
+  const [generalError, setGeneralError] = useState<any>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  
+  const clearError = () => setError(null);
+  const clearAllErrors = () => {
+    setFieldErrors({});
+    setGeneralError(null);
+  };
+  const setFieldError = (field: string, message: string) => {
+    setFieldErrors(prev => ({ ...prev, [field]: message }));
+  };
 
   // State management
   const [books, setBooks] = useState<Book[]>([]);
@@ -159,22 +112,26 @@ export default function BookManagementEnhanced() {
       startLoading('Loading books...', 'spinner');
       updateProgress(25, 'Fetching books...');
       
-      const result = await loadBooksOperation.execute(
-        pagination.page,
-        pagination.limit,
-        filters.search,
-        filters.status,
-        filters.category_id
-      );
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+        search: filters.search,
+        status: filters.status
+      });
+      if (filters.category_id) params.append('category_id', filters.category_id.toString());
+      
+      const response = await fetch(`/api/books?${params}`);
+      if (!response.ok) throw new Error('Failed to load books');
+      const result = await response.json();
       
       updateProgress(75, 'Processing data...');
       
       setBooks(result.books);
       setPagination({
-        page: result.pagination.page,
-        limit: result.pagination.limit,
-        total: result.pagination.total,
-        pages: result.pagination.pages
+        page: result.pagination.currentPage,
+        limit: result.pagination.itemsPerPage,
+        total: result.pagination.totalItems,
+        pages: result.pagination.totalPages
       });
       
       updateProgress(100, 'Completed');
@@ -218,7 +175,12 @@ export default function BookManagementEnhanced() {
       
       updateProgress(50, 'Uploading files...');
       
-      const result = await createBookOperation.execute(submitData);
+      const response = await fetch('/api/books', {
+        method: 'POST',
+        body: submitData
+      });
+      if (!response.ok) throw new Error('Failed to create book');
+      const result = await response.json();
       
       updateProgress(100, 'Book created successfully');
       setTimeout(() => {
@@ -245,7 +207,9 @@ export default function BookManagementEnhanced() {
     try {
       startLoading('Deleting book...', 'spinner');
       
-      await deleteBookOperation.execute([bookToDelete]);
+      const params = new URLSearchParams({ ids: bookToDelete.toString() });
+      const response = await fetch(`/api/books?${params}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete book');
       
       stopLoading();
       setShowDeleteConfirm(false);
@@ -269,7 +233,10 @@ export default function BookManagementEnhanced() {
       startLoading(`Deleting ${selectedBooks.length} books...`, 'progress');
       updateProgress(25, 'Preparing deletion...');
       
-      const result = await deleteBookOperation.execute(selectedBooks);
+      const params = new URLSearchParams({ ids: selectedBooks.join(',') });
+      const response = await fetch(`/api/books?${params}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete books');
+      const result = await response.json();
       
       updateProgress(100, 'Books deleted successfully');
       setTimeout(() => {
@@ -287,11 +254,7 @@ export default function BookManagementEnhanced() {
 
   const handleRetry = () => {
     clearError();
-    if (retryAction) {
-      retryAction();
-    } else {
-      loadData();
-    }
+    loadData();
   };
 
   // Render loading states
@@ -335,10 +298,7 @@ export default function BookManagementEnhanced() {
           <div className="mb-6">
             <EnhancedErrorDisplay
               error={generalError}
-              onRetry={() => {
-                clearAllErrors();
-                handleSubmit(new Event('submit') as any);
-              }}
+              onRetry={handleRetry}
               onDismiss={() => setGeneralError(null)}
             />
           </div>

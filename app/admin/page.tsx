@@ -13,7 +13,7 @@ const OverviewStats = lazy(() => import("./OverviewStats"));
 const UserManagement = lazy(() => import("./UserManagement"));
 const RoleManagement = lazy(() => import("./RoleManagement"));
 const AuditLog = lazy(() => import("./AuditLog"));
-const BookManagement = lazy(() => import("./BookManagement"));
+const BookManagement = lazy(() => import("./BookManagementEnhanced"));
 const ReviewManagement = lazy(() => import("./ReviewManagement"));
 const NotificationManagement = lazy(() => import("./NotificationManagement"));
 const OrdersManagement = lazy(() => import("./OrdersManagement"));

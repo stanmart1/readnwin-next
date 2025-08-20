@@ -15,13 +15,13 @@ export async function GET(
 
     const result = await query(`
       SELECT * FROM user_highlights 
-      WHERE user_id = $1 AND book_id = $2
-      ORDER BY created_at ASC
-    `, [session.user.id, params.bookId]);
+      WHERE book_id = $1 AND user_id = $2
+      ORDER BY created_at DESC
+    `, [params.bookId, session.user.id]);
 
     return NextResponse.json({
       success: true,
-      highlights: result.rows,
+      highlights: result.rows
     });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch highlights' }, { status: 500 });

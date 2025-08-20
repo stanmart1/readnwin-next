@@ -170,7 +170,7 @@ export default function BookUploadModal({
         }
       });
 
-      const response = await fetch('/api/admin/books', {
+      const response = await fetch('/api/books', {
         method: 'POST',
         body: formDataToSend
       });

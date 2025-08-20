@@ -15,12 +15,12 @@ export async function GET(
 
     const result = await query(`
       SELECT * FROM reading_progress 
-      WHERE user_id = $1 AND book_id = $2
-    `, [session.user.id, params.bookId]);
+      WHERE book_id = $1 AND user_id = $2
+    `, [params.bookId, session.user.id]);
 
     return NextResponse.json({
       success: true,
-      progress: result.rows[0] || null,
+      progress: result.rows[0] || null
     });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch progress' }, { status: 500 });
@@ -37,36 +37,20 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const data = await request.json();
-    
-    const result = await query(`
-      INSERT INTO reading_progress (
-        user_id, book_id, current_chapter_id, current_position, 
-        progress_percentage, total_reading_time_seconds, last_read_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
-      ON CONFLICT (user_id, book_id) 
-      DO UPDATE SET
-        current_chapter_id = EXCLUDED.current_chapter_id,
-        current_position = EXCLUDED.current_position,
-        progress_percentage = EXCLUDED.progress_percentage,
-        total_reading_time_seconds = reading_progress.total_reading_time_seconds + EXCLUDED.total_reading_time_seconds,
-        last_read_at = CURRENT_TIMESTAMP,
-        updated_at = CURRENT_TIMESTAMP
-      RETURNING *
-    `, [
-      session.user.id,
-      params.bookId,
-      data.current_chapter_id,
-      data.current_position || 0,
-      data.progress_percentage || 0,
-      data.timeSpent || 0
-    ]);
+    const progress = await request.json();
 
-    return NextResponse.json({
-      success: true,
-      progress: result.rows[0],
-    });
+    await query(`
+      INSERT INTO reading_progress (book_id, user_id, current_position, progress_percentage, last_read_at)
+      VALUES ($1, $2, $3, $4, NOW())
+      ON CONFLICT (book_id, user_id) 
+      DO UPDATE SET 
+        current_position = $3,
+        progress_percentage = $4,
+        last_read_at = NOW()
+    `, [params.bookId, session.user.id, progress.current_position, progress.progress_percentage]);
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to update progress' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to save progress' }, { status: 500 });
   }
 }

@@ -98,11 +98,11 @@ export default function EnhancedBookManagement() {
         )
       });
 
-      const response = await fetch(`/api/admin/books?${params}`);
+      const response = await fetch(`/api/books?${params}`);
       if (response.ok) {
         const data = await response.json();
         setBooks(data.books);
-        setTotalBooks(data.pagination.total);
+        setTotalBooks(data.pagination.totalItems);
       }
     } catch (error) {
       console.error('Error loading books:', error);
@@ -125,7 +125,7 @@ export default function EnhancedBookManagement() {
 
   const loadAuthors = async () => {
     try {
-      const response = await fetch('/api/admin/authors');
+      const response = await fetch('/api/authors');
       if (response.ok) {
         const data = await response.json();
         setAuthors(data.authors || []);
@@ -149,7 +149,7 @@ export default function EnhancedBookManagement() {
     if (!confirm('Are you sure you want to delete this book?')) return;
 
     try {
-      const response = await fetch(`/api/admin/books/${bookId}`, {
+      const response = await fetch(`/api/books?ids=${bookId}`, {
         method: 'DELETE'
       });
 
@@ -168,7 +168,7 @@ export default function EnhancedBookManagement() {
     if (!confirm(`Are you sure you want to delete ${bookIds.length} books?`)) return;
 
     try {
-      const response = await fetch(`/api/admin/books?ids=${bookIds.join(',')}`, {
+      const response = await fetch(`/api/books?ids=${bookIds.join(',')}`, {
         method: 'DELETE'
       });
 

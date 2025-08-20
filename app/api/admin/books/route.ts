@@ -447,8 +447,8 @@ export async function GET(request: NextRequest) {
         b.pages,
         b.publication_date,
         b.publisher,
-        'ebook' as book_type,
-        COALESCE(b.format, 'unknown') as format,
+        COALESCE(b.book_type, 'ebook') as book_type,
+        COALESCE(b.file_format, 'unknown') as format,
         COALESCE(b.processing_status, 'pending') as parsing_status,
         b.cover_image_url,
         b.ebook_file_url,
@@ -461,14 +461,15 @@ export async function GET(request: NextRequest) {
         COALESCE(b.estimated_reading_time, 0) as estimated_reading_time,
         COALESCE(b.pages, 0) as page_count,
         0 as chapter_count,
-        0 as library_count
+        COALESCE(b.stock_quantity, 0) as stock_quantity,
+        COALESCE(b.is_featured, false) as is_featured
       FROM books b
       LEFT JOIN authors a ON b.author_id = a.id
       LEFT JOIN categories c ON b.category_id = c.id
       WHERE ${whereClause}
       ORDER BY b.created_at DESC
-      LIMIT $1
-    `, [limit]);
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `, [...queryParams, limit, offset]);
 
     const books = booksResult.rows.map(book => ({
       id: book.id,
@@ -485,7 +486,8 @@ export async function GET(request: NextRequest) {
       chapter_count: book.chapter_count || 0,
       cover_image_url: book.cover_image_url || null,
       status: book.status || 'published',
-      library_count: parseInt(book.library_count) || 0,
+      stock_quantity: book.stock_quantity || 0,
+      is_featured: book.is_featured || false,
       created_at: book.created_at
     }));
 

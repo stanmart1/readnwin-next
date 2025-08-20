@@ -100,17 +100,17 @@ export default function BookManagementEnhanced() {
       });
       if (filters.category_id) params.append('category_id', filters.category_id.toString());
       
-      const response = await fetch(`/api/books?${params}`);
+      const response = await fetch(`/api/admin/books?${params}`);
       if (!response.ok) throw new Error('Failed to load books');
       const result = await response.json();
       
       setBooks(result.books || []);
       if (result.pagination) {
         setPagination({
-          page: result.pagination.currentPage || 1,
-          limit: result.pagination.itemsPerPage || 20,
-          total: result.pagination.totalItems || 0,
-          pages: result.pagination.totalPages || 0
+          page: result.pagination.page || 1,
+          limit: result.pagination.limit || 20,
+          total: result.pagination.total || 0,
+          pages: result.pagination.pages || 0
         });
       }
       
@@ -153,7 +153,7 @@ export default function BookManagementEnhanced() {
     try {
       setDeleteLoading(true);
       const params = new URLSearchParams({ ids: bookToDelete.toString() });
-      const response = await fetch(`/api/books?${params}`, { method: 'DELETE' });
+      const response = await fetch(`/api/admin/books?${params}`, { method: 'DELETE' });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to delete book');
@@ -185,7 +185,7 @@ export default function BookManagementEnhanced() {
     
     try {
       const params = new URLSearchParams({ ids: selectedBooks.join(',') });
-      const response = await fetch(`/api/books?${params}`, { method: 'DELETE' });
+      const response = await fetch(`/api/admin/books?${params}`, { method: 'DELETE' });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to delete books');

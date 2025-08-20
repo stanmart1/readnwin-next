@@ -64,8 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has admin permissions
-    // This should be implemented based on your permission system
-    const isAdmin = session.user.role === 'admin' || session.user.email === process.env.ADMIN_EMAIL;
+    const isAdmin = ['admin', 'super_admin'].includes(session.user.role) || session.user.email === process.env.ADMIN_EMAIL;
     if (!isAdmin) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
@@ -188,7 +187,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check if user has admin permissions
-    const isAdmin = session.user.role === 'admin' || session.user.email === process.env.ADMIN_EMAIL;
+    const isAdmin = ['admin', 'super_admin'].includes(session.user.role) || session.user.email === process.env.ADMIN_EMAIL;
     if (!isAdmin) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }

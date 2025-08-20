@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { formatDate } from '@/utils/dateUtils';
 import { useNotifications } from '@/components/ui/Notification';
 import { LoadingSpinner, LoadingButton } from '@/components/ui/LoadingSpinner';
+import Modal from '@/components/ui/Modal';
 import UserReadingAnalytics from './UserReadingAnalytics';
 import UserLibraryManagement from './UserLibraryManagement';
 import BulkLibraryManagement from './BulkLibraryManagement';
@@ -948,19 +949,15 @@ export default function UserManagement() {
       </div>
 
       {/* Create User Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Create New User</h2>
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="text-gray-400 hover:text-gray-600 cursor-pointer transition-colors duration-200"
-                >
-                  <i className="ri-close-line text-xl"></i>
-                </button>
-              </div>
+      <Modal 
+        isOpen={showCreateModal} 
+        onClose={() => setShowCreateModal(false)}
+        className="max-w-md w-full mx-4"
+      >
+        <div className="p-6">
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-900">Create New User</h2>
+          </div>
 
               <form className="space-y-4">
                 <div>
@@ -1051,31 +1048,26 @@ export default function UserManagement() {
                 </div>
               </form>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* Edit User Modal */}
-      {showEditModal && editingUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-8">
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Edit User</h2>
-                  <p className="text-gray-600 mt-1">Update user information and roles</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditingUser(null);
-                    setEditingUserRoles([]);
-                  }}
-                  className="text-gray-400 hover:text-gray-600 cursor-pointer transition-colors duration-200 p-2 hover:bg-gray-100 rounded-full"
-                >
-                  <i className="ri-close-line text-xl"></i>
-                </button>
+      <Modal 
+        isOpen={showEditModal && !!editingUser} 
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingUser(null);
+          setEditingUserRoles([]);
+        }}
+        className="rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+      >
+        {editingUser && (
+          <div className="p-8">
+            <div className="mb-8">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Edit User</h2>
+                <p className="text-gray-600 mt-1">Update user information and roles</p>
               </div>
+            </div>
 
               <form className="space-y-6">
                 {/* User Avatar and Basic Info */}
@@ -1207,27 +1199,23 @@ export default function UserManagement() {
                 </div>
               </form>
             </div>
-          </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* User Detail Modal */}
-      {showUserModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-8">
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">User Profile</h2>
-                  <p className="text-gray-600 mt-1">Detailed user information and management</p>
-                </div>
-                <button
-                  onClick={() => setShowUserModal(false)}
-                  className="text-gray-400 hover:text-gray-600 cursor-pointer transition-colors duration-200 p-2 hover:bg-gray-100 rounded-full"
-                >
-                  <i className="ri-close-line text-xl"></i>
-                </button>
+      <Modal 
+        isOpen={showUserModal && !!selectedUser} 
+        onClose={() => setShowUserModal(false)}
+        className="rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+      >
+        {selectedUser && (
+          <div className="p-8">
+            <div className="mb-8">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">User Profile</h2>
+                <p className="text-gray-600 mt-1">Detailed user information and management</p>
               </div>
+            </div>
 
               <div className="space-y-8">
                 {/* User Header */}
@@ -1366,24 +1354,29 @@ export default function UserManagement() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-              {/* User Reading Analytics Modal */}
-        {showUserReadingAnalytics && selectedUserForAnalytics && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl max-h-[90vh] overflow-y-auto">
-              <UserReadingAnalytics 
-                userId={selectedUserForAnalytics}
-                onClose={() => {
-                  setShowUserReadingAnalytics(false);
-                  setSelectedUserForAnalytics(null);
-                }}
-              />
-            </div>
-          </div>
         )}
+      </Modal>
+
+      {/* User Reading Analytics Modal */}
+      <Modal 
+        isOpen={showUserReadingAnalytics && !!selectedUserForAnalytics} 
+        onClose={() => {
+          setShowUserReadingAnalytics(false);
+          setSelectedUserForAnalytics(null);
+        }}
+        className="w-full max-w-7xl max-h-[90vh] overflow-y-auto"
+        showCloseIcon={false}
+      >
+        {selectedUserForAnalytics && (
+          <UserReadingAnalytics 
+            userId={selectedUserForAnalytics}
+            onClose={() => {
+              setShowUserReadingAnalytics(false);
+              setSelectedUserForAnalytics(null);
+            }}
+          />
+        )}
+      </Modal>
 
         {/* User Library Management Modal */}
         {showUserLibraryManagement && selectedUserForLibrary && (

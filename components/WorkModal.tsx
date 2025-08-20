@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import Modal from '@/components/ui/Modal';
 
 interface WorkModalProps {
   isOpen: boolean;
@@ -15,45 +16,14 @@ interface WorkModalProps {
 }
 
 export default function WorkModal({ isOpen, onClose, work }: WorkModalProps) {
-  // Handle escape key to close modal
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden'; // Prevent background scrolling
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen, onClose]);
-
   if (!isOpen || !work) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
-      {/* Modal Content */}
-      <div className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 bg-white/90 text-gray-800 p-2 rounded-full shadow-lg transition-all duration-300 hover:bg-white"
-          aria-label="Close modal"
-        >
-          <i className="ri-close-line text-xl"></i>
-        </button>
+    <Modal 
+      isOpen={isOpen} 
+      onClose={onClose}
+      className="rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+    >
         
         {/* Modal Body */}
         <div className="flex flex-col lg:flex-row h-full">
@@ -101,7 +71,6 @@ export default function WorkModal({ isOpen, onClose, work }: WorkModalProps) {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 } 

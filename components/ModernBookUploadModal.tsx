@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
+import Modal from '@/components/ui/Modal';
 
 interface ModernBookUploadModalProps {
   isOpen: boolean;
@@ -223,24 +224,21 @@ export default function ModernBookUploadModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden">
-        {/* Header */}
-        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Add New Book</h2>
-            <p className="text-xs sm:text-sm text-gray-600 mt-1">
-              Step {currentStep} of 2 - {currentStep === 1 ? 'Book Information' : 'Upload Files'}
-            </p>
-          </div>
-          <button
-            onClick={handleClose}
-            disabled={isSubmitting}
-            className="p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-white/50 disabled:opacity-50 transition-all"
-          >
-            <i className="ri-close-line text-xl sm:text-2xl"></i>
-          </button>
+    <Modal 
+      isOpen={isOpen} 
+      onClose={handleClose}
+      className="rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden"
+      closeOnOutsideClick={!isSubmitting}
+    >
+      {/* Header */}
+      <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Add New Book</h2>
+          <p className="text-xs sm:text-sm text-gray-600 mt-1">
+            Step {currentStep} of 2 - {currentStep === 1 ? 'Book Information' : 'Upload Files'}
+          </p>
         </div>
+      </div>
 
         {/* Progress Bar */}
         <div className="px-4 sm:px-6 py-3">
@@ -671,7 +669,6 @@ export default function ModernBookUploadModal({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

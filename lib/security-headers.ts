@@ -7,11 +7,11 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
     [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.flutterwave.com https://js.stripe.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https: blob:",
       "connect-src 'self' https://api.flutterwave.com https://api.paystack.co",
-      "frame-src 'self' https://checkout.flutterwave.com https://js.stripe.com",
+      "frame-src 'self' https://checkout.flutterwave.com https://checkout-v3-ui-prod.f4b-flutterwave.com https://js.stripe.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

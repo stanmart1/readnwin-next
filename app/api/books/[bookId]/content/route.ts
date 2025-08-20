@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 import StorageService from '@/lib/services/StorageService';
+import { SecureBookAccess } from '@/utils/secure-book-access';
 
 export async function GET(
   request: NextRequest,
@@ -39,15 +40,17 @@ export async function GET(
 
     const book = bookResult.rows[0];
 
-    // Check if user has access to this book
-    // This should be implemented based on your access control system
-    const hasAccess = await checkUserBookAccess(session.user.id, bookId);
-    if (!hasAccess) {
+    // Verify secure book access
+    const accessResult = await SecureBookAccess.verifyBookAccess(session.user.id, bookId);
+    if (!accessResult.hasAccess) {
       return NextResponse.json(
         { success: false, error: 'Access denied to this book' },
         { status: 403 }
       );
     }
+
+    // Validate reading session
+    await SecureBookAccess.validateReadingSession(session.user.id, bookId);
 
     // Get book content structure
     const structureResult = await query(`

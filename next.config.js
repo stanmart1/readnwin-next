@@ -44,7 +44,7 @@ const nextConfig = {
         pathname: '/**',
       },
     ],
-    unoptimized: false, // Set to true if you want to disable image optimization
+    unoptimized: true, // Disabled due to production issues
   },
 
   // Environment variables (don't include NODE_ENV here)
@@ -181,6 +181,11 @@ const nextConfig = {
       {
         source: '/media_root/:path*',
         destination: '/api/book-files/:path*',
+      },
+      // Serve images from public directory
+      {
+        source: '/images/:path*',
+        destination: '/api/images/:path*',
       },
     ];
 

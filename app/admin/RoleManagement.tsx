@@ -1264,8 +1264,9 @@ export default function RoleManagement() {
                 </div>
               )}
             </div>
-        )}
-      </Modal>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

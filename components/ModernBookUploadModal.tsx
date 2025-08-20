@@ -26,6 +26,7 @@ interface BookFormData {
   publisher: string;
   format: string;
   stock_quantity: string;
+  track_inventory: boolean;
   cover_image: File | null;
   ebook_file: File | null;
 }
@@ -54,26 +55,58 @@ export default function ModernBookUploadModal({
     publisher: '',
     format: 'ebook',
     stock_quantity: '0',
+    track_inventory: true,
     cover_image: null,
     ebook_file: null
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dragActive, setDragActive] = useState({ cover: false, ebook: false });
+  const [isParsingEbook, setIsParsingEbook] = useState(false);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const ebookInputRef = useRef<HTMLInputElement>(null);
 
-  const handleInputChange = (field: keyof BookFormData, value: string) => {
+  const handleInputChange = (field: keyof BookFormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
 
-  const handleFileChange = (field: 'cover_image' | 'ebook_file', file: File) => {
+  const handleFileChange = async (field: 'cover_image' | 'ebook_file', file: File) => {
     setFormData(prev => ({ ...prev, [field]: file }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    
+    // Parse ebook file to extract pages
+    if (field === 'ebook_file' && file.type === 'application/epub+zip') {
+      await parseEbookFile(file);
+    }
+  };
+
+  const parseEbookFile = async (file: File) => {
+    setIsParsingEbook(true);
+    try {
+      const formData = new FormData();
+      formData.append('ebook_file', file);
+      
+      const response = await fetch('/api/admin/books/parse-ebook', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.pages) {
+          setFormData(prev => ({ ...prev, pages: result.pages.toString() }));
+          toast.success(`Extracted ${result.pages} pages from ebook`);
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing ebook:', error);
+    } finally {
+      setIsParsingEbook(false);
     }
   };
 
@@ -87,7 +120,7 @@ export default function ModernBookUploadModal({
     }
   };
 
-  const handleDrop = (e: React.DragEvent, type: 'cover' | 'ebook') => {
+  const handleDrop = async (e: React.DragEvent, type: 'cover' | 'ebook') => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(prev => ({ ...prev, [type]: false }));
@@ -95,7 +128,7 @@ export default function ModernBookUploadModal({
     const files = e.dataTransfer.files;
     if (files && files[0]) {
       const field = type === 'cover' ? 'cover_image' : 'ebook_file';
-      handleFileChange(field, files[0]);
+      await handleFileChange(field, files[0]);
     }
   };
 
@@ -206,6 +239,7 @@ export default function ModernBookUploadModal({
       publisher: '',
       format: 'ebook',
       stock_quantity: '0',
+      track_inventory: true,
       cover_image: null,
       ebook_file: null
     });
@@ -394,16 +428,24 @@ export default function ModernBookUploadModal({
                 {/* Pages */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Pages
+                    Pages {isParsingEbook && <span className="text-blue-600">(Parsing...)</span>}
                   </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={formData.pages}
-                    onChange={(e) => handleInputChange('pages', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Number of pages"
-                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.pages}
+                      onChange={(e) => handleInputChange('pages', e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Number of pages"
+                      disabled={isParsingEbook}
+                    />
+                    {isParsingEbook && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Publisher (for physical books) */}
@@ -422,20 +464,48 @@ export default function ModernBookUploadModal({
                   </div>
                 )}
 
-                {/* Stock Quantity (for physical books) */}
+                {/* Inventory Management (for physical books) */}
                 {formData.format === 'physical' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Stock Quantity
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.stock_quantity}
-                      onChange={(e) => handleInputChange('stock_quantity', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Available units"
-                    />
+                  <div className="sm:col-span-2">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Inventory Management
+                      </label>
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.track_inventory}
+                          onChange={(e) => handleInputChange('track_inventory', e.target.checked)}
+                          className="sr-only"
+                        />
+                        <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          formData.track_inventory ? 'bg-blue-600' : 'bg-gray-200'
+                        }`}>
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            formData.track_inventory ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </div>
+                        <span className="ml-2 text-sm text-gray-600">
+                          {formData.track_inventory ? 'Track inventory' : 'Don\'t track inventory'}
+                        </span>
+                      </label>
+                    </div>
+                    
+                    {formData.track_inventory && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Stock Quantity
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.stock_quantity}
+                          onChange={(e) => handleInputChange('stock_quantity', e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="Available units"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -546,7 +616,7 @@ export default function ModernBookUploadModal({
                       ref={ebookInputRef}
                       type="file"
                       accept=".epub,.html,.htm"
-                      onChange={(e) => e.target.files?.[0] && handleFileChange('ebook_file', e.target.files[0])}
+                      onChange={async (e) => e.target.files?.[0] && await handleFileChange('ebook_file', e.target.files[0])}
                       className="hidden"
                     />
                     

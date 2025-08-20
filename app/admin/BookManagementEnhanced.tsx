@@ -413,6 +413,8 @@ export default function BookManagementEnhanced() {
                       <Pagination
                         currentPage={pagination.page}
                         totalPages={pagination.pages}
+                        totalItems={pagination.total}
+                        itemsPerPage={pagination.limit}
                         onPageChange={(page) => {
                           setPagination(prev => ({ ...prev, page }));
                           window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -266,6 +266,48 @@ export default function BookManagementEnhanced() {
     }
   };
 
+  const handleToggleFeature = async (bookId: number, isFeatured: boolean) => {
+    try {
+      const response = await fetch(`/api/admin/books/${bookId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_featured: isFeatured })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update book');
+      }
+
+      loadData();
+      toast.success(isFeatured ? 'Book added to featured' : 'Book removed from featured');
+    } catch (error) {
+      console.error('Toggle feature error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update book');
+    }
+  };
+
+  const handleToggleStatus = async (bookId: number, status: string) => {
+    try {
+      const response = await fetch(`/api/admin/books/${bookId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update book');
+      }
+
+      loadData();
+      toast.success(`Book ${status === 'published' ? 'activated' : 'deactivated'} successfully`);
+    } catch (error) {
+      console.error('Toggle status error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update book');
+    }
+  };
+
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
@@ -533,31 +575,33 @@ export default function BookManagementEnhanced() {
                             <div className="col-span-2">
                               <div className="flex items-center gap-1">
                                 <button
-                                  onClick={() => {
-                                    setSelectedBookForAction(book);
-                                    setShowAssignModal(true);
-                                  }}
-                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                  title="Assign to User"
+                                  onClick={() => handleToggleFeature(book.id, !book.is_featured)}
+                                  className={`p-1.5 rounded-lg transition-colors ${
+                                    book.is_featured 
+                                      ? 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100' 
+                                      : 'text-gray-400 hover:text-yellow-600 hover:bg-yellow-50'
+                                  }`}
+                                  title={book.is_featured ? 'Remove from Featured' : 'Add to Featured'}
                                 >
-                                  <i className="ri-user-add-line text-sm"></i>
+                                  <i className="ri-star-line text-sm"></i>
                                 </button>
                                 <button
-                                  onClick={() => {
-                                    setSelectedBookForAction(book);
-                                    setShowAnalyticsModal(true);
-                                  }}
-                                  className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                                  title="View Reading Analytics"
+                                  onClick={() => handleToggleStatus(book.id, book.status === 'published' ? 'draft' : 'published')}
+                                  className={`p-1.5 rounded-lg transition-colors ${
+                                    book.status === 'published'
+                                      ? 'text-green-600 bg-green-50 hover:bg-green-100'
+                                      : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+                                  }`}
+                                  title={book.status === 'published' ? 'Deactivate' : 'Activate'}
                                 >
-                                  <i className="ri-bar-chart-line text-sm"></i>
+                                  <i className={`text-sm ${book.status === 'published' ? 'ri-eye-line' : 'ri-eye-off-line'}`}></i>
                                 </button>
                                 <button
                                   onClick={() => {
                                     setSelectedBookForAction(book);
                                     setShowEditModal(true);
                                   }}
-                                  className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                   title="Edit Book"
                                 >
                                   <i className="ri-edit-line text-sm"></i>
@@ -568,7 +612,7 @@ export default function BookManagementEnhanced() {
                                     setShowDetailsModal(true);
                                   }}
                                   className="p-1.5 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                                  title="View Book Details"
+                                  title="View Details"
                                 >
                                   <i className="ri-eye-line text-sm"></i>
                                 </button>

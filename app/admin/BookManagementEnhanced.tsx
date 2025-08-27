@@ -594,7 +594,7 @@ export default function BookManagementEnhanced() {
                                   }`}
                                   title={book.status === 'published' ? 'Deactivate' : 'Activate'}
                                 >
-                                  <i className={`text-sm ${book.status === 'published' ? 'ri-eye-line' : 'ri-eye-off-line'}`}></i>
+                                  <i className={`text-sm ${book.status === 'published' ? 'ri-toggle-line' : 'ri-toggle-fill'}`}></i>
                                 </button>
                                 <button
                                   onClick={() => {

@@ -13,8 +13,16 @@ export async function GET(
     console.log('📁 Uploads API called with path:', pathArray);
     // Construct the file path using the storage location
     let basePath;
-    if (process.env.NODE_ENV === 'production') {
-      // In production, try multiple possible locations
+    
+    // Check if this is a cover image request
+    const isCoverImage = pathArray[0] === 'covers';
+    
+    if (isCoverImage) {
+      // Cover images are always in public/uploads/covers
+      basePath = join(process.cwd(), 'public', 'uploads');
+      console.log(`📁 Cover image: Using base path: ${basePath}`);
+    } else if (process.env.NODE_ENV === 'production') {
+      // In production, try multiple possible locations for other files
       const possiblePaths = [
         '/app/uploads',
         '/app/storage',
@@ -33,19 +41,32 @@ export async function GET(
     // Check if file exists, try alternative paths if not found
     let finalFilePath = filePath;
     if (!existsSync(filePath)) {
-      // Try alternative storage locations
-      const alternativePaths = [
-        join(process.cwd(), 'public', 'uploads', ...pathArray),
-        join(process.cwd(), 'uploads', ...pathArray),
-        join(process.cwd(), 'storage', ...pathArray),
-        join('/app', 'uploads', ...pathArray)
-      ];
+      // Try alternative storage locations based on file type
+      let alternativePaths: string[];
+      
+      if (isCoverImage) {
+        // For cover images, only try public directory locations
+        alternativePaths = [
+          join(process.cwd(), 'public', 'uploads', ...pathArray),
+          join('/app', 'public', 'uploads', ...pathArray)
+        ];
+      } else {
+        // For other files, try various storage locations
+        alternativePaths = [
+          join(process.cwd(), 'public', 'uploads', ...pathArray),
+          join(process.cwd(), 'uploads', ...pathArray),
+          join(process.cwd(), 'storage', ...pathArray),
+          join('/app', 'uploads', ...pathArray),
+          join('/app', 'storage', ...pathArray)
+        ];
+      }
       
       finalFilePath = alternativePaths.find(path => existsSync(path)) || filePath;
       
       if (!existsSync(finalFilePath)) {
         console.log('❌ File not found at any location:', {
           requested: pathArray,
+          isCoverImage,
           tried: [filePath, ...alternativePaths],
           cwd: process.cwd(),
           nodeEnv: process.env.NODE_ENV

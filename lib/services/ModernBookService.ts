@@ -2,6 +2,7 @@ import { query, transaction } from '../../utils/database';
 import StorageService from './StorageService';
 import EpubProcessingService from './EpubProcessingService';
 import HtmlProcessingService from './HtmlProcessingService';
+import { sanitizeForLog, sanitizeInt } from '../../utils/security';
 import path from 'path';
 
 export interface BookCreationData {
@@ -150,7 +151,7 @@ export class ModernBookService {
   }> {
     try {
       return await transaction(async (client) => {
-        console.log('Creating book:', bookData.title);
+        console.log('Creating book:', sanitizeForLog(bookData.title));
 
         // Insert book record
         const bookResult = await client.query(`
@@ -186,7 +187,7 @@ export class ModernBookService {
         const book = bookResult.rows[0];
         const bookId = book.id.toString();
 
-        console.log('Book created with ID:', bookId);
+        console.log('Book created with ID:', sanitizeForLog(bookId));
 
         // Process cover image if provided
         if (bookData.cover_image) {
@@ -245,7 +246,7 @@ export class ModernBookService {
         };
       });
     } catch (error) {
-      console.error('Error creating book:', error);
+      console.error('Error creating book:', sanitizeForLog(error));
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error creating book',
@@ -287,7 +288,7 @@ export class ModernBookService {
         secureUrl,
       };
     } catch (error) {
-      console.error('Error processing cover image:', error);
+      console.error('Error processing cover image:', sanitizeForLog(error));
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Error processing cover image',
@@ -372,7 +373,7 @@ export class ModernBookService {
         readingTime,
       };
     } catch (error) {
-      console.error('Error processing ebook file:', error);
+      console.error('Error processing ebook file:', sanitizeForLog(error));
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Error processing ebook file',
@@ -403,9 +404,9 @@ export class ModernBookService {
 
       const structureId = structureResult.rows[0].id;
 
-      // Store chapters
-      for (const chapter of epubData.chapters) {
-        await client.query(`
+      // Store chapters concurrently
+      const chapterPromises = epubData.chapters.map(chapter => 
+        client.query(`
           INSERT INTO book_chapters (
             book_id, structure_id, chapter_number, chapter_title,
             content_html, word_count, reading_time_minutes
@@ -413,24 +414,26 @@ export class ModernBookService {
         `, [
           bookId, structureId, chapter.order + 1, chapter.title,
           chapter.content, chapter.wordCount, Math.ceil(chapter.wordCount / 200)
-        ]);
-      }
+        ])
+      );
+      await Promise.all(chapterPromises);
 
-      // Store assets
-      for (const asset of epubData.assets) {
-        await client.query(`
+      // Store assets concurrently
+      const assetPromises = epubData.assets.map(asset => 
+        client.query(`
           INSERT INTO book_assets (
             book_id, asset_type, asset_path, original_path, file_size_bytes, mime_type
           ) VALUES ($1, $2, $3, $4, $5, $6)
         `, [
           bookId,
           asset.isImage ? 'image' : asset.isCss ? 'stylesheet' : asset.isFont ? 'font' : 'other',
-          asset.href, // This should be updated to stored path
+          asset.href,
           asset.href,
           asset.data.length,
           asset.mediaType
-        ]);
-      }
+        ])
+      );
+      await Promise.all(assetPromises);
     });
   }
 
@@ -457,9 +460,9 @@ export class ModernBookService {
 
       const structureId = structureResult.rows[0].id;
 
-      // Store chapters
-      for (const chapter of htmlData.chapters) {
-        await client.query(`
+      // Store chapters concurrently
+      const chapterPromises = htmlData.chapters.map(chapter => 
+        client.query(`
           INSERT INTO book_chapters (
             book_id, structure_id, chapter_number, chapter_title,
             content_html, word_count, reading_time_minutes
@@ -467,19 +470,21 @@ export class ModernBookService {
         `, [
           bookId, structureId, chapter.order + 1, chapter.title,
           chapter.content, chapter.wordCount, Math.ceil(chapter.wordCount / 200)
-        ]);
-      }
+        ])
+      );
+      await Promise.all(chapterPromises);
 
-      // Store assets
-      for (const asset of htmlData.assets) {
-        await client.query(`
+      // Store assets concurrently
+      const assetPromises = htmlData.assets.map(asset => 
+        client.query(`
           INSERT INTO book_assets (
             book_id, asset_type, asset_path, original_path, file_size_bytes, mime_type
           ) VALUES ($1, $2, $3, $4, $5, $6)
         `, [
-          bookId, asset.type, asset.storedPath, asset.originalPath, 0, asset.mimeType
-        ]);
-      }
+          bookId, asset.type, asset.storedPath, asset.originalPath, asset.data?.length || 0, asset.mimeType
+        ])
+      );
+      await Promise.all(assetPromises);
     });
   }
 
@@ -514,7 +519,7 @@ export class ModernBookService {
 
       return book;
     } catch (error) {
-      console.error('Error getting book by ID:', error);
+      console.error('Error getting book by ID:', sanitizeForLog(error));
       return null;
     }
   }
@@ -529,6 +534,9 @@ export class ModernBookService {
     book_type?: string;
     status?: string;
     is_featured?: boolean;
+    is_bestseller?: boolean;
+    is_new_release?: boolean;
+    visibility?: string;
     page?: number;
     limit?: number;
   } = {}): Promise<{
@@ -580,6 +588,24 @@ export class ModernBookService {
       if (filters.is_featured !== undefined) {
         whereClause += ` AND b.is_featured = $${paramIndex}`;
         params.push(filters.is_featured);
+        paramIndex++;
+      }
+
+      if (filters.is_bestseller !== undefined) {
+        whereClause += ` AND b.is_bestseller = $${paramIndex}`;
+        params.push(filters.is_bestseller);
+        paramIndex++;
+      }
+
+      if (filters.is_new_release !== undefined) {
+        whereClause += ` AND b.is_new_release = $${paramIndex}`;
+        params.push(filters.is_new_release);
+        paramIndex++;
+      }
+
+      if (filters.visibility) {
+        whereClause += ` AND b.visibility = $${paramIndex}`;
+        params.push(filters.visibility);
         paramIndex++;
       }
 
@@ -640,7 +666,7 @@ export class ModernBookService {
         currentPage: page,
       };
     } catch (error) {
-      console.error('Error getting books:', error);
+      console.error('Error getting books:', sanitizeForLog(error));
       return {
         books: [],
         total: 0,
@@ -684,6 +710,9 @@ export class ModernBookService {
             if (field === 'dimensions' && value) {
               value = JSON.stringify(value);
             }
+            if (field === 'marketing_tags' && value) {
+              value = JSON.stringify(value);
+            }
             
             updateValues.push(value);
             paramIndex++;
@@ -721,7 +750,7 @@ export class ModernBookService {
         };
       });
     } catch (error) {
-      console.error('Error updating book:', error);
+      console.error('Error updating book:', sanitizeForLog(error));
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Error updating book',
@@ -783,7 +812,7 @@ export class ModernBookService {
         return { success: true };
       });
     } catch (error) {
-      console.error('Error deleting book:', error);
+      console.error('Error deleting book:', sanitizeForLog(error));
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Error deleting book',

@@ -310,10 +310,7 @@ export default function WorksCarousel() {
                       src={work.src}
                       alt={work.alt}
                       className="w-full h-64 md:h-80 object-cover object-center"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = 'https://via.placeholder.com/400x320?text=Work+Image';
-                      }}
+
                     />
                   </div>
                   

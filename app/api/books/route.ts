@@ -3,15 +3,25 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import ModernBookService from '@/lib/services/ModernBookService';
 import StorageService from '@/lib/services/StorageService';
+import { sanitizeForLog, sanitizeHtml, sanitizeInt, safeJsonParse } from '@/utils/security';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
+    
+    // Check if this is a public request for featured books
+    const isFeaturedRequest = searchParams.get('is_featured') === 'true';
+    const isBestsellersRequest = searchParams.get('is_bestseller') === 'true';
+    const isNewReleasesRequest = searchParams.get('is_new_release') === 'true';
+    const isPublicRequest = isFeaturedRequest || isBestsellersRequest || isNewReleasesRequest;
+    
+    // For non-public requests, require authentication
+    if (!isPublicRequest) {
+      const session = await getServerSession(authOptions);
+      if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+    }
     
     // Parse query parameters
     const filters = {
@@ -19,8 +29,11 @@ export async function GET(request: NextRequest) {
       category_id: searchParams.get('category_id') ? parseInt(searchParams.get('category_id')!) : undefined,
       author_id: searchParams.get('author_id') ? parseInt(searchParams.get('author_id')!) : undefined,
       book_type: searchParams.get('book_type') || undefined,
-      status: searchParams.get('status') || undefined,
+      status: isPublicRequest ? 'published' : (searchParams.get('status') || undefined),
       is_featured: searchParams.get('is_featured') === 'true' ? true : undefined,
+      is_bestseller: searchParams.get('is_bestseller') === 'true' ? true : undefined,
+      is_new_release: searchParams.get('is_new_release') === 'true' ? true : undefined,
+      visibility: isPublicRequest ? 'public' : undefined,
       page: parseInt(searchParams.get('page') || '1'),
       limit: parseInt(searchParams.get('limit') || '20'),
     };
@@ -29,7 +42,8 @@ export async function GET(request: NextRequest) {
     if (filters.page < 1) filters.page = 1;
     if (filters.limit < 1 || filters.limit > 100) filters.limit = 20;
 
-    console.log('Fetching books with filters:', filters);
+    console.log('Fetching books with filters:', sanitizeForLog(JSON.stringify(filters)));
+    console.log('Is public request:', isPublicRequest);
 
     const result = await ModernBookService.getBooks(filters);
 
@@ -75,8 +89,8 @@ export async function POST(request: NextRequest) {
     const bookData = {
       title: formData.get('title') as string,
       subtitle: formData.get('subtitle') as string || undefined,
-      author_id: parseInt(formData.get('author_id') as string),
-      category_id: parseInt(formData.get('category_id') as string),
+      author_id: sanitizeInt(formData.get('author_id')),
+      category_id: sanitizeInt(formData.get('category_id')),
       isbn: formData.get('isbn') as string || undefined,
       description: formData.get('description') as string || undefined,
       short_description: formData.get('short_description') as string || undefined,
@@ -84,23 +98,23 @@ export async function POST(request: NextRequest) {
       book_type: formData.get('book_type') as 'physical' | 'ebook' | 'hybrid' || 'ebook',
       primary_format: formData.get('primary_format') as string || undefined,
       
-      price: parseFloat(formData.get('price') as string),
-      original_price: formData.get('original_price') ? parseFloat(formData.get('original_price') as string) : undefined,
-      cost_price: formData.get('cost_price') ? parseFloat(formData.get('cost_price') as string) : undefined,
+      price: sanitizeInt(formData.get('price')),
+      original_price: formData.get('original_price') ? sanitizeInt(formData.get('original_price')) : undefined,
+      cost_price: formData.get('cost_price') ? sanitizeInt(formData.get('cost_price')) : undefined,
       currency: formData.get('currency') as string || 'NGN',
       
-      weight_grams: formData.get('weight_grams') ? parseInt(formData.get('weight_grams') as string) : undefined,
-      dimensions: formData.get('dimensions') ? JSON.parse(formData.get('dimensions') as string) : undefined,
+      weight_grams: formData.get('weight_grams') ? sanitizeInt(formData.get('weight_grams')) : undefined,
+      dimensions: formData.get('dimensions') ? safeJsonParse(formData.get('dimensions') as string) : undefined,
       shipping_class: formData.get('shipping_class') as string || undefined,
-      stock_quantity: formData.get('stock_quantity') ? parseInt(formData.get('stock_quantity') as string) : 0,
-      low_stock_threshold: formData.get('low_stock_threshold') ? parseInt(formData.get('low_stock_threshold') as string) : 5,
+      stock_quantity: sanitizeInt(formData.get('stock_quantity')),
+      low_stock_threshold: sanitizeInt(formData.get('low_stock_threshold'), 5),
       inventory_tracking: formData.get('inventory_tracking') === 'true',
       
-      download_limit: formData.get('download_limit') ? parseInt(formData.get('download_limit') as string) : -1,
+      download_limit: sanitizeInt(formData.get('download_limit'), -1),
       drm_protected: formData.get('drm_protected') === 'true',
       
       language: formData.get('language') as string || 'en',
-      pages: formData.get('pages') ? parseInt(formData.get('pages') as string) : undefined,
+      pages: formData.get('pages') ? sanitizeInt(formData.get('pages')) : undefined,
       publication_date: formData.get('publication_date') as string || undefined,
       publisher: formData.get('publisher') as string || undefined,
       edition: formData.get('edition') as string || undefined,
@@ -120,7 +134,7 @@ export async function POST(request: NextRequest) {
       ebook_file: formData.get('ebook_file') as File || undefined,
       sample_content: formData.get('sample_content') as File || undefined,
       
-      created_by: parseInt(session.user.id),
+      created_by: sanitizeInt(session.user.id),
     };
 
     // Validate required fields
@@ -146,7 +160,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Creating book:', bookData.title);
+    console.log('Creating book:', sanitizeForLog(bookData.title));
 
     const result = await ModernBookService.createBook(bookData);
 
@@ -211,24 +225,34 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    console.log('Bulk deleting books:', bookIds);
+    console.log('Bulk deleting books:', sanitizeForLog(bookIds.join(',')));
 
     let deletedCount = 0;
     const errors: string[] = [];
 
-    // Delete books one by one to handle individual errors
-    for (const bookId of bookIds) {
+    // Delete books concurrently for better performance
+    const deletePromises = bookIds.map(async (bookId) => {
       try {
         const result = await ModernBookService.deleteBook(bookId);
-        if (result.success) {
+        return { bookId, success: result.success, error: result.error };
+      } catch (error) {
+        return { bookId, success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    });
+
+    const results = await Promise.allSettled(deletePromises);
+    
+    results.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        if (result.value.success) {
           deletedCount++;
         } else {
-          errors.push(`Book ${bookId}: ${result.error}`);
+          errors.push(`Book ${result.value.bookId}: ${sanitizeHtml(result.value.error || 'Unknown error')}`);
         }
-      } catch (error) {
-        errors.push(`Book ${bookId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } else {
+        errors.push(`Delete operation failed: ${sanitizeHtml(result.reason)}`);
       }
-    }
+    });
 
     return NextResponse.json({
       success: deletedCount > 0,

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 import { createHash } from 'crypto';
+import { sanitizeForLog, sanitizeHtml, sanitizeInt } from '@/utils/security';
 
 // Lazy load file upload service only when needed
 let fileUploadService: any = null;
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
       formData = await request.formData();
       console.log('✅ Stage 2 PASSED: Form data parsed');
     } catch (parseError) {
-      console.log('❌ Stage 2 FAILED: Form data parsing error:', parseError);
+      console.log('❌ Stage 2 FAILED: Form data parsing error:', sanitizeForLog(parseError));
       return NextResponse.json(
         { error: 'Invalid form data' },
         { status: 400 }
@@ -127,27 +128,27 @@ export async function POST(request: NextRequest) {
         RETURNING id
       `, [
         title,
-        parseInt(author_id),
-        parseInt(category_id),
-        parseFloat(price),
+        sanitizeInt(author_id),
+        sanitizeInt(category_id),
+        sanitizeInt(price),
         isbn || null,
         description || null,
         language || 'en',
-        pages ? parseInt(pages) : null,
+        pages ? sanitizeInt(pages) : null,
         publication_date || null,
         publisher || null,
         book_type,
-        stock_quantity ? parseInt(stock_quantity) : 0,
+        stock_quantity ? sanitizeInt(stock_quantity) : 0,
         inventory_enabled === 'true',
-        low_stock_threshold ? parseInt(low_stock_threshold) : 10,
-        parseInt(session.user.id),
+        low_stock_threshold ? sanitizeInt(low_stock_threshold, 10) : 10,
+        sanitizeInt(session.user.id),
         'published'
       ]);
 
       bookId = bookResult.rows[0].id;
       console.log(`✅ Stage 5 PASSED: Book record created with ID ${bookId}`);
     } catch (dbError) {
-      console.log('❌ Stage 5 FAILED: Database error:', dbError);
+      console.log('❌ Stage 5 FAILED: Database error:', sanitizeForLog(dbError));
       return NextResponse.json(
         { error: 'Failed to create book record' },
         { status: 500 }
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
       const coverResult = await getFileUploadService().uploadBookFile(cover_image, bookId, 'cover');
       
       if (!coverResult.success) {
-        console.log('❌ Stage 6 FAILED: Cover image upload failed:', coverResult.error);
+        console.log('❌ Stage 6 FAILED: Cover image upload failed:', sanitizeForLog(coverResult.error));
         // Clean up book record
         await query('DELETE FROM books WHERE id = $1', [bookId]);
         return NextResponse.json(
@@ -178,7 +179,7 @@ export async function POST(request: NextRequest) {
 
       console.log('✅ Stage 6 PASSED: Cover image uploaded successfully');
     } catch (coverError) {
-      console.log('❌ Stage 6 FAILED: Cover image upload error:', coverError);
+      console.log('❌ Stage 6 FAILED: Cover image upload error:', sanitizeForLog(coverError));
       // Clean up book record
       await query('DELETE FROM books WHERE id = $1', [bookId]);
       return NextResponse.json(
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest) {
         ebookFileResult = await getFileUploadService().uploadBookFile(ebook_file, bookId, 'ebook');
         
         if (!ebookFileResult.success) {
-          console.log('❌ Stage 7 FAILED: E-book file upload failed:', ebookFileResult.error);
+          console.log('❌ Stage 7 FAILED: E-book file upload failed:', sanitizeForLog(ebookFileResult.error));
           // Clean up book record and files
           await getFileUploadService().deleteBookFiles(bookId);
           await query('DELETE FROM books WHERE id = $1', [bookId]);
@@ -224,7 +225,7 @@ export async function POST(request: NextRequest) {
 
         console.log('✅ Stage 7 PASSED: E-book file uploaded successfully');
       } catch (ebookError) {
-        console.log('❌ Stage 7 FAILED: E-book file upload error:', ebookError);
+        console.log('❌ Stage 7 FAILED: E-book file upload error:', sanitizeForLog(ebookError));
         // Clean up book record and files
         await getFileUploadService().deleteBookFiles(bookId);
         await query('DELETE FROM books WHERE id = $1', [bookId]);
@@ -241,7 +242,7 @@ export async function POST(request: NextRequest) {
       const securityToken = await getFileUploadService().generateAccessToken(bookId, parseInt(session.user.id));
       console.log('✅ Stage 8 PASSED: Security token generated');
     } catch (tokenError) {
-      console.log('⚠️ Stage 8 WARNING: Security token generation failed:', tokenError);
+      console.log('⚠️ Stage 8 WARNING: Security token generation failed:', sanitizeForLog(tokenError));
       // Don't fail the request for token generation failure
     }
 
@@ -314,7 +315,7 @@ export async function POST(request: NextRequest) {
       });
 
     } catch (fetchError) {
-      console.log('❌ Stage 9 FAILED: Error fetching book data:', fetchError);
+      console.log('❌ Stage 9 FAILED: Error fetching book data:', sanitizeForLog(fetchError));
       return NextResponse.json(
         { error: 'Book created but failed to fetch complete data' },
         { status: 500 }
@@ -375,8 +376,8 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const page = sanitizeInt(searchParams.get('page'), 1);
+    const limit = sanitizeInt(searchParams.get('limit'), 20);
     const search = searchParams.get('search') || '';
     const category = searchParams.get('category') || '';
     const author = searchParams.get('author') || '';
@@ -534,7 +535,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const bookIdArray = bookIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+    const bookIdArray = bookIds.split(',').map(id => sanitizeInt(id.trim())).filter(id => id > 0);
 
     if (bookIdArray.length === 0) {
       return NextResponse.json(
@@ -554,7 +555,7 @@ export async function DELETE(request: NextRequest) {
           await getFileUploadService().deleteBookFiles(bookId);
           console.log(`🗑️ Deleted files for book ${bookId}`);
         } catch (fileError) {
-          console.warn(`⚠️ Failed to delete files for book ${bookId}:`, fileError);
+          console.warn(`⚠️ Failed to delete files for book ${sanitizeForLog(bookId)}:`, sanitizeForLog(fileError));
           // Continue with book deletion even if file deletion fails
         }
 
@@ -567,15 +568,15 @@ export async function DELETE(request: NextRequest) {
 
         if (result.rows.length > 0) {
           deletedCount++;
-          console.log(`✅ Deleted book ${bookId}`);
+          console.log(`✅ Deleted book ${sanitizeForLog(bookId)}`);
         } else {
           failedIds.push(bookId);
-          errors.push(`Book ${bookId} not found`);
+          errors.push(`Book ${sanitizeHtml(String(bookId))} not found`);
         }
       } catch (error) {
-        console.error(`❌ Error deleting book ${bookId}:`, error);
+        console.error(`❌ Error deleting book ${sanitizeForLog(bookId)}:`, sanitizeForLog(error));
         failedIds.push(bookId);
-        errors.push(`Failed to delete book ${bookId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        errors.push(`Failed to delete book ${sanitizeHtml(String(bookId))}: ${sanitizeHtml(error instanceof Error ? error.message : 'Unknown error')}`);
       }
     }
 
@@ -589,7 +590,7 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error in bulk delete books:', error);
+    console.error('Error in bulk delete books:', sanitizeForLog(error));
     return NextResponse.json(
       { error: 'Failed to delete books' },
       { status: 500 }

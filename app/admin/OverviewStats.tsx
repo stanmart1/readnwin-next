@@ -95,8 +95,8 @@ export default function OverviewStats() {
           {
             title: 'Total Users',
             value: totalUsers.toLocaleString(),
-            change: '+12.3%',
-            changeType: 'positive',
+            change: totalUsers > 0 ? '+12.3%' : '0%',
+            changeType: totalUsers > 0 ? 'positive' : 'neutral',
             icon: 'ri-user-line',
             color: 'bg-blue-500',
             tabId: 'users'
@@ -104,17 +104,17 @@ export default function OverviewStats() {
           {
             title: 'Total Books',
             value: totalBooks.toLocaleString(),
-            change: '+8.1%',
-            changeType: 'positive',
+            change: totalBooks > 0 ? '+8.1%' : '0%',
+            changeType: totalBooks > 0 ? 'positive' : 'neutral',
             icon: 'ri-book-line',
             color: 'bg-green-500',
-            tabId: 'content'
+            tabId: 'books'
           },
           {
             title: 'Monthly Sales',
             value: `₦${totalRevenue.toLocaleString()}`,
-            change: '+23.4%',
-            changeType: 'positive',
+            change: totalRevenue > 0 ? '+23.4%' : '0%',
+            changeType: totalRevenue > 0 ? 'positive' : 'neutral',
             icon: 'ri-money-dollar-circle-line',
             color: 'bg-purple-500',
             tabId: 'orders'
@@ -122,8 +122,8 @@ export default function OverviewStats() {
           {
             title: 'Total Orders',
             value: totalOrders.toLocaleString(),
-            change: '+5.7%',
-            changeType: 'positive',
+            change: totalOrders > 0 ? '+5.7%' : '0%',
+            changeType: totalOrders > 0 ? 'positive' : 'neutral',
             icon: 'ri-shopping-cart-line',
             color: 'bg-yellow-500',
             tabId: 'orders'
@@ -135,10 +135,19 @@ export default function OverviewStats() {
           const trendDataFromAPI = analytics.monthly_sales.map((item: any) => ({
             date: item.month,
             sales: parseFloat(item.sales) || 0,
-            orders: parseInt(item.orders) || 0,
-            users: Math.floor(Math.random() * 1000) + 500 // Placeholder for user growth
+            orders: parseInt(item.orders) || 0
           }));
           setTrendData(trendDataFromAPI);
+        }
+        
+        // Update daily activity with real data
+        if (analytics.dailyActivity && analytics.dailyActivity.length > 0) {
+          setDailyActivity(analytics.dailyActivity);
+        }
+        
+        // Update recent activities with real data
+        if (analytics.recentActivities && analytics.recentActivities.length > 0) {
+          setRecentActivities(analytics.recentActivities);
         }
       } else {
         throw new Error('Invalid response format');
@@ -236,13 +245,13 @@ export default function OverviewStats() {
             onClick={() => handleCardClick(stat.tabId)}
           >
             <div className="flex items-center">
-              <div className={`w-12 h-12 ${stat.color} rounded-lg flex items-center justify-center`}>
+              <div className={`w-12 h-12 ${stat.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
                 <i className={`${stat.icon} text-white text-xl`}></i>
               </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-600">{stat.title}</p>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                <p className={`text-sm ${stat.changeType === 'positive' ? 'text-green-600' : 'text-red-600'}`}>
+              <div className="ml-4 flex-1 min-w-0">
+                <p className="text-sm text-gray-600 truncate">{stat.title}</p>
+                <p className="text-2xl font-bold text-gray-900 truncate" title={stat.value}>{stat.value}</p>
+                <p className={`text-sm truncate ${stat.changeType === 'positive' ? 'text-green-600' : stat.changeType === 'negative' ? 'text-red-600' : 'text-gray-500'}`}>
                   {stat.change} from last month
                 </p>
               </div>

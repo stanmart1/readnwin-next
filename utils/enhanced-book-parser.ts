@@ -428,73 +428,34 @@ export class EnhancedBookParser {
   }
 
   /**
-   * Store parsed content securely in database and filesystem
+   * Store parsed metadata in database (content stays on filesystem)
    */
   private async storeParsedContent(bookId: number, parsedContent: ParsedBookContent, contentType: string) {
     try {
-      // Store content structure in database
-      await query(`
-        INSERT INTO book_content (book_id, content_type, content_structure, content_files, word_count, estimated_reading_time, page_count, chapter_count, language)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ON CONFLICT (book_id) DO UPDATE SET
-          content_type = EXCLUDED.content_type,
-          content_structure = EXCLUDED.content_structure,
-          content_files = EXCLUDED.content_files,
-          word_count = EXCLUDED.word_count,
-          estimated_reading_time = EXCLUDED.estimated_reading_time,
-          page_count = EXCLUDED.page_count,
-          chapter_count = EXCLUDED.chapter_count,
-          language = EXCLUDED.language,
-          updated_at = CURRENT_TIMESTAMP
-      `, [
-        bookId,
-        contentType,
-        JSON.stringify(parsedContent.contentStructure),
-        JSON.stringify(parsedContent.contentFiles),
-        parsedContent.metadata.wordCount,
-        parsedContent.metadata.estimatedReadingTime,
-        parsedContent.metadata.pageCount,
-        parsedContent.metadata.chapterCount,
-        parsedContent.metadata.language
-      ]);
-
-      // Store individual chapters
-      for (const chapter of parsedContent.chapters) {
-        await query(`
-          INSERT INTO book_chapters (book_id, chapter_number, chapter_title, chapter_content, word_count, reading_time, chapter_metadata)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-          ON CONFLICT (book_id, chapter_number) DO UPDATE SET
-            chapter_title = EXCLUDED.chapter_title,
-            chapter_content = EXCLUDED.chapter_content,
-            word_count = EXCLUDED.word_count,
-            reading_time = EXCLUDED.reading_time,
-            chapter_metadata = EXCLUDED.chapter_metadata
-        `, [
-          bookId,
-          parseInt(chapter.id.replace(/\D/g, '')) || 1,
-          chapter.title,
-          chapter.content,
-          chapter.wordCount,
-          chapter.estimatedReadingTime,
-          JSON.stringify(chapter.metadata)
-        ]);
-      }
-
-      // Update book metadata
+      // Store only metadata and structure in database, not full content
       await query(`
         UPDATE books 
         SET 
+          word_count = $2,
+          estimated_reading_time = $3,
+          pages = $4,
           parsing_status = 'completed',
           metadata_extracted_at = CURRENT_TIMESTAMP,
-          file_size = $2,
-          file_hash = $3
+          chapters = $5
         WHERE id = $1
-      `, [bookId, 0, 'hash-placeholder']); // File size and hash will be updated by file upload service
+      `, [
+        bookId,
+        parsedContent.metadata.wordCount,
+        parsedContent.metadata.estimatedReadingTime,
+        parsedContent.metadata.pageCount,
+        JSON.stringify(parsedContent.metadata.tableOfContents)
+      ]);
 
-      console.log(`✅ Parsed content stored for book ${bookId}`);
+      console.log(`✅ Book metadata stored for book ${bookId}`);
+      console.log(`📊 Stats: ${parsedContent.metadata.wordCount} words, ${parsedContent.metadata.pageCount} pages, ${parsedContent.metadata.chapterCount} chapters`);
 
     } catch (error) {
-      console.error(`❌ Error storing parsed content for book ${bookId}:`, error);
+      console.error(`❌ Error storing book metadata for book ${bookId}:`, error);
       throw error;
     }
   }

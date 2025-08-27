@@ -3,16 +3,22 @@ import { BookStorageService } from './BookStorageService';
 export class EReaderContentLoader {
   static async loadBook(bookId: string) {
     try {
-      // Load HTML content from media_root
-      const htmlContent = await BookStorageService.loadBookContent(bookId);
+      // Get book file information from database
+      const response = await fetch(`/api/books/${bookId}/file-info`);
+      if (!response.ok) {
+        throw new Error('Failed to get book file information');
+      }
+      
+      const fileInfo = await response.json();
       
       // Get book metadata from database
       const bookMetadata = await this.getBookMetadata(bookId);
       
       return {
-        content: htmlContent,
+        content: null, // Content will be loaded securely through API
         metadata: bookMetadata,
-        contentUrl: `/uploads/books/html/${bookId}.html`
+        contentUrl: `/api/secure/books/${bookId}/${fileInfo.filename}`,
+        fileInfo
       };
     } catch (error) {
       throw new Error(`Failed to load book for e-reader: ${error instanceof Error ? error.message : 'Unknown error'}`);

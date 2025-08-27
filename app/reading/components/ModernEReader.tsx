@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useModernEReaderStore } from '@/stores/modernEReaderStore';
+import { EbookContentLoader } from '@/lib/services/EbookContentLoader';
 import { useSession } from 'next-auth/react';
 import {
   Menu,
@@ -79,13 +80,22 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
   // Load book on mount
   useEffect(() => {
     if (bookId && session?.user?.id) {
-      loadBook(bookId, session.user.id);
+      loadEbook(bookId, session.user.id);
     }
 
     return () => {
       unloadBook();
     };
-  }, [bookId, session?.user?.id, loadBook, unloadBook]);
+  }, [bookId, session?.user?.id]);
+
+  const loadEbook = async (bookId: string, userId: string) => {
+    try {
+      const bookData = await EbookContentLoader.loadBook(bookId, userId);
+      loadBook(bookId, userId, bookData);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to load book');
+    }
+  };
 
   // Auto-hide menu after inactivity
   useEffect(() => {

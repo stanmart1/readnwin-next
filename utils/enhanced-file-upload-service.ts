@@ -32,14 +32,14 @@ export class EnhancedFileUploadService {
   private bookParser: EnhancedBookParser;
 
   constructor() {
-    // Use consistent storage directory structure
+    // Use server-side storage (not in public directory for security)
     this.mediaRootDir = process.env.NODE_ENV === 'production' 
-      ? '/app/uploads' 
-      : join(process.cwd(), 'public', 'uploads');
+      ? '/app/storage' 
+      : join(process.cwd(), 'storage');
     
     this.booksDir = join(this.mediaRootDir, 'books');
     this.tempDir = join(this.booksDir, 'temp');
-    this.coversDir = join(this.mediaRootDir, 'covers');
+    this.coversDir = join(process.cwd(), 'public', 'uploads', 'covers'); // Covers can be public
     
     // Ensure all directories exist
     if (typeof window === 'undefined') {
@@ -100,15 +100,15 @@ export class EnhancedFileUploadService {
       let relativePath: string;
       
       if (fileType === 'cover') {
-        // Cover images go to uploads/covers for web access
+        // Cover images go to public directory for web access
         targetDir = this.coversDir;
         relativePath = `/uploads/covers/${secureFilename}`;
         console.log(`📁 Cover image will be stored at: ${targetDir}/${secureFilename}`);
         console.log(`📁 Cover image URL will be: ${relativePath}`);
       } else {
-        // Book files go to book-specific directory
+        // Book files go to secure server-side directory
         targetDir = bookDir;
-        relativePath = `/uploads/books/${bookId}/${secureFilename}`;
+        relativePath = `/secure/books/${bookId}/${secureFilename}`; // Secure path for API access
       }
       
       const filePath = join(targetDir, secureFilename);
@@ -185,7 +185,6 @@ export class EnhancedFileUploadService {
    * Validate uploaded file
    */
   private validateFile(file: File, fileType: 'cover' | 'ebook' | 'sample'): { valid: boolean; error?: string } {
-    // Check file size
     const maxSizes = {
       cover: 10 * 1024 * 1024, // 10MB
       ebook: 50 * 1024 * 1024, // 50MB
@@ -199,26 +198,20 @@ export class EnhancedFileUploadService {
       };
     }
 
-    // Check file type
-    const allowedTypes = {
-      cover: ['image/jpeg', 'image/png', 'image/webp'],
-      ebook: ['application/epub+zip', 'text/html']
-    };
-
-    const fileExtension = extname(file.name).toLowerCase();
-    const allowedExtensions = {
-      cover: ['.jpg', '.jpeg', '.png', '.webp'],
-      ebook: ['.epub', '.html', '.htm']
-    };
-
-    const isValidType = allowedTypes[fileType].includes(file.type) || 
-                       allowedExtensions[fileType].includes(fileExtension);
-
-    if (!isValidType) {
-      return {
-        valid: false,
-        error: `File type not allowed for ${fileType}. Allowed types: ${allowedExtensions[fileType].join(', ')}`
-      };
+    if (fileType === 'ebook') {
+      const fileExtension = extname(file.name).toLowerCase();
+      const allowedExtensions = ['.epub', '.html', '.htm'];
+      const allowedMimeTypes = ['application/epub+zip', 'text/html', 'application/octet-stream'];
+      
+      const isValidExtension = allowedExtensions.includes(fileExtension);
+      const isValidMimeType = allowedMimeTypes.includes(file.type);
+      
+      if (!isValidExtension) {
+        return {
+          valid: false,
+          error: 'Only EPUB (.epub) and HTML (.html, .htm) files are supported'
+        };
+      }
     }
 
     return { valid: true };
@@ -295,13 +288,7 @@ export class EnhancedFileUploadService {
       return 'image';
     }
     
-    // Default fallback based on extension
-    switch (extension) {
-      case '.epub': return 'epub';
-      case '.html':
-      case '.htm': return 'html';
-      default: return 'image';
-    }
+    return extension === '.epub' ? 'epub' : 'html';
   }
 
   /**

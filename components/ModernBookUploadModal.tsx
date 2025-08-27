@@ -614,7 +614,7 @@ export default function ModernBookUploadModal({
                     <input
                       ref={ebookInputRef}
                       type="file"
-                      accept=".epub,.html,.htm"
+                      accept=".epub,.html,.htm,application/epub+zip,text/html"
                       onChange={async (e) => e.target.files?.[0] && await handleFileChange('ebook_file', e.target.files[0])}
                       className="hidden"
                     />
@@ -652,7 +652,7 @@ export default function ModernBookUploadModal({
                             Drop ebook file here or click to browse
                           </p>
                           <p className="text-sm text-gray-500 mt-1">
-                            Supports EPUB, HTML (Max 50MB)
+                            Supports EPUB (.epub) and HTML (.html, .htm) files only (Max 50MB)
                           </p>
                         </div>
                       </div>

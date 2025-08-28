@@ -9,8 +9,8 @@ import { pipeline } from 'stream/promises';
  * Ensures all file operations account for the persistent volume mounted on /
  */
 export class StorageService {
-  // Base paths - use local storage in development, persistent volume in production
-  private static readonly BASE_STORAGE_PATH = process.env.NODE_ENV === 'production' ? '/app/storage' : './storage';
+  // Base paths - use persistent volume
+  private static readonly BASE_STORAGE_PATH = '/app/storage';
   private static readonly BOOKS_PATH = `${this.BASE_STORAGE_PATH}/books`;
   private static readonly COVERS_PATH = `${this.BASE_STORAGE_PATH}/covers`;
   private static readonly ASSETS_PATH = `${this.BASE_STORAGE_PATH}/assets`;

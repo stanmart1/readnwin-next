@@ -6,6 +6,14 @@ import { handleApiError } from '@/utils/error-handler';
 
 export const GET = withPermission('content.read', async (request: NextRequest, context: any, session: any) => {
   try {
+    console.log('📋 Admin Authors GET: Starting request...');
+    
+    if (!session?.user?.id) {
+      console.log('❌ Admin Authors GET: Unauthorized access attempt');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    console.log(`✅ Admin Authors GET: User ${session.user.id} authenticated`);
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -17,7 +25,11 @@ export const GET = withPermission('content.read', async (request: NextRequest, c
     if (search) filters.search = search;
     if (status) filters.status = status;
 
+    console.log('📋 Admin Authors GET: Fetching authors with filters:', filters);
+
     const result = await ecommerceService.getAuthors(filters);
+
+    console.log(`✅ Admin Authors GET: Successfully fetched authors`);
 
     return NextResponse.json({
       success: true,
@@ -26,8 +38,11 @@ export const GET = withPermission('content.read', async (request: NextRequest, c
     });
 
   } catch (error) {
-    console.error('Error fetching authors:', error);
-    return handleApiError(error);
+    console.error('❌ Admin Authors GET: Error fetching authors:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch authors' },
+      { status: 500 }
+    );
   }
 });
 

@@ -87,15 +87,10 @@ export default function BookCard({
   const { addToCart: addToGuestCart } = useGuestCart();
 
   const getImageSrc = () => {
-    // Handle production secure URLs
-    if (displayCover?.startsWith('/api/files/secure/')) {
-      return displayCover;
-    }
-    
-    // Handle storage paths - convert to API endpoint
-    if (displayCover?.includes('/app/storage/') || displayCover?.includes('storage/')) {
-      const cleanPath = displayCover.replace(/^\/?(app\/)?storage\//, '');
-      return `/api/images/${cleanPath}`;
+    // Handle storage paths - convert to storage endpoint
+    if (displayCover?.includes('/app/storage/covers/') || displayCover?.includes('covers/')) {
+      const cleanPath = displayCover.replace(/^\/?(app\/)?storage\/covers\//, '');
+      return `/storage/covers/${cleanPath}`;
     }
     
     return displayCover;

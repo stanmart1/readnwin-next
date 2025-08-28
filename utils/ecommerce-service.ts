@@ -161,11 +161,57 @@ export interface SalesAnalytics {
 }
 
 class EcommerceService {
+  // Ensure authors table exists
+  private async ensureAuthorsTable(): Promise<void> {
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS authors (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255),
+          bio TEXT,
+          avatar_url VARCHAR(500),
+          website_url VARCHAR(500),
+          social_media JSONB,
+          is_verified BOOLEAN DEFAULT false,
+          status VARCHAR(50) DEFAULT 'active',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    } catch (error) {
+      console.error('Error ensuring authors table:', error);
+    }
+  }
+
+  // Ensure books table exists
+  private async ensureBooksTable(): Promise<void> {
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS books (
+          id SERIAL PRIMARY KEY,
+          title VARCHAR(500) NOT NULL,
+          author_id INTEGER REFERENCES authors(id),
+          category_id INTEGER,
+          price DECIMAL(10,2) NOT NULL,
+          status VARCHAR(50) DEFAULT 'published',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    } catch (error) {
+      console.error('Error ensuring books table:', error);
+    }
+  }
+
   // Book Management
   async getBooks(filters: any = {}, page: number = 1, limit: number = 12, showAll: boolean = false): Promise<{ books: Book[], total: number, pages: number }> {
-    let whereClause = showAll ? 'WHERE 1=1' : 'WHERE b.status = $1';
-    let params: any[] = showAll ? [] : ['published'];
-    let paramIndex = showAll ? 1 : 2;
+    try {
+      await this.ensureBooksTable();
+      
+      let whereClause = showAll ? 'WHERE 1=1' : 'WHERE b.status = $1';
+      let params: any[] = showAll ? [] : ['published'];
+      let paramIndex = showAll ? 1 : 2;
 
     if (filters.category_id) {
       whereClause += ` AND b.category_id = $${paramIndex}`;
@@ -267,6 +313,10 @@ class EcommerceService {
       total,
       pages
     };
+    } catch (error) {
+      console.error('Error in getBooks:', error);
+      return { books: [], total: 0, pages: 0 };
+    }
   }
 
   async getBookById(id: number): Promise<Book | null> {
@@ -676,32 +726,40 @@ class EcommerceService {
 
   // Author Management
   async getAuthors(filters: any = {}): Promise<Author[] | { authors: Author[], pagination: any }> {
-    // If no pagination requested, return simple array for backward compatibility
-    if (!filters.page && !filters.limit) {
-      let whereClause = 'WHERE 1=1';
-      const params: any[] = [];
+    try {
+      // Check if authors table exists, create if not
+      await this.ensureAuthorsTable();
+      
+      // If no pagination requested, return simple array for backward compatibility
+      if (!filters.page && !filters.limit) {
+        let whereClause = 'WHERE 1=1';
+        const params: any[] = [];
 
-      if (filters.status) {
-        whereClause += ` AND a.status = $${params.length + 1}`;
-        params.push(filters.status);
+        if (filters.status) {
+          whereClause += ` AND a.status = $${params.length + 1}`;
+          params.push(filters.status);
+        }
+
+        const result = await query(`
+          SELECT 
+            a.*,
+            COUNT(b.id) as books_count,
+            COALESCE(SUM(oi.total_price), 0) as total_sales,
+            COALESCE(SUM(oi.total_price * 0.7), 0) as revenue
+          FROM authors a
+          LEFT JOIN books b ON a.id = b.author_id
+          LEFT JOIN order_items oi ON b.id = oi.book_id
+          LEFT JOIN orders o ON oi.order_id = o.id AND o.status IN ('confirmed', 'processing', 'shipped', 'delivered')
+          ${whereClause}
+          GROUP BY a.id
+          ORDER BY a.name
+        `, params);
+
+        return result.rows;
       }
-
-      const result = await query(`
-        SELECT 
-          a.*,
-          COUNT(b.id) as books_count,
-          COALESCE(SUM(oi.total_price), 0) as total_sales,
-          COALESCE(SUM(oi.total_price * 0.7), 0) as revenue
-        FROM authors a
-        LEFT JOIN books b ON a.id = b.author_id
-        LEFT JOIN order_items oi ON b.id = oi.book_id
-        LEFT JOIN orders o ON oi.order_id = o.id AND o.status IN ('confirmed', 'processing', 'shipped', 'delivered')
-        ${whereClause}
-        GROUP BY a.id
-        ORDER BY a.name
-      `, params);
-
-      return result.rows;
+    } catch (error) {
+      console.error('Error in getAuthors:', error);
+      return filters.page ? { authors: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } } : [];
     }
 
     // Paginated version

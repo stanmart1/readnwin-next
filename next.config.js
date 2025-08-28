@@ -179,6 +179,11 @@ const nextConfig = {
   // Rewrites (if needed)
   async rewrites() {
     return [
+      // Serve book covers from storage
+      {
+        source: '/storage/covers/:path*',
+        destination: '/api/storage/covers/:path*',
+      },
       // Serve uploaded files from the uploads directory
       {
         source: '/uploads/:path*',

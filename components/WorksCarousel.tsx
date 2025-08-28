@@ -303,19 +303,17 @@ export default function WorksCarousel() {
                     />
                   </div>
                   
-                  <div className="p-6 flex-1 flex flex-col justify-between">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-3 line-clamp-2 min-h-[3.5rem]">
-                        {work.title}
-                      </h3>
-                      <p className="text-gray-600 text-sm leading-relaxed line-clamp-4 mb-4">
-                        {work.description || 'Innovative solutions that enhance the digital reading experience and connect readers with their favorite books.'}
-                      </p>
-                    </div>
+                  <div className="p-6 flex-1 flex flex-col">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3 line-clamp-2 min-h-[3.5rem]">
+                      {work.title}
+                    </h3>
+                    <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 flex-1">
+                      {work.description || 'Innovative solutions that enhance the digital reading experience and connect readers with their favorite books.'}
+                    </p>
                     {truncatedWorks.has(work.id) && (
                       <button
                         onClick={() => openModal(work)}
-                        className="text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors duration-300 self-start mt-auto"
+                        className="text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors duration-300 self-start mt-3"
                       >
                         Read More
                       </button>

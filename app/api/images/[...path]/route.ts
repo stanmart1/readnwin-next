@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import StorageService from '@/lib/services/StorageService';
 
 export async function GET(
   request: NextRequest,
@@ -9,6 +10,33 @@ export async function GET(
 ) {
   try {
     const imagePath = params.path.join('/');
+    
+    // Try storage system first for book covers
+    if (imagePath.includes('covers/') || imagePath.includes('books/')) {
+      const storagePath = `/app/storage/${imagePath}`;
+      
+      if (existsSync(storagePath)) {
+        const imageBuffer = await readFile(storagePath);
+        const ext = imagePath.split('.').pop()?.toLowerCase();
+        
+        let contentType = 'image/jpeg';
+        switch (ext) {
+          case 'png': contentType = 'image/png'; break;
+          case 'gif': contentType = 'image/gif'; break;
+          case 'webp': contentType = 'image/webp'; break;
+          case 'svg': contentType = 'image/svg+xml'; break;
+        }
+
+        return new NextResponse(imageBuffer, {
+          headers: {
+            'Content-Type': contentType,
+            'Cache-Control': 'public, max-age=86400',
+          },
+        });
+      }
+    }
+    
+    // Fallback to public images
     const fullPath = join(process.cwd(), 'public', 'images', imagePath);
     
     if (!existsSync(fullPath)) {
@@ -20,18 +48,10 @@ export async function GET(
     
     let contentType = 'image/jpeg';
     switch (ext) {
-      case 'png':
-        contentType = 'image/png';
-        break;
-      case 'gif':
-        contentType = 'image/gif';
-        break;
-      case 'webp':
-        contentType = 'image/webp';
-        break;
-      case 'svg':
-        contentType = 'image/svg+xml';
-        break;
+      case 'png': contentType = 'image/png'; break;
+      case 'gif': contentType = 'image/gif'; break;
+      case 'webp': contentType = 'image/webp'; break;
+      case 'svg': contentType = 'image/svg+xml'; break;
     }
 
     return new NextResponse(imageBuffer, {

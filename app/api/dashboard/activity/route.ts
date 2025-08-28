@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
+import { safeToISOString } from '@/utils/dateUtils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,15 +54,19 @@ export async function GET(request: NextRequest) {
       LIMIT 20
     `, [userId]);
 
-    const activities = result.rows.map(row => ({
-      id: row.id,
-      activityType: row.activity_type,
-      title: row.title,
-      description: row.description,
-      metadata: row.metadata,
-      createdAt: row.created_at,
-      timeAgo: getTimeAgo(row.created_at)
-    }));
+    const activities = result.rows.map(row => {
+      const safeCreatedAt = safeToISOString(row.created_at);
+      
+      return {
+        id: row.id,
+        activity_type: row.activity_type, // Match frontend interface
+        title: row.title,
+        description: row.description,
+        metadata: row.metadata,
+        created_at: safeCreatedAt,
+        timeAgo: getTimeAgo(safeCreatedAt)
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -79,13 +84,25 @@ export async function GET(request: NextRequest) {
 }
 
 function getTimeAgo(date: string): string {
-  const now = new Date();
-  const activityDate = new Date(date);
-  const diffInSeconds = Math.floor((now.getTime() - activityDate.getTime()) / 1000);
+  try {
+    const now = new Date();
+    const activityDate = new Date(date);
+    
+    // Check if date is valid
+    if (isNaN(activityDate.getTime())) {
+      return 'Unknown time';
+    }
+    
+    const diffInSeconds = Math.floor((now.getTime() - activityDate.getTime()) / 1000);
 
-  if (diffInSeconds < 60) return 'Just now';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
-  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`;
-  return activityDate.toLocaleDateString();
+    if (diffInSeconds < 0) return 'Just now'; // Future dates
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    return activityDate.toLocaleDateString();
+  } catch (error) {
+    console.warn('Error calculating time ago:', error);
+    return 'Unknown time';
+  }
 }

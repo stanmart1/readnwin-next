@@ -1,79 +1,99 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
+import { fetchBookCover } from '@/utils/bookCoverFetcher';
 
 interface SafeImageProps {
-  src: string;
+  src?: string | null;
   alt: string;
+  bookTitle?: string;
   width?: number;
   height?: number;
   className?: string;
   fallbackSrc?: string;
-  priority?: boolean;
-  fill?: boolean;
-  sizes?: string;
+  onError?: () => void;
   style?: React.CSSProperties;
 }
 
 export default function SafeImage({
   src,
   alt,
+  bookTitle,
   width,
   height,
   className = '',
-  fallbackSrc = '/placeholder-book.png',
-  priority = false,
-  fill = false,
-  sizes,
+  fallbackSrc = '/placeholder-book.jpg',
+  onError,
   style,
   ...props
 }: SafeImageProps) {
-  const [imgSrc, setImgSrc] = useState(src);
+  const [imgSrc, setImgSrc] = useState<string>(src || fallbackSrc);
   const [hasError, setHasError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
-  // Reset error state when src changes
   useEffect(() => {
-    setImgSrc(src);
-    setHasError(false);
+    if (src && src !== imgSrc) {
+      setImgSrc(src);
+      setHasError(false);
+      setRetryCount(0);
+    }
   }, [src]);
 
-  const handleError = () => {
-    if (!hasError) {
-      setHasError(true);
-      
-      // Try API route if direct path fails
-      if (imgSrc && imgSrc.startsWith('/uploads/')) {
-        const apiPath = `/api${imgSrc}`;
-        setImgSrc(apiPath);
-        return;
+  const handleError = async () => {
+    if (hasError || retryCount >= 3) {
+      if (imgSrc !== fallbackSrc) {
+        setImgSrc(fallbackSrc);
+      }
+      onError?.();
+      return;
+    }
+
+    setHasError(true);
+    setRetryCount(prev => prev + 1);
+    
+    if (retryCount === 0 && src) {
+      if (src.includes('readnwin.com')) {
+        const filename = src.split('/').pop();
+        if (filename) {
+          setImgSrc(`/uploads/covers/${filename}`);
+          return;
+        }
       }
       
-      // Use fallback image
-      setImgSrc(fallbackSrc);
+      if (src.startsWith('/uploads/')) {
+        setImgSrc(`/api${src}`);
+        return;
+      }
     }
+    
+    // Try fetching from public sources using book title
+    if (retryCount === 1 && bookTitle) {
+      try {
+        const publicCover = await fetchBookCover(bookTitle);
+        if (publicCover) {
+          setImgSrc(publicCover);
+          return;
+        }
+      } catch (error) {
+        console.warn('Failed to fetch public cover:', error);
+      }
+    }
+    
+    setImgSrc(fallbackSrc);
+    onError?.();
   };
-
-  const imageProps = {
-    src: imgSrc,
-    alt,
-    onError: handleError,
-    className,
-    priority,
-    style,
-    ...props
-  };
-
-  if (fill) {
-    return <Image {...imageProps} fill sizes={sizes} />;
-  }
 
   return (
-    <Image
-      {...imageProps}
-      width={width || 200}
-      height={height || 250}
-      sizes={sizes}
+    <img
+      src={imgSrc}
+      alt={alt}
+      width={width}
+      height={height}
+      className={className}
+      style={style}
+      onError={handleError}
+      loading="lazy"
+      {...props}
     />
   );
 }

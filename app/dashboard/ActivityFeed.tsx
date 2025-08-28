@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { formatDistanceToNow } from 'date-fns';
+import { safeFormatDistanceToNow, isValidDateString } from '@/utils/dateUtils';
 
 interface Activity {
   id: number;
@@ -23,23 +23,34 @@ export default function ActivityFeed() {
 
   useEffect(() => {
     const fetchActivities = async () => {
-      if (!session?.user?.id) return;
+      if (!session?.user?.id) {
+        setLoading(false);
+        return;
+      }
 
       try {
         const response = await fetch('/api/dashboard/activity?limit=10');
         if (response.ok) {
           const data = await response.json();
-          setActivities(data.activities || []);
+          // Filter out activities with invalid dates
+          const validActivities = (data.activities || []).filter((activity: Activity) => {
+            return isValidDateString(activity.created_at);
+          });
+          setActivities(validActivities);
+        } else {
+          console.warn('Failed to fetch activities:', response.status);
+          setActivities([]);
         }
       } catch (error) {
         console.error('Error fetching activities:', error);
+        setActivities([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchActivities();
-  }, [session]);
+  }, [session?.user?.id]);
 
   const displayActivities = activities;
 
@@ -68,6 +79,8 @@ export default function ActivityFeed() {
       default: return 'text-gray-600 bg-gray-100';
     }
   };
+
+
 
   if (loading) {
     return (
@@ -100,7 +113,7 @@ export default function ActivityFeed() {
                 <div className="flex-1">
                   <p className="text-sm text-gray-900">{activity.title}</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
+                    {safeFormatDistanceToNow(activity.created_at)}
                   </p>
                 </div>
               </div>

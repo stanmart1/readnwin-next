@@ -294,33 +294,32 @@ export default function WorksCarousel() {
           >
             {worksImages.map((work, index) => (
               <div key={work.id} className="flex-shrink-0 w-full md:w-1/2 lg:w-1/3" data-work-id={work.id}>
-                <div className="relative bg-white rounded-2xl shadow-lg overflow-hidden h-[450px] md:h-[500px] flex flex-col">
+                <div className="relative bg-white rounded-2xl shadow-lg overflow-hidden h-[480px] flex flex-col">
                   <div className="relative overflow-hidden flex-shrink-0">
                     <img
                       src={work.src}
                       alt={work.alt}
-                      className="w-full h-64 md:h-80 object-cover object-center"
-
+                      className="w-full h-64 object-cover object-center"
                     />
                   </div>
                   
-                  <div className="p-6 flex-1 flex flex-col">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3 line-clamp-2">
-                      {work.title}
-                    </h3>
-                    <div className="flex-1 flex flex-col">
-                      <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 max-h-[4.5rem] overflow-hidden">
+                  <div className="p-6 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-3 line-clamp-2 min-h-[3.5rem]">
+                        {work.title}
+                      </h3>
+                      <p className="text-gray-600 text-sm leading-relaxed line-clamp-4 mb-4">
                         {work.description || 'Innovative solutions that enhance the digital reading experience and connect readers with their favorite books.'}
                       </p>
-                      {truncatedWorks.has(work.id) && (
-                        <button
-                          onClick={() => openModal(work)}
-                          className="mt-3 text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors duration-300 self-start"
-                        >
-                          Read More
-                        </button>
-                      )}
                     </div>
+                    {truncatedWorks.has(work.id) && (
+                      <button
+                        onClick={() => openModal(work)}
+                        className="text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors duration-300 self-start mt-auto"
+                      >
+                        Read More
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

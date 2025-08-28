@@ -75,26 +75,29 @@ export default function BookCard({
 }: BookCardProps) {
   // Use API data if available, fallback to mock data
   const displayAuthor = author_name || author || 'Unknown Author';
-  const displayCover = cover_image_url || cover || '/placeholder-book.jpg';
+  const displayCover = cover_image_url || cover;
   const displayOriginalPrice = original_price || originalPrice;
   const displayRating = rating || 0;
   const displayReviewCount = reviewCount || 0;
   const displayIsAvailable = isAvailable !== undefined ? isAvailable : true;
   const [isHovered, setIsHovered] = useState(false);
   const [wishlistStatus, setWishlistStatus] = useState(isWishlisted);
-  const [imageError, setImageError] = useState(false);
   const { data: session } = useSession();
   const { addToCart } = useCart();
   const { addToCart: addToGuestCart } = useGuestCart();
 
-  const handleImageError = () => {
-    setImageError(true);
-  };
-
   const getImageSrc = () => {
-    if (imageError) {
-      return '/placeholder-book.jpg';
+    // Handle production secure URLs
+    if (displayCover?.startsWith('/api/files/secure/')) {
+      return displayCover;
     }
+    
+    // Handle storage paths - convert to API endpoint
+    if (displayCover?.includes('/app/storage/') || displayCover?.includes('storage/')) {
+      const cleanPath = displayCover.replace(/^\/?(app\/)?storage\//, '');
+      return `/api/images/${cleanPath}`;
+    }
+    
     return displayCover;
   };
 
@@ -199,7 +202,6 @@ export default function BookCard({
             src={getImageSrc()} 
             alt={title}
             className="w-full h-72 object-cover object-top"
-            onError={handleImageError}
           />
           
           {/* Book Type Badge */}

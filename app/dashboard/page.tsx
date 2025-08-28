@@ -17,6 +17,7 @@ import PurchaseHistory from './PurchaseHistory';
 import ReviewStats from './ReviewStats';
 import NotificationCenter from './NotificationCenter';
 import ReadingAnalyticsDashboard from './ReadingAnalyticsDashboard';
+import ActivityErrorBoundary from '@/components/ui/ActivityErrorBoundary';
 
 export default function Dashboard() {
   const { data: session } = useSession();
@@ -103,10 +104,12 @@ export default function Dashboard() {
         return (
           <DashboardErrorBoundary>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Recent Activity</h2>
-                <ActivityFeed />
-              </div>
+              <ActivityErrorBoundary>
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Recent Activity</h2>
+                  <ActivityFeed />
+                </div>
+              </ActivityErrorBoundary>
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Notifications</h2>
                 <NotificationCenter />

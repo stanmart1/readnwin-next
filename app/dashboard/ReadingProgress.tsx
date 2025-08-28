@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import SafeImage from '@/components/ui/SafeImage';
 
 interface CurrentlyReading {
   id: number;
@@ -81,13 +82,13 @@ export default function ReadingProgress() {
         <div className="space-y-4">
           {currentlyReading.map(book => (
             <div key={book.id} className="flex items-center space-x-4 p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
-              <img
-                src={book.cover_image_url || '/placeholder-book.jpg'}
+              <SafeImage
+                src={book.cover_image_url}
                 alt={book.title}
+                bookTitle={book.title}
+                width={48}
+                height={64}
                 className="w-12 h-16 object-cover rounded"
-                onError={(e) => {
-                  e.currentTarget.src = '/placeholder-book.jpg';
-                }}
               />
               
               <div className="flex-1 min-w-0">

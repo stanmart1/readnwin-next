@@ -10,6 +10,7 @@ import PreloadDisabler from './components/PreloadDisabler'
 import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 import FlutterwaveScriptLoader from '../components/FlutterwaveScriptLoader'
 import { initializeSecurityPatches } from '@/utils/apply-security-patches'
+import '@/utils/errorSuppression'
 
 export const metadata: Metadata = {
   title: 'ReadnWin - Your Digital Library',

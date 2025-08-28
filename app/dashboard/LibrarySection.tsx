@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import SafeImage from '@/components/ui/SafeImage';
 
 interface LibraryBook {
   id: number;
@@ -37,9 +38,13 @@ export default function LibrarySection() {
         if (response.ok) {
           const data = await response.json();
           setBooks(data.books || []);
+        } else {
+          console.warn('Library API error:', response.status);
+          setBooks([]);
         }
       } catch (error) {
         console.error('Error fetching library:', error);
+        setBooks([]);
       } finally {
         setLoading(false);
       }
@@ -211,13 +216,11 @@ export default function LibrarySection() {
             viewMode === 'grid' ? (
               <div key={book.id} className="group bg-white rounded-xl sm:rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-100 hover:border-blue-200">
                 <div className="aspect-[3/4] relative overflow-hidden">
-                  <img
-                    src={book.cover_image_url || '/placeholder-book.jpg'}
+                  <SafeImage
+                    src={book.cover_image_url}
                     alt={book.title}
+                    bookTitle={book.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    onError={(e) => {
-                      e.currentTarget.src = '/placeholder-book.jpg';
-                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   
@@ -289,13 +292,11 @@ export default function LibrarySection() {
               <div key={book.id} className="group bg-white rounded-xl border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all duration-300 p-4">
                 <div className="flex items-center space-x-4">
                   <div className="flex-shrink-0 w-16 h-20 sm:w-20 sm:h-24 relative overflow-hidden rounded-lg">
-                    <img
-                      src={book.cover_image_url || '/placeholder-book.jpg'}
+                    <SafeImage
+                      src={book.cover_image_url}
                       alt={book.title}
+                      bookTitle={book.title}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = '/placeholder-book.jpg';
-                      }}
                     />
                     {book.progress_percentage > 0 && (
                       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1">

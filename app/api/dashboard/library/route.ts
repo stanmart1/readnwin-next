@@ -12,7 +12,26 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id;
 
-    // Create user_library table if it doesn't exist
+    // Create required tables
+    await query(`
+      CREATE TABLE IF NOT EXISTS authors (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS books (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        author_id INTEGER REFERENCES authors(id),
+        cover_image_url TEXT,
+        format VARCHAR(50) DEFAULT 'ebook',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     await query(`
       CREATE TABLE IF NOT EXISTS user_library (
         id SERIAL PRIMARY KEY,
@@ -25,6 +44,19 @@ export async function GET(request: NextRequest) {
       )
     `);
 
+    await query(`
+      CREATE TABLE IF NOT EXISTS reading_progress (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        book_id INTEGER NOT NULL,
+        progress_percentage DECIMAL(5,2) DEFAULT 0,
+        last_read_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        total_reading_time_seconds INTEGER DEFAULT 0,
+        UNIQUE(user_id, book_id)
+      )
+    `);
+
     // Get user library books
     const result = await query(`
       SELECT 
@@ -32,8 +64,8 @@ export async function GET(request: NextRequest) {
         b.title,
         COALESCE(a.name, 'Unknown Author') as author_name,
         b.cover_image_url,
-        b.format as book_type,
-        b.format as primary_format,
+        COALESCE(b.format, 'ebook') as book_type,
+        COALESCE(b.format, 'ebook') as primary_format,
         COALESCE(rp.progress_percentage, 0) as progress_percentage,
         rp.last_read_at,
         rp.completed_at,

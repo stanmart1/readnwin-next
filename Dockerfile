@@ -74,9 +74,15 @@ RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
 # Copy the public folder
 COPY --from=builder /app/public ./public
 
-# Create storage directory
-RUN mkdir -p /app/storage
-RUN chown -R pptruser:pptruser /app/storage
+# Copy setup scripts
+COPY --from=builder /app/scripts ./scripts
+
+# Create storage and uploads directories
+RUN mkdir -p /app/storage /app/uploads /app/public/uploads
+RUN chown -R pptruser:pptruser /app/storage /app/uploads /app/public/uploads
+
+# Create volume mount points for persistent storage
+VOLUME ["/app/storage"]
 
 # Set the correct permission for prerender cache
 RUN mkdir .next
@@ -94,6 +100,10 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
+# Create startup script
+RUN echo '#!/bin/bash\nnode scripts/setup-production-storage.js\nnode scripts/migrate-covers-to-storage.js\nnode server.js' > /app/start.sh
+RUN chmod +x /app/start.sh
+
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["node", "server.js"] 
+CMD ["/app/start.sh"] 

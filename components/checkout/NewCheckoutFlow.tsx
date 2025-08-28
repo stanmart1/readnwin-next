@@ -3,6 +3,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { sanitizeForXSS, sanitizeLogInput } from '@/utils/security';
+import { useToast } from '@/components/ui/Toast';
+import { useCheckoutData } from './hooks/useCheckoutData';
+import { useCartAnalytics } from './hooks/useCartAnalytics';
 import { 
   CheckCircle, 
   Truck, 
@@ -86,14 +90,16 @@ interface CartAnalytics {
 export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: CheckoutFlowProps) {
   const { data: session } = useSession();
   const router = useRouter();
+  const { showToast, ToastContainer } = useToast();
   
   // State management
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [analytics, setAnalytics] = useState<CartAnalytics | null>(null);
-  const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
-  const [paymentGateways, setPaymentGateways] = useState<PaymentGateway[]>([]);
+  
+  // Use custom hooks for data management
+  const { shippingMethods, paymentGateways, isLoading: dataLoading, error: dataError } = useCheckoutData();
+  const analytics = useCartAnalytics(cartItems, formData.shipping_method);
   
   const [formData, setFormData] = useState<CheckoutFormData>({
     shipping: {
@@ -249,7 +255,7 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
         setPaymentGateways(paymentData.gateways || []);
       }
     } catch (error) {
-      console.error('Error loading checkout data:', error);
+      console.error('Error loading checkout data:', sanitizeLogInput(error));
       setError('Failed to load checkout options');
     } finally {
       setIsLoading(false);
@@ -321,6 +327,12 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
       setIsLoading(true);
       setError(null);
 
+      // Validate form data before submission
+      if (!validateStep(currentStep)) {
+        showToast('Please fill in all required fields', 'error');
+        return;
+      }
+
       const checkoutData = {
         formData,
         cartItems,
@@ -337,20 +349,24 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Checkout failed');
+        const errorMessage = errorData.error || `Checkout failed (${response.status})`;
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
       
       // Handle successful checkout
       if (result.success) {
+        showToast('Order created successfully!', 'success');
         onComplete(result);
       } else {
         throw new Error(result.error || 'Payment processing failed');
       }
     } catch (error) {
-      console.error('Checkout error:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      console.error('Checkout error:', sanitizeLogInput(error));
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -521,6 +537,8 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
           </button>
         )}
       </div>
+      
+      <ToastContainer />
     </div>
   );
 }
@@ -544,7 +562,7 @@ function CustomerInformationStep({ formData, updateFormData }: {
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={formData.shipping.first_name}
-            onChange={(e) => updateFormData('shipping', { first_name: e.target.value })}
+            onChange={(e) => updateFormData('shipping', { first_name: sanitizeForXSS(e.target.value) })}
           />
         </div>
         
@@ -557,7 +575,7 @@ function CustomerInformationStep({ formData, updateFormData }: {
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={formData.shipping.last_name}
-            onChange={(e) => updateFormData('shipping', { last_name: e.target.value })}
+            onChange={(e) => updateFormData('shipping', { last_name: sanitizeForXSS(e.target.value) })}
           />
         </div>
       </div>
@@ -573,7 +591,7 @@ function CustomerInformationStep({ formData, updateFormData }: {
             required
             className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={formData.shipping.email}
-            onChange={(e) => updateFormData('shipping', { email: e.target.value })}
+            onChange={(e) => updateFormData('shipping', { email: sanitizeForXSS(e.target.value) })}
           />
         </div>
       </div>
@@ -588,7 +606,7 @@ function CustomerInformationStep({ formData, updateFormData }: {
             type="tel"
             className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={formData.shipping.phone}
-            onChange={(e) => updateFormData('shipping', { phone: e.target.value })}
+            onChange={(e) => updateFormData('shipping', { phone: sanitizeForXSS(e.target.value) })}
             placeholder="+234 801 234 5678"
           />
         </div>
@@ -616,7 +634,7 @@ function ShippingAddressStep({ formData, updateFormData }: {
             required
             className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={formData.shipping.address}
-            onChange={(e) => updateFormData('shipping', { address: e.target.value })}
+            onChange={(e) => updateFormData('shipping', { address: sanitizeForXSS(e.target.value) })}
             placeholder="123 Main Street, Apartment 4B"
           />
         </div>
@@ -634,7 +652,7 @@ function ShippingAddressStep({ formData, updateFormData }: {
               required
               className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={formData.shipping.city}
-              onChange={(e) => updateFormData('shipping', { city: e.target.value })}
+              onChange={(e) => updateFormData('shipping', { city: sanitizeForXSS(e.target.value) })}
               placeholder="Lagos"
             />
           </div>
@@ -676,7 +694,7 @@ function ShippingAddressStep({ formData, updateFormData }: {
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={formData.shipping.zip_code}
-            onChange={(e) => updateFormData('shipping', { zip_code: e.target.value })}
+            onChange={(e) => updateFormData('shipping', { zip_code: sanitizeForXSS(e.target.value) })}
             placeholder="100001"
           />
         </div>

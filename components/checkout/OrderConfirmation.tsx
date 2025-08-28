@@ -7,6 +7,7 @@ import { formatNaira, calculateVAT } from '@/utils/currency';
 import { useCart } from '@/contexts/CartContextNew';
 import { useFlutterwaveInline } from '@/hooks/useFlutterwaveInline';
 import { AlertCircle, CheckCircle, Loader2, Upload, X, FileText, Image as ImageIcon } from 'lucide-react';
+import { sanitizeLogInput } from '@/utils/security';
 
 interface OrderConfirmationProps {
   formData: any;
@@ -43,7 +44,7 @@ export default function OrderConfirmation({
   // Flutterwave inline payment hook
   const { initializePayment } = useFlutterwaveInline({
     onSuccess: (response) => {
-      console.log('Payment successful:', response);
+      console.log('Payment successful:', sanitizeLogInput(response));
       if (response.status === 'successful') {
         router.push(`/order-confirmation/${response.meta?.order_id || 'success'}`);
       } else {
@@ -58,7 +59,7 @@ export default function OrderConfirmation({
       router.push(`/payment/cancelled?order=${orderNumber}`);
     },
     onError: (error) => {
-      console.error('Payment error:', error);
+      console.error('Payment error:', sanitizeLogInput(error));
       const orderNumber = orderData?.order_number || 'unknown';
       router.push(`/payment/failed?order=${orderNumber}&reason=payment_error`);
     }
@@ -327,7 +328,7 @@ export default function OrderConfirmation({
       }
 
       const orderResult = await orderResponse.json();
-      console.log('🔍 Order result received:', JSON.stringify(orderResult, null, 2));
+      console.log('🔍 Order result received:', sanitizeLogInput(JSON.stringify(orderResult, null, 2)));
       
       setProcessingStep('Completing order...');
       setProcessingProgress(90);
@@ -343,8 +344,8 @@ export default function OrderConfirmation({
         // Handle different payment methods based on the response
         if (orderResult.paymentMethod === 'bank_transfer') {
           console.log('🔍 Processing bank transfer response');
-          console.log('🔍 Bank transfer ID:', orderResult.bankTransferId);
-          console.log('🔍 Bank transfer details:', orderResult.bankTransferDetails);
+          console.log('🔍 Bank transfer ID:', sanitizeLogInput(orderResult.bankTransferId));
+          console.log('🔍 Bank transfer details:', sanitizeLogInput(orderResult.bankTransferDetails));
           
           // Bank transfer is already handled in the API
           setBankTransferData(orderResult.bankTransferDetails);
@@ -376,7 +377,7 @@ export default function OrderConfirmation({
         throw new Error(orderResult.error || 'Failed to create order');
       }
     } catch (error) {
-      console.error('Error placing order:', error);
+      console.error('Error placing order:', sanitizeLogInput(error));
       const errorMessage = error instanceof Error ? error.message : 'There was an error processing your order. Please try again.';
       setOrderError(errorMessage);
       // Clear error after 8 seconds
@@ -390,7 +391,7 @@ export default function OrderConfirmation({
 
   const handleInlinePayment = async (orderResult: any) => {
     try {
-      console.log('🔍 Order result for inline payment:', JSON.stringify(orderResult, null, 2));
+      console.log('🔍 Order result for inline payment:', sanitizeLogInput(JSON.stringify(orderResult, null, 2)));
       
       // Extract payment data from the order result
       const paymentDataForInline = {
@@ -411,22 +412,22 @@ export default function OrderConfirmation({
         }
       };
 
-      console.log('🔍 Payment data for inline:', JSON.stringify(paymentDataForInline, null, 2));
+      console.log('🔍 Payment data for inline:', sanitizeLogInput(JSON.stringify(paymentDataForInline, null, 2)));
 
       // Initialize inline payment
       await initializePayment(paymentDataForInline);
     } catch (error) {
-      console.error('Inline payment error:', error);
+      console.error('Inline payment error:', sanitizeLogInput(error));
     }
   };
 
   const handleBankTransferContinue = () => {
     console.log('🔍 handleBankTransferContinue called');
-    console.log('🔍 bankTransferId:', bankTransferId);
-    console.log('🔍 bankTransferData:', bankTransferData);
+    console.log('🔍 bankTransferId:', sanitizeLogInput(bankTransferId));
+    console.log('🔍 bankTransferData:', sanitizeLogInput(bankTransferData));
     
     if (bankTransferId) {
-      console.log('🔍 Navigating to bank transfer page:', `/payment/bank-transfer/${bankTransferId}`);
+      console.log('🔍 Navigating to bank transfer page:', sanitizeLogInput(`/payment/bank-transfer/${bankTransferId}`));
       router.push(`/payment/bank-transfer/${bankTransferId}`);
     } else {
       console.error('Bank transfer ID is not available');

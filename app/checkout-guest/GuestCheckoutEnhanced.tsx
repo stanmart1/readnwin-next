@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { sanitizeForXSS } from '@/utils/security';
+import { useToast } from '@/components/ui/Toast';
 import { ShoppingBag, Download, Package, AlertCircle, Lock, User, Mail, MapPin, Truck, ChevronRight, Check } from 'lucide-react';
 import { useGuestCart } from '@/contexts/GuestCartContext';
 import Header from '@/components/Header';
@@ -41,6 +43,7 @@ const GUEST_SHIPPING_METHOD_KEY = 'readnwin_guest_shipping_method';
 export default function GuestCheckoutEnhanced() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { showToast, ToastContainer } = useToast();
   const {
     cartItems,
     isLoading: cartLoading,
@@ -167,9 +170,28 @@ export default function GuestCheckoutEnhanced() {
     if (status === 'loading') return;
 
     if (session) {
-      // Transfer guest cart to user account
+      // Transfer guest cart to user account with validation
       if (cartItems.length > 0) {
-        transferCartToUser(parseInt(session.user.id));
+        try {
+          const userId = session.user?.id;
+          if (!userId) {
+            showToast('Invalid user session. Please sign in again.', 'error');
+            return;
+          }
+          
+          const parsedUserId = parseInt(userId, 10);
+          if (isNaN(parsedUserId) || parsedUserId <= 0) {
+            showToast('Invalid user ID. Please contact support.', 'error');
+            return;
+          }
+          
+          transferCartToUser(parsedUserId);
+          showToast('Cart transferred successfully!', 'success');
+        } catch (error) {
+          console.error('Error transferring cart:', error);
+          showToast('Failed to transfer cart. Please try again.', 'error');
+          return;
+        }
       }
       router.push('/checkout-new');
       return;
@@ -240,7 +262,7 @@ export default function GuestCheckoutEnhanced() {
 
   const handleContinueFromShipping = () => {
     if (!selectedShippingMethod) {
-      alert('Please select a shipping method');
+      showToast('Please select a shipping method', 'error');
       return;
     }
     saveShippingData();
@@ -410,7 +432,7 @@ export default function GuestCheckoutEnhanced() {
                       <input
                         type="text"
                         value={shippingAddress.firstName}
-                        onChange={(e) => handleAddressInputChange('firstName', e.target.value)}
+                        onChange={(e) => handleAddressInputChange('firstName', sanitizeForXSS(e.target.value))}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           validationErrors.firstName ? 'border-red-300' : 'border-gray-300'
                         }`}
@@ -428,7 +450,7 @@ export default function GuestCheckoutEnhanced() {
                       <input
                         type="text"
                         value={shippingAddress.lastName}
-                        onChange={(e) => handleAddressInputChange('lastName', e.target.value)}
+                        onChange={(e) => handleAddressInputChange('lastName', sanitizeForXSS(e.target.value))}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           validationErrors.lastName ? 'border-red-300' : 'border-gray-300'
                         }`}
@@ -448,7 +470,7 @@ export default function GuestCheckoutEnhanced() {
                       <input
                         type="email"
                         value={shippingAddress.email}
-                        onChange={(e) => handleAddressInputChange('email', e.target.value)}
+                        onChange={(e) => handleAddressInputChange('email', sanitizeForXSS(e.target.value))}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           validationErrors.email ? 'border-red-300' : 'border-gray-300'
                         }`}
@@ -466,7 +488,7 @@ export default function GuestCheckoutEnhanced() {
                       <input
                         type="tel"
                         value={shippingAddress.phone}
-                        onChange={(e) => handleAddressInputChange('phone', e.target.value)}
+                        onChange={(e) => handleAddressInputChange('phone', sanitizeForXSS(e.target.value))}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           validationErrors.phone ? 'border-red-300' : 'border-gray-300'
                         }`}
@@ -485,7 +507,7 @@ export default function GuestCheckoutEnhanced() {
                     <input
                       type="text"
                       value={shippingAddress.addressLine1}
-                      onChange={(e) => handleAddressInputChange('addressLine1', e.target.value)}
+                      onChange={(e) => handleAddressInputChange('addressLine1', sanitizeForXSS(e.target.value))}
                       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         validationErrors.addressLine1 ? 'border-red-300' : 'border-gray-300'
                       }`}
@@ -503,7 +525,7 @@ export default function GuestCheckoutEnhanced() {
                     <input
                       type="text"
                       value={shippingAddress.addressLine2}
-                      onChange={(e) => handleAddressInputChange('addressLine2', e.target.value)}
+                      onChange={(e) => handleAddressInputChange('addressLine2', sanitizeForXSS(e.target.value))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Apartment, suite, unit, building, floor, etc."
                     />
@@ -517,7 +539,7 @@ export default function GuestCheckoutEnhanced() {
                       <input
                         type="text"
                         value={shippingAddress.city}
-                        onChange={(e) => handleAddressInputChange('city', e.target.value)}
+                        onChange={(e) => handleAddressInputChange('city', sanitizeForXSS(e.target.value))}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           validationErrors.city ? 'border-red-300' : 'border-gray-300'
                         }`}
@@ -535,7 +557,7 @@ export default function GuestCheckoutEnhanced() {
                       <input
                         type="text"
                         value={shippingAddress.state}
-                        onChange={(e) => handleAddressInputChange('state', e.target.value)}
+                        onChange={(e) => handleAddressInputChange('state', sanitizeForXSS(e.target.value))}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           validationErrors.state ? 'border-red-300' : 'border-gray-300'
                         }`}
@@ -553,7 +575,7 @@ export default function GuestCheckoutEnhanced() {
                       <input
                         type="text"
                         value={shippingAddress.postalCode}
-                        onChange={(e) => handleAddressInputChange('postalCode', e.target.value)}
+                        onChange={(e) => handleAddressInputChange('postalCode', sanitizeForXSS(e.target.value))}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           validationErrors.postalCode ? 'border-red-300' : 'border-gray-300'
                         }`}
@@ -802,6 +824,8 @@ export default function GuestCheckoutEnhanced() {
           </div>
         </div>
       </div>
+      
+      <ToastContainer />
     </div>
   );
 } 

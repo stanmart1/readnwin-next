@@ -1,13 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { CartItem } from '@/types/ecommerce';
 import { formatNumber } from '@/utils/dateUtils';
 
+interface CheckoutSummary {
+  subtotal: number;
+  tax_amount: number;
+  shipping_amount: number;
+  discount_amount: number;
+  total_amount: number;
+}
+
 interface OrderSummaryProps {
   cartItems: CartItem[];
-  checkoutSummary: any;
+  checkoutSummary: CheckoutSummary;
   onContinue: () => void;
   isLoading?: boolean;
 }
@@ -130,7 +138,7 @@ export default function OrderSummary({
       )}
 
       {/* E-book Benefits - Only show if there are e-books in cart */}
-      {cartItems.some(item => item.book?.format === 'ebook') && (
+      {useMemo(() => cartItems.some(item => item.book?.format === 'ebook'), [cartItems]) && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-start space-x-3">
             <div className="flex-shrink-0">

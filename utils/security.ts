@@ -83,3 +83,20 @@ export function safeJsonParse(jsonString: string, defaultValue: any = null): any
     return defaultValue;
   }
 }
+
+export function sanitizeForXSS(input: string): string {
+  if (!input) return '';
+  return input
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+}
+
+export function sanitizeLogInput(input: any): string {
+  if (typeof input !== 'string') {
+    input = String(input);
+  }
+  return input.replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
+}

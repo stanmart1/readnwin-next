@@ -5,13 +5,14 @@ import { ecommerceService } from '@/utils/ecommerce-service-new';
 import { FlutterwaveService } from '@/utils/flutterwave-service';
 import { CheckoutFormData, OrderResponse } from '@/types/ecommerce';
 import { query } from '@/utils/database';
+import { sanitizeLogInput } from '@/utils/security';
 
 export async function POST(request: NextRequest) {
   try {
     console.log('🔍 Checkout API called');
     
     const session = await getServerSession(authOptions);
-    console.log('🔍 Session:', JSON.stringify(session, null, 2));
+    console.log('🔍 Session:', sanitizeLogInput(JSON.stringify(session, null, 2)));
     
     if (!session?.user?.id) {
       console.log('❌ No session or user ID');
@@ -22,16 +23,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body: CheckoutFormData | { formData: CheckoutFormData } = await request.json();
-    console.log('🔍 Request body:', JSON.stringify(body, null, 2));
+    console.log('🔍 Request body:', sanitizeLogInput(JSON.stringify(body, null, 2)));
     
     // Handle nested formData structure from frontend
     const requestData = 'formData' in body ? body : { formData: body as CheckoutFormData };
     const { formData } = requestData;
     
-    console.log('🔍 Form data:', JSON.stringify(formData, null, 2));
-    console.log('🔍 Form data shipping:', JSON.stringify(formData.shipping, null, 2));
-    console.log('🔍 Form data billing:', JSON.stringify(formData.billing, null, 2));
-    console.log('🔍 Form data payment:', JSON.stringify(formData.payment, null, 2));
+    console.log('🔍 Form data:', sanitizeLogInput(JSON.stringify(formData, null, 2)));
+    console.log('🔍 Form data shipping:', sanitizeLogInput(JSON.stringify(formData.shipping, null, 2)));
+    console.log('🔍 Form data billing:', sanitizeLogInput(JSON.stringify(formData.billing, null, 2)));
+    console.log('🔍 Form data payment:', sanitizeLogInput(JSON.stringify(formData.payment, null, 2)));
     
     const userId = parseInt(session.user.id);
     console.log('🔍 User ID:', userId);
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
     // Get cart analytics to determine checkout flow
     console.log('🔍 Getting cart analytics...');
     const analytics = await ecommerceService.getCartAnalytics(userId);
-    console.log('🔍 Analytics:', JSON.stringify(analytics, null, 2));
+    console.log('🔍 Analytics:', sanitizeLogInput(JSON.stringify(analytics, null, 2)));
     
     const isEbookOnly = analytics.isEbookOnly;
     console.log('🔍 Is ebook only:', isEbookOnly);
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
       formData.shippingMethod?.id,
       formData.discountCode
     );
-    console.log('🔍 Order created:', JSON.stringify(order, null, 2));
+    console.log('🔍 Order created:', sanitizeLogInput(JSON.stringify(order, null, 2)));
     
     if (!order || !order.id) {
       console.error('❌ Order creation failed - no order ID returned');
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
         }
         console.log('✅ All eBooks added to user library successfully');
       } catch (libraryError) {
-        console.error('❌ Error adding eBooks to library:', libraryError);
+        console.error('❌ Error adding eBooks to library:', sanitizeLogInput(libraryError));
         // Don't fail the entire checkout for library issues - this can be retried later
       }
     }
@@ -183,16 +184,16 @@ export async function POST(request: NextRequest) {
         if (emailResult.success) {
           console.log('✅ Order confirmation email sent');
         } else {
-          console.warn('⚠️ Order confirmation email failed:', emailResult.error);
+          console.warn('⚠️ Order confirmation email failed:', sanitizeLogInput(emailResult.error));
         }
       }
     } catch (emailError) {
-      console.error('❌ Error sending order confirmation email:', emailError);
+      console.error('❌ Error sending order confirmation email:', sanitizeLogInput(emailError));
       // Don't fail the order creation if email fails
     }
 
     // Generate transaction ID
-    const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
     console.log('🔍 Transaction ID:', transactionId);
 
     // Create payment transaction record
@@ -209,7 +210,7 @@ export async function POST(request: NextRequest) {
       console.log('🔍 Payment transaction created');
       paymentTransactionCreated = true;
     } catch (error) {
-      console.error('❌ Error creating payment transaction:', error);
+      console.error('❌ Error creating payment transaction:', sanitizeLogInput(error));
       console.warn('⚠️ Payment transaction creation failed, but continuing with checkout');
       // Continue without payment transaction record
     }
@@ -220,7 +221,7 @@ export async function POST(request: NextRequest) {
       await ecommerceService.updateOrderPaymentMethod(order.id, formData.payment.method, transactionId);
       console.log('🔍 Order payment method updated');
     } catch (error) {
-      console.error('❌ Error updating order payment method:', error);
+      console.error('❌ Error updating order payment method:', sanitizeLogInput(error));
       console.warn('⚠️ Order payment method update failed, but continuing with checkout');
       // Don't throw error here as the order was created successfully
     }
@@ -235,7 +236,7 @@ export async function POST(request: NextRequest) {
         const { bankTransferService: importedService } = await import('@/utils/bank-transfer-service');
         bankTransferService = importedService;
       } catch (importError) {
-        console.error('❌ Error importing bank transfer service:', importError);
+        console.error('❌ Error importing bank transfer service:', sanitizeLogInput(importError));
         return NextResponse.json(
           { error: 'Bank transfer service not available' },
           { status: 500 }
@@ -359,11 +360,11 @@ export async function POST(request: NextRequest) {
         } as OrderResponse);
 
       } catch (error) {
-        console.error('❌ Flutterwave payment error:', error);
-        console.error('❌ Error details:', {
+        console.error('❌ Flutterwave payment error:', sanitizeLogInput(error));
+        console.error('❌ Error details:', sanitizeLogInput({
           message: error instanceof Error ? error.message : 'Unknown error',
           stack: error instanceof Error ? error.stack : 'No stack trace'
-        });
+        }));
         return NextResponse.json(
           { error: 'Failed to initialize Flutterwave payment' },
           { status: 500 }
@@ -378,8 +379,8 @@ export async function POST(request: NextRequest) {
     );
 
   } catch (error) {
-    console.error('❌ Error processing checkout:', error);
-    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('❌ Error processing checkout:', sanitizeLogInput(error));
+    console.error('❌ Error stack:', sanitizeLogInput(error instanceof Error ? error.stack : 'No stack trace'));
     
     if (error instanceof Error) {
       if (error.message.includes('Insufficient stock')) {
@@ -407,7 +408,7 @@ async function getPaymentGateways() {
     `);
     return result.rows;
   } catch (error) {
-    console.error('Error getting payment gateways:', error);
+    console.error('Error getting payment gateways:', sanitizeLogInput(error));
     return [];
   }
 }
@@ -423,7 +424,7 @@ async function getPaymentGateway(gatewayId: string) {
     
     return result.rows[0] || null;
   } catch (error) {
-    console.error('Error getting payment gateway:', error);
+    console.error('Error getting payment gateway:', sanitizeLogInput(error));
     return null;
   }
 }
@@ -473,7 +474,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error getting checkout summary:', error);
+    console.error('Error getting checkout summary:', sanitizeLogInput(error));
     return NextResponse.json(
       { error: 'Failed to get checkout summary' },
       { status: 500 }

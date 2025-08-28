@@ -39,7 +39,11 @@ export class EnhancedFileUploadService {
     
     this.booksDir = join(this.mediaRootDir, 'books');
     this.tempDir = join(this.booksDir, 'temp');
-    this.coversDir = join(process.cwd(), 'public', 'uploads', 'covers'); // Covers can be public
+    
+    // In production, covers also go to persistent storage
+    this.coversDir = process.env.NODE_ENV === 'production'
+      ? join('/app/storage/uploads/covers')
+      : join(process.cwd(), 'public', 'uploads', 'covers');
     
     // Ensure all directories exist
     if (typeof window === 'undefined') {
@@ -100,7 +104,7 @@ export class EnhancedFileUploadService {
       let relativePath: string;
       
       if (fileType === 'cover') {
-        // Cover images go to public directory for web access
+        // Cover images go to covers directory (persistent storage in production)
         targetDir = this.coversDir;
         relativePath = `/uploads/covers/${secureFilename}`;
         console.log(`📁 Cover image will be stored at: ${targetDir}/${secureFilename}`);

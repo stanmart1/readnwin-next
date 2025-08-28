@@ -11,82 +11,74 @@ export async function GET(
     // Handle both array and string path formats
     const pathArray = Array.isArray(params.path) ? params.path : [params.path];
     console.log('📁 Uploads API called with path:', pathArray);
-    // Construct the file path using the storage location
-    let basePath;
     
-    // Check if this is a cover image request
+    // In production Docker, files are in different locations
+    const isProduction = process.env.NODE_ENV === 'production';
     const isCoverImage = pathArray[0] === 'covers';
     
-    if (isCoverImage) {
-      // Cover images are always in public/uploads/covers
-      basePath = join(process.cwd(), 'public', 'uploads');
-      console.log(`📁 Cover image: Using base path: ${basePath}`);
-    } else if (process.env.NODE_ENV === 'production') {
-      // In production, try multiple possible locations for other files
-      const possiblePaths = [
-        '/app/uploads',
-        '/app/storage',
-        join(process.cwd(), 'uploads'),
-        join(process.cwd(), 'public', 'uploads')
+    let possiblePaths: string[];
+    
+    if (isProduction) {
+      // Production Docker paths - prioritize persistent storage
+      possiblePaths = [
+        join('/app/storage/uploads', ...pathArray),
+        join('/app/storage/public/uploads', ...pathArray),
+        join('/app/storage', ...pathArray),
+        join('/app/public/uploads', ...pathArray),
+        join('/app/uploads', ...pathArray),
+        join('/app/.next/standalone/public/uploads', ...pathArray),
+        join(process.cwd(), 'public/uploads', ...pathArray)
       ];
-      basePath = possiblePaths.find(path => existsSync(path)) || '/app/uploads';
-      console.log(`📁 Production: Using base path: ${basePath}`);
     } else {
-      basePath = join(process.cwd(), 'public', 'uploads');
-      console.log(`📁 Development: Using base path: ${basePath}`);
+      // Development paths
+      possiblePaths = [
+        join(process.cwd(), 'public/uploads', ...pathArray),
+        join(process.cwd(), 'uploads', ...pathArray)
+      ];
     }
     
-    const filePath = join(basePath, ...pathArray);
+    console.log(`📁 Searching for file in paths:`, possiblePaths);
     
-    // Check if file exists, try alternative paths if not found
-    let finalFilePath = filePath;
-    if (!existsSync(filePath)) {
-      // Try alternative storage locations based on file type
-      let alternativePaths: string[];
+    // Find the first existing file
+    let filePath = possiblePaths.find(path => {
+      const exists = existsSync(path);
+      console.log(`📁 Checking ${path}: ${exists ? '✅ EXISTS' : '❌ NOT FOUND'}`);
+      return exists;
+    });
+    
+    if (!filePath) {
+      console.log('❌ File not found at any location:', {
+        requested: pathArray,
+        isCoverImage,
+        tried: possiblePaths,
+        cwd: process.cwd(),
+        nodeEnv: process.env.NODE_ENV,
+        dockerEnv: process.env.DOCKER_ENV,
+        platform: process.platform
+      });
       
-      if (isCoverImage) {
-        // For cover images, only try public directory locations
-        alternativePaths = [
-          join(process.cwd(), 'public', 'uploads', ...pathArray),
-          join('/app', 'public', 'uploads', ...pathArray)
-        ];
-      } else {
-        // For other files, try various storage locations
-        alternativePaths = [
-          join(process.cwd(), 'public', 'uploads', ...pathArray),
-          join(process.cwd(), 'uploads', ...pathArray),
-          join(process.cwd(), 'storage', ...pathArray),
-          join('/app', 'uploads', ...pathArray),
-          join('/app', 'storage', ...pathArray)
-        ];
-      }
-      
-      finalFilePath = alternativePaths.find(path => existsSync(path)) || filePath;
-      
-      if (!existsSync(finalFilePath)) {
-        console.log('❌ File not found at any location:', {
-          requested: pathArray,
-          isCoverImage,
-          tried: [filePath, ...alternativePaths],
-          cwd: process.cwd(),
-          nodeEnv: process.env.NODE_ENV
-        });
-        return NextResponse.json(
-          { error: 'File not found' },
-          { status: 404 }
-        );
-      } else {
-        console.log('✅ File found at:', finalFilePath);
-      }
-    } else {
-      console.log('✅ File found at primary location:', finalFilePath);
+      // Return detailed error for debugging in production
+      return NextResponse.json(
+        { 
+          error: 'File not found',
+          debug: {
+            requested: pathArray.join('/'),
+            environment: process.env.NODE_ENV,
+            searchedPaths: possiblePaths,
+            cwd: process.cwd()
+          }
+        },
+        { status: 404 }
+      );
     }
+    
+    console.log('✅ File found at:', filePath);
 
     // Read the file
-    const fileBuffer = await readFile(finalFilePath);
+    const fileBuffer = await readFile(filePath);
     
     // Determine content type based on file extension
-    const extension = finalFilePath.split('.').pop()?.toLowerCase();
+    const extension = filePath.split('.').pop()?.toLowerCase();
     let contentType = 'application/octet-stream';
     
     switch (extension) {

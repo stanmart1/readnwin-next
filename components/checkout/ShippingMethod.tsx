@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Truck, Package, Clock, CheckCircle } from 'lucide-react';
+import { sanitizeLogInput } from '@/utils/security';
 
 interface ShippingMethod {
   id: string;
@@ -60,36 +61,37 @@ export default function ShippingMethod({
       
       let methods = data.methods || [];
       
-      // Filter methods based on cart type
+      // Filter methods based on cart type with safe string operations
       if (isEbookOnly) {
         // For ebook-only carts, only show digital access methods
-        methods = methods.filter((method: any) => 
-          method.name.toLowerCase().includes('digital') || 
-          method.name.toLowerCase().includes('instant') ||
-          method.description.toLowerCase().includes('digital')
-        );
-        console.log('📚 Ebook-only cart - showing digital methods:', methods);
+        methods = methods.filter((method: any) => {
+          const name = String(method.name || '').toLowerCase();
+          const description = String(method.description || '').toLowerCase();
+          return name.includes('digital') || name.includes('instant') || description.includes('digital');
+        });
+        console.log('📚 Ebook-only cart - showing digital methods:', sanitizeLogInput(methods));
       } else {
         // For physical books, exclude digital-only methods
-        methods = methods.filter((method: any) => 
-          !method.name.toLowerCase().includes('digital') &&
-          !method.description.toLowerCase().includes('instant digital access')
-        );
-        console.log('📦 Physical book cart - showing shipping methods:', methods);
+        methods = methods.filter((method: any) => {
+          const name = String(method.name || '').toLowerCase();
+          const description = String(method.description || '').toLowerCase();
+          return !name.includes('digital') && !description.includes('instant digital access');
+        });
+        console.log('📦 Physical book cart - showing shipping methods:', sanitizeLogInput(methods));
       }
       
-      console.log('📦 Filtered shipping methods:', methods);
+      console.log('📦 Filtered shipping methods:', sanitizeLogInput(methods));
 
       setShippingMethods(methods);
       
       // Auto-select first available shipping method if none selected
       if (!selectedMethodId && methods.length > 0) {
-        console.log('✅ Auto-selecting first method:', methods[0]);
+        console.log('✅ Auto-selecting first method:', sanitizeLogInput(methods[0]));
         setSelectedMethodId(methods[0].id);
         onSelect(methods[0]);
       }
     } catch (err) {
-      console.error('❌ Error loading shipping methods:', err);
+      console.error('❌ Error loading shipping methods:', sanitizeLogInput(err));
       setError('Failed to load shipping methods. Please try again.');
     } finally {
       setIsLoading(false);

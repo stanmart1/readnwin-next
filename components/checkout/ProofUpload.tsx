@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { formatNaira } from '@/utils/currency';
 import { PaymentIntegrationHandlers } from '@/utils/checkout-integration';
 
@@ -67,11 +67,14 @@ export default function ProofUpload({
 
     setSelectedFile(file);
 
-    // Create preview for images
+    // Create preview for images with error handling
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => {
         setPreviewUrl(e.target?.result as string);
+      };
+      reader.onerror = () => {
+        onUploadError('Failed to read file. Please try again.');
       };
       reader.readAsDataURL(file);
     } else {
@@ -99,10 +102,18 @@ export default function ProofUpload({
       formData.append('bank_transfer_id', bankTransferId.toString());
       formData.append('file', selectedFile);
 
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 10, 90));
+      }, 200);
+
       const response = await fetch('/api/payment/bank-transfer/upload-proof', {
         method: 'POST',
         body: formData,
       });
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
       if (response.ok) {
         const data = await response.json();
@@ -136,11 +147,24 @@ export default function ProofUpload({
 
   const removeFile = () => {
     setSelectedFile(null);
+    // Revoke object URL to prevent memory leaks
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
     setPreviewUrl(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   return (
     <div className="w-full">

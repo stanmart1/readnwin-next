@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEReaderStore } from "@/stores/ereaderStore";
+import { SecurityUtils } from "@/utils/security";
 import {
   Play,
   Pause,
@@ -145,7 +146,7 @@ export default function TextToSpeech({ className = "" }: TextToSpeechProps) {
           }
         }
       } catch (error) {
-        console.warn("Error highlighting sentence:", error);
+        console.warn("Error highlighting sentence:", SecurityUtils.sanitizeLogInput(String(error)));
       }
     },
     [sentences, removeHighlight],
@@ -190,7 +191,7 @@ export default function TextToSpeech({ className = "" }: TextToSpeechProps) {
       };
 
       utterance.onerror = (event) => {
-        console.error("Speech synthesis error:", event);
+        console.error("Speech synthesis error:", SecurityUtils.sanitizeLogInput(String(event)));
         setIsLoading(false);
         stopTextToSpeech();
       };
@@ -207,7 +208,7 @@ export default function TextToSpeech({ className = "" }: TextToSpeechProps) {
       setCurrentUtterance(utterance);
       synthRef.current.speak(utterance);
     } catch (error) {
-      console.error("Error starting speech:", error);
+      console.error("Error starting speech:", SecurityUtils.sanitizeLogInput(String(error)));
       setIsLoading(false);
     }
   }, [

@@ -118,11 +118,17 @@ const DashboardContext = createContext<DashboardContextType | undefined>(undefin
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(dashboardReducer, initialState);
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
   const fetchUserStats = async () => {
     console.log('🔍 DashboardContext - Session:', session ? 'Present' : 'Not present');
     console.log('🔍 DashboardContext - Session user:', session?.user);
+    console.log('🔍 DashboardContext - Session status:', status);
+    
+    if (status === 'loading') {
+      console.log('🔍 DashboardContext - Session still loading');
+      return;
+    }
     
     if (!session?.user?.id) {
       console.log('❌ DashboardContext - No session or user ID');
@@ -135,14 +141,21 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const response = await fetch('/api/dashboard/stats');
       console.log('🔍 DashboardContext - Stats response status:', response.status);
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('🔍 DashboardContext - Stats data:', data);
+      const data = await response.json();
+      console.log('🔍 DashboardContext - Stats data:', data);
+      if (data.stats) {
         dispatch({ type: 'SET_USER_STATS', payload: data.stats });
       } else {
-        const errorData = await response.json();
-        console.error('❌ DashboardContext - Stats response error:', errorData);
-        throw new Error(`Failed to fetch user stats: ${response.status} ${errorData.error}`);
+        console.error('❌ DashboardContext - Stats response error:', data);
+        // Set default stats instead of throwing
+        dispatch({ type: 'SET_USER_STATS', payload: {
+          totalBooks: 0,
+          completedBooks: 0,
+          totalReadingTime: 0,
+          totalPagesRead: 0,
+          readingSessions: 0,
+          averageRating: 0
+        }});
       }
     } catch (error) {
       console.error('Error fetching user stats:', error);
@@ -153,22 +166,16 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   };
 
   const fetchReadingProgress = async () => {
-    if (!session?.user?.id) return;
+    if (status === 'loading' || !session?.user?.id) return;
     
     try {
       console.log('🔍 DashboardContext - Fetching reading progress...');
       const response = await fetch('/api/dashboard/reading-progress');
       console.log('🔍 DashboardContext - Reading progress response status:', response.status);
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('🔍 DashboardContext - Reading progress data:', data);
-        dispatch({ type: 'SET_READING_PROGRESS', payload: data });
-      } else {
-        const errorData = await response.json();
-        console.error('❌ DashboardContext - Reading progress response error:', errorData);
-        throw new Error(`Failed to fetch reading progress: ${response.status} ${errorData.error}`);
-      }
+      const data = await response.json();
+      console.log('🔍 DashboardContext - Reading progress data:', data);
+      dispatch({ type: 'SET_READING_PROGRESS', payload: data });
     } catch (error) {
       console.error('Error fetching reading progress:', error);
       // Don't throw here to prevent blocking other requests
@@ -176,79 +183,55 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   };
 
   const fetchLibraryItems = async () => {
-    if (!session?.user?.id) return;
+    if (status === 'loading' || !session?.user?.id) return;
     
     try {
       console.log('🔍 DashboardContext - Fetching library items...');
       const response = await fetch('/api/user/library');
-      if (response.ok) {
-        const data = await response.json();
-        dispatch({ type: 'SET_LIBRARY_ITEMS', payload: data.libraryItems || [] });
-      } else {
-        const errorData = await response.json();
-        console.error('❌ DashboardContext - Library items response error:', errorData);
-        throw new Error(`Failed to fetch library items: ${response.status} ${errorData.error}`);
-      }
+      const data = await response.json();
+      dispatch({ type: 'SET_LIBRARY_ITEMS', payload: data.libraryItems || [] });
     } catch (error) {
       console.error('Error fetching library items:', error);
     }
   };
 
   const fetchNotifications = async () => {
-    if (!session?.user?.id) return;
+    if (status === 'loading' || !session?.user?.id) return;
     
     try {
       console.log('🔍 DashboardContext - Fetching notifications...');
       const response = await fetch('/api/dashboard/notifications');
-      if (response.ok) {
-        const data = await response.json();
-        dispatch({ type: 'SET_NOTIFICATIONS', payload: data.notifications || [] });
-      } else {
-        const errorData = await response.json();
-        console.error('❌ DashboardContext - Notifications response error:', errorData);
-        throw new Error(`Failed to fetch notifications: ${response.status} ${errorData.error}`);
-      }
+      const data = await response.json();
+      dispatch({ type: 'SET_NOTIFICATIONS', payload: data.notifications || [] });
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
   };
 
   const fetchActivities = async () => {
-    if (!session?.user?.id) return;
+    if (status === 'loading' || !session?.user?.id) return;
     
     try {
       console.log('🔍 DashboardContext - Fetching activities...');
       const response = await fetch('/api/dashboard/activity');
-      if (response.ok) {
-        const data = await response.json();
-        dispatch({ type: 'SET_ACTIVITIES', payload: data.activities || [] });
-      } else {
-        const errorData = await response.json();
-        console.error('❌ DashboardContext - Activities response error:', errorData);
-        throw new Error(`Failed to fetch activities: ${response.status} ${errorData.error}`);
-      }
+      const data = await response.json();
+      dispatch({ type: 'SET_ACTIVITIES', payload: data.activities || [] });
     } catch (error) {
       console.error('Error fetching activities:', error);
     }
   };
 
   const fetchGoals = async () => {
-    if (!session?.user?.id) return;
+    if (status === 'loading' || !session?.user?.id) return;
     
     try {
       console.log('🔍 DashboardContext - Fetching goals...');
       const response = await fetch('/api/dashboard/goals');
       console.log('🔍 DashboardContext - Goals response status:', response.status);
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('🔍 DashboardContext - Goals data:', data);
-        dispatch({ type: 'SET_GOALS', payload: data.goals || [] });
-      } else {
-        const errorData = await response.json();
-        console.error('❌ DashboardContext - Goals response error:', errorData);
-        throw new Error(`Failed to fetch goals: ${response.status} ${errorData.error}`);
-      }
+      const data = await response.json();
+      console.log('🔍 DashboardContext - Goals data:', data);
+      dispatch({ type: 'SET_GOALS', payload: data.goals || [] });
     } catch (error) {
       console.error('Error fetching goals:', error);
     }
@@ -286,8 +269,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   // Initial data fetch
   useEffect(() => {
     console.log('🔍 DashboardContext - useEffect triggered');
+    console.log('🔍 DashboardContext - Session status:', status);
     console.log('🔍 DashboardContext - Session in useEffect:', session ? 'Present' : 'Not present');
     console.log('🔍 DashboardContext - Session user ID:', session?.user?.id);
+    
+    if (status === 'loading') {
+      console.log('🔍 DashboardContext - Session still loading, waiting...');
+      return;
+    }
     
     if (session?.user?.id) {
       console.log('🔍 DashboardContext - Calling refreshData from useEffect');
@@ -295,15 +284,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     } else {
       console.log('❌ DashboardContext - No session or user ID in useEffect');
     }
-  }, [session]);
+  }, [session, status]);
 
   // Auto-refresh every 5 minutes
   useEffect(() => {
-    if (session?.user?.id) {
+    if (status === 'authenticated' && session?.user?.id) {
       const interval = setInterval(refreshData, 5 * 60 * 1000);
       return () => clearInterval(interval);
     }
-  }, [session]);
+  }, [session, status]);
 
   const value: DashboardContextType = {
     state,

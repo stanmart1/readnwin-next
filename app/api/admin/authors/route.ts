@@ -1,25 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { withPermission } from '@/utils/api-protection';
 import { rbacService } from '@/utils/rbac-service';
 import { ecommerceService } from '@/utils/ecommerce-service';
+import { handleApiError } from '@/utils/error-handler';
 
-export async function GET(request: NextRequest) {
+export const GET = withPermission('content.read', async (request: NextRequest, context: any, session: any) => {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check permission
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'content.read'
-    );
-    
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -41,36 +27,19 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error fetching authors:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withPermission('content.create', async (request: NextRequest, context: any, session: any) => {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check permission
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'content.create'
-    );
-    
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
 
     const body = await request.json();
     
     // Validate required fields
-    if (!body.name) {
+    if (!body.name || !body.name.trim()) {
       return NextResponse.json(
-        { error: 'Missing required field: name' },
+        { error: 'Author name is required' },
         { status: 400 }
       );
     }
@@ -84,7 +53,7 @@ export async function POST(request: NextRequest) {
       'content.create',
       'authors',
       author.id,
-      { name: author.name, email: author.email },
+      { name: author.name },
       request.headers.get('x-forwarded-for') || request.ip || '',
       request.headers.get('user-agent') || ''
     );
@@ -97,9 +66,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error creating author:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
-} 
+}); 

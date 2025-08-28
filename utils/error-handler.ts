@@ -1,48 +1,42 @@
-export interface ErrorDetails {
+import { NextResponse } from 'next/server';
+
+export interface ApiError {
   message: string;
-  type: 'network' | 'validation' | 'server' | 'unknown';
   code?: string;
-  timestamp: string;
+  statusCode: number;
+  details?: any;
 }
 
-export const errorHandler = {
-  categorizeError: (error: any): ErrorDetails => {
-    const timestamp = new Date().toISOString();
-    
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      return {
-        message: 'Network connection failed',
-        type: 'network',
-        timestamp
-      };
-    }
-    
-    if (error?.status >= 400 && error?.status < 500) {
-      return {
-        message: error.message || 'Validation error',
-        type: 'validation',
-        code: error.status?.toString(),
-        timestamp
-      };
-    }
-    
-    if (error?.status >= 500) {
-      return {
-        message: 'Server error occurred',
-        type: 'server',
-        code: error.status?.toString(),
-        timestamp
-      };
-    }
-    
-    return {
-      message: error?.message || 'An unexpected error occurred',
-      type: 'unknown',
-      timestamp
-    };
-  },
+export function handleApiError(error: any): NextResponse {
+  console.error('API Error:', error);
 
-  logError: (error: ErrorDetails, context?: string) => {
-    console.error(`[${error.type.toUpperCase()}] ${context || 'Error'}:`, error);
+  if (error.code === '23505') { // PostgreSQL unique violation
+    return NextResponse.json(
+      { error: 'Resource already exists' },
+      { status: 409 }
+    );
   }
-};
+
+  if (error.code === '23503') { // PostgreSQL foreign key violation
+    return NextResponse.json(
+      { error: 'Referenced resource not found' },
+      { status: 400 }
+    );
+  }
+
+  if (error.message?.includes('permission')) {
+    return NextResponse.json(
+      { error: 'Insufficient permissions' },
+      { status: 403 }
+    );
+  }
+
+  return NextResponse.json(
+    { error: 'Internal server error' },
+    { status: 500 }
+  );
+}
+
+export function validateApiResponse(data: any): boolean {
+  return data && typeof data === 'object' && !Array.isArray(data);
+}

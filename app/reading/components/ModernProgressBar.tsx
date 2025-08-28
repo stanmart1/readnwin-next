@@ -19,7 +19,7 @@ export default function ModernProgressBar({ progress, bookProgress }: ModernProg
         <div 
           className="absolute top-0 right-0 h-full w-1 bg-green-500"
           style={{ 
-            transform: `translateX(${((bookProgress - progress) / progress) * 100}%)`,
+            transform: `translateX(${progress > 0 ? ((bookProgress - progress) / progress) * 100 : 0}%)`,
             opacity: bookProgress > progress ? 1 : 0
           }}
         />

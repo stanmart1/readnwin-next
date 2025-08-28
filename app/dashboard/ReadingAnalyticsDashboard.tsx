@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth';
+import { useSession } from 'next-auth/react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 interface ReadingAnalytics {
@@ -24,14 +24,18 @@ interface ReadingAnalytics {
 }
 
 export default function ReadingAnalyticsDashboard() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [analytics, setAnalytics] = useState<ReadingAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('year');
 
   useEffect(() => {
     const fetchAnalytics = async () => {
-      if (!session?.user?.id) return;
+      if (status === 'loading') return;
+      if (!session?.user?.id) {
+        setLoading(false);
+        return;
+      }
 
       try {
         setLoading(true);
@@ -48,11 +52,11 @@ export default function ReadingAnalyticsDashboard() {
     };
 
     fetchAnalytics();
-  }, [session, period]);
+  }, [session, period, status]);
 
   const genreColors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
-  if (loading) {
+  if (loading || status === 'loading') {
     return (
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex items-center justify-center h-64">

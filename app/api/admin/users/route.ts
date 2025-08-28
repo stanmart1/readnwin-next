@@ -1,25 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { withPermission } from '@/utils/api-protection';
 import { rbacService } from '@/utils/rbac-service';
+import { handleApiError } from '@/utils/error-handler';
 
-export async function GET(request: NextRequest) {
+export const GET = withPermission('users.read', async (request: NextRequest, context: any, session: any) => {
   try {
-    // Verify authentication
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check permission
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'users.read'
-    );
-    
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
@@ -69,30 +54,12 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error fetching users:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withPermission('users.create', async (request: NextRequest, context: any, session: any) => {
   try {
-    // Verify authentication
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check permission
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'users.create'
-    );
-    
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
 
     // Get request body
     const body = await request.json();
@@ -152,9 +119,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error creating user:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
-} 
+}); 

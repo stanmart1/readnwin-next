@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { SecurityUtils } from '@/utils/security';
 
 interface TextToSpeechProps {
   text: string;
@@ -93,7 +94,7 @@ export default function TextToSpeech({
     };
 
     speechRef.current.onerror = (event) => {
-      console.error('Speech synthesis error:', event);
+      console.error('Speech synthesis error:', SecurityUtils.sanitizeLogInput(String(event)));
       onStop();
     };
 

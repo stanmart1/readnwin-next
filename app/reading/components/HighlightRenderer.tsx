@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, RefObject } from "react";
 import { Highlight } from "@/types/ereader";
+import { SecurityUtils } from "@/utils/security";
 
 interface HighlightRendererProps {
   highlights: Highlight[];
@@ -114,8 +115,8 @@ export default function HighlightRenderer({
     span.style.padding = "1px 2px";
     span.style.margin = "0 1px";
     span.style.transition = "background-color 0.2s ease";
-    span.dataset.highlightId = highlight.id;
-    span.dataset.highlightColor = highlight.color;
+    span.dataset.highlightId = SecurityUtils.sanitizeDBInput(highlight.id);
+    span.dataset.highlightColor = SecurityUtils.sanitizeDBInput(highlight.color);
 
     // Add event listeners
     span.addEventListener("click", (e) => {

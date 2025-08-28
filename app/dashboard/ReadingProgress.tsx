@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 
 interface CurrentlyReading {
@@ -16,13 +16,17 @@ interface CurrentlyReading {
 }
 
 export default function ReadingProgress() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [currentlyReading, setCurrentlyReading] = useState<CurrentlyReading[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchCurrentlyReading = async () => {
-      if (!session?.user?.id) return;
+      if (status === 'loading') return;
+      if (!session?.user?.id) {
+        setLoading(false);
+        return;
+      }
 
       try {
         const response = await fetch('/api/dashboard/currently-reading');
@@ -38,9 +42,9 @@ export default function ReadingProgress() {
     };
 
     fetchCurrentlyReading();
-  }, [session]);
+  }, [session, status]);
 
-  if (loading) {
+  if (loading || status === 'loading') {
     return (
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex items-center justify-center h-32">

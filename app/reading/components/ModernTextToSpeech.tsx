@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useModernEReaderStore } from '@/stores/modernEReaderStore';
+import { SecurityUtils } from '@/utils/security';
 
 export default function ModernTextToSpeech() {
   const {
@@ -37,7 +38,7 @@ export default function ModernTextToSpeech() {
 
     // Extract text content from HTML
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = currentChapter.content_html;
+    tempDiv.innerHTML = SecurityUtils.sanitizeHTML(currentChapter.content_html);
     const textContent = tempDiv.textContent || tempDiv.innerText || '';
 
     if (!textContent.trim()) return;
@@ -70,7 +71,7 @@ export default function ModernTextToSpeech() {
     };
 
     utterance.onerror = (event) => {
-      console.error('Speech synthesis error:', event);
+      console.error('Speech synthesis error:', SecurityUtils.sanitizeLogInput(String(event)));
       isPlayingRef.current = false;
       updateTextToSpeechState({ isPlaying: false });
       speechRef.current = null;

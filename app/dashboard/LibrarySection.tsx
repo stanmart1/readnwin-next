@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 
 interface LibraryBook {
@@ -18,7 +18,7 @@ interface LibraryBook {
 }
 
 export default function LibrarySection() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [books, setBooks] = useState<LibraryBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'reading' | 'completed'>('all');
@@ -26,7 +26,11 @@ export default function LibrarySection() {
 
   useEffect(() => {
     const fetchLibrary = async () => {
-      if (!session?.user?.id) return;
+      if (status === 'loading') return;
+      if (!session?.user?.id) {
+        setLoading(false);
+        return;
+      }
 
       try {
         const response = await fetch('/api/dashboard/library');
@@ -42,7 +46,7 @@ export default function LibrarySection() {
     };
 
     fetchLibrary();
-  }, [session]);
+  }, [session, status]);
 
   const filteredBooks = books.filter(book => {
     switch (filter) {
@@ -65,7 +69,7 @@ export default function LibrarySection() {
 
   const counts = getFilterCounts();
 
-  if (loading) {
+  if (loading || status === 'loading') {
     return (
       <div className="space-y-6">
         {/* Header Skeleton */}

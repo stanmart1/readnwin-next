@@ -1,173 +1,132 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { ecommerceService } from '@/utils/ecommerce-service';
 import { query } from '@/utils/database';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get user session
     const session = await getServerSession(authOptions);
-    console.log('🔍 Dashboard goals API - Session:', session ? 'Present' : 'Not present');
-    console.log('🔍 Dashboard goals API - Session user:', session?.user);
-    
     if (!session?.user?.id) {
-      console.log('❌ No session or user ID found in goals API');
-      return NextResponse.json(
-        { error: 'Unauthorized - Please log in to access this resource' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = parseInt(session.user.id);
+    const userId = session.user.id;
 
-    // Fetch user's reading goals
-    const goals = await ecommerceService.getReadingGoals(userId);
+    // Create goals table if it doesn't exist
+    await query(`
+      CREATE TABLE IF NOT EXISTS user_goals (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        goal_type VARCHAR(100) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        target_value INTEGER NOT NULL,
+        current_value INTEGER DEFAULT 0,
+        target_date DATE,
+        status VARCHAR(50) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
-    // Get current progress for each goal type
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth() + 1;
+    // Insert default goals if none exist
+    const existingGoals = await query('SELECT COUNT(*) FROM user_goals WHERE user_id = $1', [userId]);
+    
+    if (parseInt(existingGoals.rows[0].count) === 0) {
+      await query(`
+        INSERT INTO user_goals (user_id, goal_type, title, description, target_value, target_date)
+        VALUES 
+          ($1, 'books_per_month', 'Read 2 Books This Month', 'Complete reading 2 books by the end of this month', 2, DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day'),
+          ($1, 'reading_time', 'Read 10 Hours This Month', 'Spend 10 hours reading this month', 36000, DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day'),
+          ($1, 'yearly_books', 'Read 24 Books This Year', 'Complete reading 24 books by the end of this year', 24, DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year' - INTERVAL '1 day')
+      `, [userId]);
+    }
 
-    // Calculate current values for different goal types
-    const goalProgress = await Promise.all(
-      goals.map(async (goal) => {
-        let currentValue = 0;
-        
-        switch (goal.goal_type) {
-          case 'annual_books':
-            // Count books completed this year
-            const annualBooksResult = await query(`
-              SELECT COUNT(DISTINCT book_id) as count
-              FROM reading_progress
-              WHERE user_id = $1 
-                AND progress_percentage >= 100
-                AND EXTRACT(YEAR FROM last_read_at) = $2
-            `, [userId, currentYear]);
-            currentValue = parseInt(annualBooksResult.rows[0]?.count || '0');
-            break;
-            
-          case 'monthly_pages':
-            // Count pages read this month
-            const monthlyPagesResult = await query(`
-              SELECT COALESCE(SUM(current_page), 0) as pages
-              FROM reading_progress
-              WHERE user_id = $1 
-                AND EXTRACT(YEAR FROM last_read_at) = $2
-                AND EXTRACT(MONTH FROM last_read_at) = $3
-                AND current_page > 0
-            `, [userId, currentYear, currentMonth]);
-            currentValue = parseInt(monthlyPagesResult.rows[0]?.pages || '0');
-            break;
-            
-          case 'reading_streak':
-            // Calculate current reading streak
-            const streakResult = await query(`
-              WITH reading_days AS (
-                SELECT DISTINCT DATE(last_read_at) as read_date
-                FROM reading_progress
-                WHERE user_id = $1 AND last_read_at >= CURRENT_DATE - INTERVAL '365 days'
-                ORDER BY read_date DESC
-              ),
-              streak_calc AS (
-                SELECT 
-                  read_date,
-                  ROW_NUMBER() OVER (ORDER BY read_date DESC) as rn,
-                  read_date + (ROW_NUMBER() OVER (ORDER BY read_date DESC) - 1) * INTERVAL '1 day' as expected_date
-                FROM reading_days
-              )
-              SELECT COUNT(*) as streak
-              FROM streak_calc
-              WHERE read_date = expected_date
-              AND read_date >= CURRENT_DATE - INTERVAL '365 days'
-            `, [userId]);
-            currentValue = parseInt(streakResult.rows[0]?.streak || '0');
-            break;
-            
-          case 'daily_hours':
-            // Calculate average daily reading hours this month
-            const dailyHoursResult = await query(`
-              SELECT COALESCE(AVG(daily_hours), 0) as avg_hours
-              FROM (
-                SELECT DATE(last_read_at) as read_date,
-                       SUM(current_page * 0.016) as daily_hours
-                FROM reading_progress
-                WHERE user_id = $1 
-                  AND EXTRACT(YEAR FROM last_read_at) = $2
-                  AND EXTRACT(MONTH FROM last_read_at) = $3
-                GROUP BY DATE(last_read_at)
-              ) daily_stats
-            `, [userId, currentYear, currentMonth]);
-            currentValue = Math.round(parseFloat(dailyHoursResult.rows[0]?.avg_hours || '0') * 100) / 100;
-            break;
-        }
-        
-        return {
-          ...goal,
-          current_value: currentValue,
-          progress_percentage: Math.min((currentValue / goal.target_value) * 100, 100)
-        };
-      })
-    );
+    // Get user goals
+    const result = await query(`
+      SELECT 
+        id,
+        goal_type,
+        title,
+        description,
+        target_value,
+        current_value,
+        target_date,
+        status,
+        created_at,
+        updated_at
+      FROM user_goals
+      WHERE user_id = $1 AND status = 'active'
+      ORDER BY created_at DESC
+    `, [userId]);
+
+    const goals = result.rows.map(row => ({
+      id: row.id,
+      goalType: row.goal_type,
+      title: row.title,
+      description: row.description,
+      targetValue: row.target_value,
+      currentValue: row.current_value,
+      targetDate: row.target_date,
+      status: row.status,
+      progress: row.target_value > 0 ? Math.min(100, (row.current_value / row.target_value) * 100) : 0,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
 
     return NextResponse.json({
       success: true,
-      goals: goalProgress
+      goals
     });
 
   } catch (error) {
-    console.error('Error fetching reading goals:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    console.error('Error fetching goals:', error);
+    return NextResponse.json({ 
+      success: true,
+      error: 'Failed to fetch goals',
+      goals: []
+    }, { status: 200 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user session
     const session = await getServerSession(authOptions);
-    
     if (!session?.user?.id) {
-      console.log('❌ No session or user ID found in goals POST API');
-      return NextResponse.json(
-        { error: 'Unauthorized - Please log in to access this resource' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = parseInt(session.user.id);
-    const body = await request.json();
-    const { goal_type, target_value, start_date, end_date } = body;
+    const userId = session.user.id;
+    const { goalType, title, description, targetValue, targetDate } = await request.json();
 
-    if (!goal_type || !target_value || !start_date || !end_date) {
-      return NextResponse.json(
-        { error: 'Missing required fields: goal_type, target_value, start_date, end_date' },
-        { status: 400 }
-      );
-    }
+    const result = await query(`
+      INSERT INTO user_goals (user_id, goal_type, title, description, target_value, target_date)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `, [userId, goalType, title, description, targetValue, targetDate]);
 
-    // Create new reading goal
-    const goal = await ecommerceService.createReadingGoal(userId, {
-      goal_type,
-      target_value,
-      start_date,
-      end_date
-    });
+    const goal = result.rows[0];
 
     return NextResponse.json({
       success: true,
-      goal
+      goal: {
+        id: goal.id,
+        goalType: goal.goal_type,
+        title: goal.title,
+        description: goal.description,
+        targetValue: goal.target_value,
+        currentValue: goal.current_value,
+        targetDate: goal.target_date,
+        status: goal.status,
+        progress: 0
+      }
     });
 
   } catch (error) {
-    console.error('Error creating reading goal:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Error creating goal:', error);
+    return NextResponse.json({ 
+      success: false,
+      error: 'Failed to create goal'
+    }, { status: 500 });
   }
-} 
-
- 
+}

@@ -1,56 +1,84 @@
-/**
- * Security utilities for input sanitization and validation
- */
-
-/**
- * Sanitize input for logging to prevent log injection
- */
-export function sanitizeForLog(input: any): string {
-  if (input === null || input === undefined) return 'null';
+// Security utilities for sanitization
+export class SecurityUtils {
+  // Sanitize HTML content to prevent XSS
+  static sanitizeHTML(html: string): string {
+    if (typeof window === 'undefined') return html;
+    
+    // Create a temporary div to parse HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    
+    // Remove script tags and event handlers
+    const scripts = temp.querySelectorAll('script');
+    scripts.forEach(script => script.remove());
+    
+    // Remove dangerous attributes
+    const allElements = temp.querySelectorAll('*');
+    allElements.forEach(element => {
+      const dangerousAttrs = ['onload', 'onerror', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'onchange', 'onsubmit'];
+      dangerousAttrs.forEach(attr => {
+        if (element.hasAttribute(attr)) {
+          element.removeAttribute(attr);
+        }
+      });
+      
+      // Remove javascript: URLs
+      ['href', 'src', 'action'].forEach(attr => {
+        const value = element.getAttribute(attr);
+        if (value && value.toLowerCase().startsWith('javascript:')) {
+          element.removeAttribute(attr);
+        }
+      });
+    });
+    
+    return temp.innerHTML;
+  }
   
-  const str = String(input);
-  return str
-    .replace(/[\r\n]/g, ' ') // Remove newlines
-    .replace(/[\x00-\x1f\x7f]/g, '') // Remove control characters
-    .substring(0, 200); // Limit length
-}
-
-/**
- * Sanitize HTML output to prevent XSS
- */
-export function sanitizeHtml(input: string): string {
-  if (!input) return '';
+  // Sanitize log input to prevent log injection
+  static sanitizeLogInput(input: any): string {
+    if (typeof input !== 'string') {
+      input = String(input);
+    }
+    
+    // Remove newlines and carriage returns that could break log format
+    return input.replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
   
-  return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
+  // Sanitize database input to prevent injection
+  static sanitizeDBInput(input: any): any {
+    if (typeof input === 'string') {
+      // Basic sanitization - remove potential SQL/NoSQL injection patterns
+      return input.replace(/['"\\;]/g, '').trim();
+    }
+    return input;
+  }
+  
+  // Validate and sanitize book ID
+  static validateBookId(bookId: any): string | null {
+    if (typeof bookId !== 'string') return null;
+    
+    // Only allow alphanumeric characters and hyphens
+    const sanitized = bookId.replace(/[^a-zA-Z0-9-]/g, '');
+    return sanitized.length > 0 ? sanitized : null;
+  }
 }
 
-/**
- * Validate and sanitize numeric input
- */
-export function sanitizeNumber(input: any, defaultValue: number = 0): number {
-  const num = Number(input);
-  return isNaN(num) ? defaultValue : num;
+// Export individual functions for backward compatibility
+export const sanitizeForLog = SecurityUtils.sanitizeLogInput;
+export const sanitizeHtml = SecurityUtils.sanitizeHTML;
+
+export function sanitizeInt(value: any, defaultValue: number = 0): number {
+  if (typeof value === 'number') return Math.floor(value);
+  if (typeof value === 'string') {
+    const parsed = parseInt(value, 10);
+    return isNaN(parsed) ? defaultValue : parsed;
+  }
+  return defaultValue;
 }
 
-/**
- * Validate and sanitize integer input
- */
-export function sanitizeInt(input: any, defaultValue: number = 0): number {
-  const num = parseInt(String(input), 10);
-  return isNaN(num) ? defaultValue : num;
-}
-
-/**
- * Safe JSON parse
- */
-export function safeJsonParse(input: string, defaultValue: any = null): any {
+export function safeJsonParse(jsonString: string, defaultValue: any = null): any {
   try {
-    return JSON.parse(input);
+    return JSON.parse(jsonString);
   } catch {
     return defaultValue;
   }

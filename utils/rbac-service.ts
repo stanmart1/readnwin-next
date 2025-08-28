@@ -361,6 +361,18 @@ class RBACService {
     return result.rows;
   }
 
+  async getUsersWithRole(roleName: string): Promise<User[]> {
+    const result = await query(
+      `SELECT u.* FROM users u
+       JOIN user_roles ur ON u.id = ur.user_id
+       JOIN roles r ON ur.role_id = r.id
+       WHERE r.name = $1 AND ur.is_active = TRUE
+       AND (ur.expires_at IS NULL OR ur.expires_at > CURRENT_TIMESTAMP)`,
+      [roleName]
+    );
+    return result.rows;
+  }
+
   async assignRoleToUser(userId: number, roleId: number, assignedBy?: number, expiresAt?: Date): Promise<boolean> {
     try {
       await query(
@@ -444,19 +456,23 @@ class RBACService {
 
   // Permission Checking
   async hasPermission(userId: number, permissionName: string): Promise<boolean> {
+    const cacheKey = `perm:${userId}:${permissionName}`;
+    
     try {
-      // Check cache first
-      const cacheResult = await query(
-        'SELECT is_active FROM user_permission_cache WHERE user_id = $1 AND permission_name = $2',
-        [userId, permissionName]
-      );
+      // Check cache first with timeout
+      const cacheResult = await Promise.race([
+        query(
+          'SELECT is_active FROM user_permission_cache WHERE user_id = $1 AND permission_name = $2 AND cached_at > NOW() - INTERVAL \'5 minutes\'',
+          [userId, permissionName]
+        ),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Cache timeout')), 1000))
+      ]);
       
-      if (cacheResult.rows.length > 0) {
+      if (cacheResult.rows && cacheResult.rows.length > 0) {
         return cacheResult.rows[0].is_active;
       }
     } catch (error) {
-      console.warn('Permission cache table not available, falling back to direct permission check:', error instanceof Error ? error.message : 'Unknown error');
-      // Continue to direct permission check if cache table doesn't exist
+      // Continue to direct permission check
     }
     
     // If not in cache, check database

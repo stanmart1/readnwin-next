@@ -75,16 +75,6 @@ export default function WorksCarousel() {
         // Check for text truncation after setting works
         works.forEach((work: { id: number; description: string; title: string }) => {
           checkTextTruncation(work.id, work.description || '', work.title);
-          // Debug log for the specific problematic card
-          if (work.title === "Need For Young Men To Embrace Reading Culture") {
-            console.log('Debug - Work:', {
-              id: work.id,
-              title: work.title,
-              description: work.description,
-              descriptionLength: work.description?.length || 0,
-              shouldShowReadMore: (work.description?.length || 0) > 100
-            });
-          }
         });
       } else {
         setError(data.error || 'Failed to fetch works');

@@ -2,161 +2,177 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { rbacService } from '@/utils/rbac-service';
+import { withPermission } from '@/utils/api-protection';
+import { handleError } from '@/utils/error-handler';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  try {
-    // Verify authentication
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  return withPermission('users.read', async (session) => {
+    try {
+      const userId = parseInt(params.id);
+      if (isNaN(userId)) {
+        return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
+      }
+
+      // Get user roles
+      const userRoles = await rbacService.getUserRoles(userId);
+
+      // Log audit event
+      await rbacService.logAuditEvent(
+        parseInt(session.user.id),
+        'users.roles.read',
+        'users',
+        userId,
+        undefined,
+        request.headers.get('x-forwarded-for') || request.ip || undefined,
+        request.headers.get('user-agent') || undefined
+      );
+
+      return NextResponse.json({
+        success: true,
+        roles: userRoles
+      });
+
+    } catch (error) {
+      return handleError(error, 'Error fetching user roles');
     }
-
-    // Check permission
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'users.read'
-    );
-    
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    const userId = parseInt(params.id);
-    if (isNaN(userId)) {
-      return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
-    }
-
-    // Check if current user is super_admin
-    const isSuperAdmin = session.user.role === 'super_admin';
-    
-    // Get user roles to check if target user is super_admin
-    const userRoles = await rbacService.getUserRoles(userId);
-    const targetUserIsSuperAdmin = userRoles.some((role: any) => role.role_name === 'super_admin');
-    
-    // Prevent non-super_admin users from accessing super_admin user roles
-    if (targetUserIsSuperAdmin && !isSuperAdmin) {
-      return NextResponse.json({ error: 'Access denied: Insufficient privileges' }, { status: 403 });
-    }
-
-    // Log audit event
-    await rbacService.logAuditEvent(
-      parseInt(session.user.id),
-      'users.roles.read',
-      'users',
-      userId,
-      { userId },
-      request.headers.get('x-forwarded-for') || request.ip || undefined,
-      request.headers.get('user-agent') || undefined
-    );
-
-    return NextResponse.json({
-      success: true,
-      roles: userRoles.map((ur: any) => ({
-        id: ur.role_id,
-        name: ur.role_name,
-        display_name: ur.role_display_name,
-        description: ur.role_description,
-        priority: ur.role_priority,
-        is_system_role: ur.role_is_system_role,
-        created_at: ur.role_created_at
-      }))
-    });
-
-  } catch (error) {
-    console.error('Error fetching user roles:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+  })(request);
 }
 
-export async function PUT(
+export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  try {
-    // Verify authentication
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check permission
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'users.manage_roles'
-    );
-    
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    const userId = parseInt(params.id);
-    if (isNaN(userId)) {
-      return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
-    }
-
-    // Check if current user is super_admin
-    const isSuperAdmin = session.user.role === 'super_admin';
-    
-    // Get user roles to check if target user is super_admin
-    const currentUserRoles = await rbacService.getUserRoles(userId);
-    const targetUserIsSuperAdmin = currentUserRoles.some((role: any) => role.role_name === 'super_admin');
-    
-    // Prevent non-super_admin users from modifying super_admin user roles
-    if (targetUserIsSuperAdmin && !isSuperAdmin) {
-      return NextResponse.json({ error: 'Access denied: Cannot modify super administrator roles' }, { status: 403 });
-    }
-
-    const body = await request.json();
-    const { role_ids } = body;
-
-    if (!Array.isArray(role_ids)) {
-      return NextResponse.json({ error: 'role_ids must be an array' }, { status: 400 });
-    }
-
-    // Get current user roles
-    const currentRoleIds = currentUserRoles.map(ur => ur.role_id);
-
-    // Remove roles that are no longer assigned
-    for (const roleId of currentRoleIds) {
-      if (!role_ids.includes(roleId)) {
-        await rbacService.removeRoleFromUser(userId, roleId);
+  return withPermission('users.manage_roles', async (session) => {
+    try {
+      const userId = parseInt(params.id);
+      if (isNaN(userId)) {
+        return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
       }
-    }
 
-    // Add new roles
-    for (const roleId of role_ids) {
-      if (!currentRoleIds.includes(roleId)) {
-        await rbacService.assignRoleToUser(userId, roleId, parseInt(session.user.id));
+      // Get request body
+      const body = await request.json();
+      const { role_id, expires_at } = body;
+
+      if (!role_id) {
+        return NextResponse.json({ error: 'Role ID is required' }, { status: 400 });
       }
+
+      // Verify the role exists
+      const role = await rbacService.getRoleById(role_id);
+      if (!role) {
+        return NextResponse.json({ error: 'Role not found' }, { status: 404 });
+      }
+
+      // Check if user exists
+      const user = await rbacService.getUserById(userId);
+      if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      // Assign role to user
+      const success = await rbacService.assignRoleToUser(
+        userId,
+        role_id,
+        parseInt(session.user.id),
+        expires_at ? new Date(expires_at) : undefined
+      );
+
+      if (!success) {
+        return NextResponse.json({ error: 'Failed to assign role to user' }, { status: 400 });
+      }
+
+      // Log audit event
+      await rbacService.logAuditEvent(
+        parseInt(session.user.id),
+        'users.roles.assign',
+        'users',
+        userId,
+        { role_id, role_name: role.name, expires_at },
+        request.headers.get('x-forwarded-for') || request.ip || undefined,
+        request.headers.get('user-agent') || undefined
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: 'Role assigned to user successfully'
+      });
+
+    } catch (error) {
+      return handleError(error, 'Error assigning role to user');
     }
+  })(request);
+}
 
-    // Log audit event
-    await rbacService.logAuditEvent(
-      parseInt(session.user.id),
-      'users.roles.update',
-      'users',
-      userId,
-      { userId, role_ids, previous_roles: currentRoleIds },
-      request.headers.get('x-forwarded-for') || request.ip || undefined,
-      request.headers.get('user-agent') || undefined
-    );
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return withPermission('users.manage_roles', async (session) => {
+    try {
+      const userId = parseInt(params.id);
+      if (isNaN(userId)) {
+        return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
+      }
 
-    return NextResponse.json({
-      success: true,
-      message: 'User roles updated successfully'
-    });
+      // Get role ID from query parameters
+      const { searchParams } = new URL(request.url);
+      const roleId = searchParams.get('role_id');
 
-  } catch (error) {
-    console.error('Error updating user roles:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-} 
+      if (!roleId) {
+        return NextResponse.json({ error: 'Role ID is required' }, { status: 400 });
+      }
+
+      // Verify the role exists
+      const role = await rbacService.getRoleById(parseInt(roleId));
+      if (!role) {
+        return NextResponse.json({ error: 'Role not found' }, { status: 404 });
+      }
+
+      // Check if user exists
+      const user = await rbacService.getUserById(userId);
+      if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      // Prevent removing super_admin role from the last super admin
+      if (role.name === 'super_admin') {
+        const superAdminCount = await rbacService.getUsersWithRole('super_admin');
+        if (superAdminCount.length <= 1) {
+          return NextResponse.json(
+            { error: 'Cannot remove super_admin role from the last super administrator' },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Remove role from user
+      const success = await rbacService.removeRoleFromUser(userId, parseInt(roleId));
+
+      if (!success) {
+        return NextResponse.json({ error: 'Failed to remove role from user' }, { status: 400 });
+      }
+
+      // Log audit event
+      await rbacService.logAuditEvent(
+        parseInt(session.user.id),
+        'users.roles.remove',
+        'users',
+        userId,
+        { role_id: roleId, role_name: role.name },
+        request.headers.get('x-forwarded-for') || request.ip || undefined,
+        request.headers.get('user-agent') || undefined
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: 'Role removed from user successfully'
+      });
+
+    } catch (error) {
+      return handleError(error, 'Error removing role from user');
+    }
+  })(request);
+}

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 import StorageService from '@/lib/services/StorageService';
 import { SecureBookAccess } from '@/utils/secure-book-access';
+import { SecurityUtils } from '@/utils/security';
 
 export async function GET(
   request: NextRequest,
@@ -15,7 +16,13 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const bookId = params.bookId;
+    const bookId = SecurityUtils.validateBookId(params.bookId);
+    if (!bookId) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid book ID' },
+        { status: 400 }
+      );
+    }
     
     console.log(`Fetching content for book ${bookId}`);
 

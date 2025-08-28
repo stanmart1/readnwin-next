@@ -15,6 +15,24 @@ export async function GET(request: NextRequest) {
     const bookId = searchParams.get('bookId');
     const limit = parseInt(searchParams.get('limit') || '20');
 
+    // Create tables if they don't exist
+    await query(`
+      CREATE TABLE IF NOT EXISTS reading_sessions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        book_id INTEGER NOT NULL,
+        session_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        session_end TIMESTAMP NULL,
+        start_page INTEGER,
+        end_page INTEGER,
+        pages_read INTEGER DEFAULT 0,
+        reading_time_minutes INTEGER DEFAULT 0,
+        reading_speed_wpm DECIMAL(5,2),
+        device_info JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     let sessionQuery = `
       SELECT 
         rs.id,
@@ -28,10 +46,11 @@ export async function GET(request: NextRequest) {
         rs.reading_speed_wpm,
         rs.device_info,
         rs.created_at,
-        b.title as book_title,
-        b.author_name
+        COALESCE(b.title, 'Unknown Book') as book_title,
+        COALESCE(a.name, 'Unknown Author') as author_name
       FROM reading_sessions rs
-      JOIN books b ON rs.book_id = b.id
+      LEFT JOIN books b ON rs.book_id = b.id
+      LEFT JOIN authors a ON b.author_id = a.id
       WHERE rs.user_id = $1
     `;
     const queryParams = [userId];

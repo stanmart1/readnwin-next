@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { withPermission } from '@/utils/api-protection';
 import { query } from '@/utils/database';
 import { createHash } from 'crypto';
 import { sanitizeForLog, sanitizeHtml, sanitizeInt } from '@/utils/security';
+import { handleApiError } from '@/utils/error-handler';
 
 // Lazy load file upload service only when needed
 let fileUploadService: any = null;
@@ -16,32 +18,14 @@ function getFileUploadService() {
   return fileUploadService;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withPermission('books.create', async (request: NextRequest, context: any, session: any) => {
   const startTime = Date.now();
   
   try {
     console.log('🚀 Starting enhanced book creation process...');
     
-    // Stage 1: Authentication Check
-    console.log('📋 Stage 1: Authentication check...');
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      console.log('❌ Stage 1 FAILED: User not authenticated');
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    // Check admin role
-    if (!['admin', 'super_admin'].includes(session.user.role)) {
-      console.log('❌ Stage 1 FAILED: User does not have admin role');
-      return NextResponse.json(
-        { error: 'Unauthorized - Admin access required' },
-        { status: 401 }
-      );
-    }
-    console.log('✅ Stage 1 PASSED: User authenticated with admin role');
+    // Authentication handled by middleware
+    console.log('✅ Stage 1 PASSED: User authenticated with proper permissions');
 
     // Stage 2: Parse Form Data
     console.log('📋 Stage 2: Parsing form data...');
@@ -323,33 +307,16 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorStack = error instanceof Error ? error.stack : 'No stack trace';
-    
-    console.error('❌ UNEXPECTED ERROR in book creation:', {
-      message: errorMessage,
-      stack: errorStack,
-      timestamp: new Date().toISOString(),
-      userAgent: request.headers.get('user-agent'),
-      contentType: request.headers.get('content-type'),
-      contentLength: request.headers.get('content-length')
-    });
-    
-    return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        details: process.env.NODE_ENV === 'development' ? errorMessage : 'An unexpected error occurred'
-      },
-      { status: 500 }
-    );
+    console.error('❌ UNEXPECTED ERROR in book creation:', error);
+    return handleApiError(error);
   }
-}
+});
 
-export async function GET(request: NextRequest) {
+export const GET = withPermission('books.read', async (request: NextRequest, context: any, session: any) => {
   try {
     console.log('📋 Admin Books GET: Starting request...');
     
-    const session = await getServerSession(authOptions);
+    // Session is already provided by withPermission middleware
     if (!session?.user?.id) {
       console.log('❌ Admin Books GET: Unauthorized access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -516,11 +483,11 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
-export async function DELETE(request: NextRequest) {
+export const DELETE = withPermission('books.delete', async (request: NextRequest, context: any, session: any) => {
   try {
-    const session = await getServerSession(authOptions);
+    // Session is already provided by withPermission middleware
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -596,4 +563,4 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+});

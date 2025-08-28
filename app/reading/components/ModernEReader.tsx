@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useModernEReaderStore } from '@/stores/modernEReaderStore';
 import { EbookContentLoader } from '@/lib/services/EbookContentLoader';
 import { useSession } from 'next-auth/react';
+import { SecurityUtils } from '@/utils/security';
 import {
   Menu,
   Settings,
@@ -310,7 +311,7 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
               onClick={() => {
                 clearError();
                 if (session?.user?.id) {
-                  loadBook(bookId, session.user.id);
+                  loadEbook(bookId, session.user.id);
                 }
               }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -518,7 +519,7 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
             }}
             onMouseUp={handleTextSelection}
             onTouchEnd={handleTextSelection}
-            dangerouslySetInnerHTML={{ __html: currentChapter.content_html }}
+            dangerouslySetInnerHTML={{ __html: SecurityUtils.sanitizeHTML(currentChapter.content_html) }}
           />
 
           {/* Chapter Navigation */}
@@ -598,7 +599,7 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
         contentRef={contentRef}
         onHighlightClick={(highlight) => {
           // Handle highlight click
-          console.log('Highlight clicked:', highlight);
+          console.log('Highlight clicked:', SecurityUtils.sanitizeLogInput(JSON.stringify(highlight)));
         }}
       />
 

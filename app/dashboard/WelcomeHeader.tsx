@@ -1,70 +1,12 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-
-interface UserStats {
-  booksRead: number;
-  completedBooks: number;
-  currentlyReading: number;
-  totalBooks: number;
-  totalPagesRead: number;
-  totalHours: number;
-  streak: number;
-  avgProgress: number;
-  favoriteBooks: number;
-  recentPurchases: number;
-  totalGoals: number;
-  completedGoals: number;
-  avgGoalProgress: number;
-}
+import { useUserStats } from '@/hooks/useUserStats';
 
 export default function WelcomeHeader() {
   const { data: session } = useSession();
-  const [userStats, setUserStats] = useState<UserStats>({
-    booksRead: 0,
-    completedBooks: 0,
-    currentlyReading: 0,
-    totalBooks: 0,
-    totalPagesRead: 0,
-    totalHours: 0,
-    streak: 0,
-    avgProgress: 0,
-    favoriteBooks: 0,
-    recentPurchases: 0,
-    totalGoals: 0,
-    completedGoals: 0,
-    avgGoalProgress: 0
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchUserStats = async () => {
-      if (!session?.user?.id) return;
-
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const response = await fetch('/api/dashboard/stats');
-        if (response.ok) {
-          const data = await response.json();
-          setUserStats(data.stats);
-        } else {
-          throw new Error('Failed to fetch user stats');
-        }
-      } catch (error) {
-        console.error('Error fetching user stats:', error);
-        setError('Failed to load user statistics');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserStats();
-  }, [session]);
+  const { stats, loading, error, refetch } = useUserStats();
 
   const formatHours = (pages: number) => {
     // Estimate 1 hour per 50 pages
@@ -117,7 +59,7 @@ export default function WelcomeHeader() {
             </h1>
             <p className="text-red-100 mb-4">Unable to load your reading statistics</p>
             <button 
-              onClick={() => window.location.reload()}
+              onClick={refetch}
               className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
             >
               Retry
@@ -139,19 +81,19 @@ export default function WelcomeHeader() {
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold">{userStats.booksRead}</div>
+              <div className="text-2xl font-bold">{stats?.booksRead || 0}</div>
               <div className="text-sm text-blue-100">Books Read</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold">{userStats.currentlyReading}</div>
+              <div className="text-2xl font-bold">{stats?.currentlyReading || 0}</div>
               <div className="text-sm text-blue-100">Currently Reading</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold">{formatHours(userStats.totalPagesRead)}</div>
+              <div className="text-2xl font-bold">{stats?.totalHours || 0}</div>
               <div className="text-sm text-blue-100">Hours Read</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold">{userStats.totalBooks}</div>
+              <div className="text-2xl font-bold">{stats?.totalBooks || 0}</div>
               <div className="text-sm text-blue-100">Total Books</div>
             </div>
           </div>
@@ -159,20 +101,20 @@ export default function WelcomeHeader() {
           {/* Additional stats for larger screens */}
           <div className="hidden lg:grid lg:grid-cols-4 gap-4 mt-4 pt-4 border-t border-white/20">
             <div className="text-center">
-              <div className="text-lg font-bold">{userStats.completedBooks}</div>
+              <div className="text-lg font-bold">{stats?.completedBooks || 0}</div>
               <div className="text-xs text-blue-100">Completed</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-bold">{userStats.favoriteBooks}</div>
-              <div className="text-xs text-blue-100">Favorites</div>
+              <div className="text-lg font-bold">{stats?.totalBooks || 0}</div>
+              <div className="text-xs text-blue-100">Library</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-bold">{userStats.totalGoals}</div>
-              <div className="text-xs text-blue-100">Goals</div>
+              <div className="text-lg font-bold">{stats?.readingSessions || 0}</div>
+              <div className="text-xs text-blue-100">Sessions</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-bold">{Math.round(userStats.avgProgress)}%</div>
-              <div className="text-xs text-blue-100">Avg Progress</div>
+              <div className="text-lg font-bold">{Math.round((stats?.averageRating || 0) * 10)}%</div>
+              <div className="text-xs text-blue-100">Avg Rating</div>
             </div>
           </div>
         </div>

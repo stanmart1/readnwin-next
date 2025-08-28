@@ -1,11 +1,12 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import { DashboardProvider } from '@/contexts/DashboardContext';
+import DashboardErrorBoundary from '@/components/ui/DashboardErrorBoundary';
 import WelcomeHeader from './WelcomeHeader';
 import QuickActions from './QuickActions';
 import ReadingProgress from './ReadingProgress';
@@ -31,9 +32,9 @@ export default function Dashboard() {
   }, [searchParams]);
 
   useEffect(() => {
-    // Send welcome email when user first visits dashboard
+    // Send welcome email only once per session
     const sendWelcomeEmail = async () => {
-      if (session?.user?.email) {
+      if (session?.user?.email && !sessionStorage.getItem('welcome-email-sent')) {
         try {
           const response = await fetch('/api/auth/send-welcome-email', {
             method: 'POST',
@@ -43,9 +44,13 @@ export default function Dashboard() {
           });
           
           if (response.ok) {
-            console.log('Welcome email sent successfully');
+            const result = await response.json();
+            if (result.success) {
+              sessionStorage.setItem('welcome-email-sent', 'true');
+              console.log('Welcome email sent successfully');
+            }
           } else {
-            console.log('Welcome email already sent or failed');
+            console.warn('Welcome email failed:', response.status);
           }
         } catch (error) {
           console.error('Error sending welcome email:', error);
@@ -53,60 +58,70 @@ export default function Dashboard() {
       }
     };
 
-    sendWelcomeEmail();
-  }, [session]);
+    if (session?.user?.email) {
+      sendWelcomeEmail();
+    }
+  }, [session?.user?.email]);
 
-  const tabs = [
+  const tabs = useMemo(() => [
     { id: 'overview', label: 'Overview', icon: 'ri-dashboard-line' },
     { id: 'library', label: 'Library', icon: 'ri-book-line' },
     { id: 'activity', label: 'Activity', icon: 'ri-time-line' },
     { id: 'analytics', label: 'Analytics', icon: 'ri-bar-chart-line' }
-  ];
+  ], []);
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'overview':
         return (
-          <div className="space-y-8">
-            <WelcomeHeader />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-8">
-                <QuickActions />
-                <ReadingProgress />
-              </div>
-              <div className="space-y-8">
-                <ReadingGoals />
+          <DashboardErrorBoundary>
+            <div className="space-y-8">
+              <WelcomeHeader />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-8">
+                  <QuickActions />
+                  <ReadingProgress />
+                </div>
+                <div className="space-y-8">
+                  <ReadingGoals />
+                </div>
               </div>
             </div>
-          </div>
+          </DashboardErrorBoundary>
         );
       
       case 'library':
         return (
-          <div className="space-y-6">
-            <LibrarySection />
-          </div>
+          <DashboardErrorBoundary>
+            <div className="space-y-6">
+              <LibrarySection />
+            </div>
+          </DashboardErrorBoundary>
         );
       
       case 'activity':
         return (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Recent Activity</h2>
-              <ActivityFeed />
+          <DashboardErrorBoundary>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Recent Activity</h2>
+                <ActivityFeed />
+              </div>
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Notifications</h2>
+                <NotificationCenter />
+              </div>
             </div>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Notifications</h2>
-              <NotificationCenter />
-            </div>
-          </div>
+          </DashboardErrorBoundary>
         );
       
       case 'analytics':
         return (
-          <div className="space-y-8">
-            <ReadingAnalyticsDashboard />
-          </div>
+          <DashboardErrorBoundary>
+            <div className="space-y-8">
+              <ReadingAnalyticsDashboard />
+            </div>
+          </DashboardErrorBoundary>
         );
       
       default:

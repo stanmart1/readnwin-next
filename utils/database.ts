@@ -12,11 +12,14 @@ const pool = new Pool({
   // Optimized connection pool configuration for better performance
   max: 10, // Increased from 5 to handle more concurrent connections
   min: 2, // Increased from 1 to maintain more idle connections
-  connectionTimeoutMillis: 5000, // Reduced from 10000 to fail faster on connection issues
-  idleTimeoutMillis: 60000, // Increased from 30000 to keep connections alive longer
+  connectionTimeoutMillis: 30000, // Increased to 30 seconds for cloud database
+  idleTimeoutMillis: 300000, // Increased to 5 minutes to keep connections alive longer
   maxUses: 10000, // Increased from 7500 to reduce connection cycling
   // Add statement timeout to prevent long-running queries
-  statement_timeout: 10000, // 10 seconds
+  statement_timeout: 30000, // 30 seconds
+  // Add keepalive settings for cloud database
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000
 });
 
 // Set timezone for all connections to Nigeria (UTC+1)

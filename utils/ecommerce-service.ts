@@ -770,7 +770,7 @@ class EcommerceService {
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `, [
-      authorData.name, authorData.email, authorData.bio, authorData.avatar_url,
+      authorData.name, authorData.email || null, authorData.bio, authorData.avatar_url,
       authorData.website_url, authorData.social_media, authorData.status || 'active'
     ]);
     return result.rows[0];

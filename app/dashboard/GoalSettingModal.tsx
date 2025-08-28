@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Target, Calendar, BookOpen, Clock, TrendingUp } from 'lucide-react';
+import { validateGoalType } from '@/utils/input-validation';
 
 interface GoalSettingModalProps {
   isOpen: boolean;
@@ -93,6 +94,11 @@ export default function GoalSettingModal({ isOpen, onClose, onGoalCreated, exist
   }, [existingGoal, isOpen]);
 
   const handleGoalTypeChange = (goalType: string) => {
+    if (!validateGoalType(goalType)) {
+      console.error('Invalid goal type:', goalType);
+      return;
+    }
+    
     const goalTypeConfig = goalTypes.find(gt => gt.id === goalType);
     if (goalTypeConfig) {
       const now = new Date();

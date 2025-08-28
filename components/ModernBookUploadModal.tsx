@@ -62,6 +62,9 @@ export default function ModernBookUploadModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dragActive, setDragActive] = useState({ cover: false, ebook: false });
   const [isParsingEbook, setIsParsingEbook] = useState(false);
+  const [showAddAuthor, setShowAddAuthor] = useState(false);
+  const [newAuthorName, setNewAuthorName] = useState('');
+  const [addingAuthor, setAddingAuthor] = useState(false);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const ebookInputRef = useRef<HTMLInputElement>(null);
@@ -224,6 +227,36 @@ export default function ModernBookUploadModal({
     }
   };
 
+  const handleAddAuthor = async () => {
+    if (!newAuthorName.trim()) return;
+    
+    setAddingAuthor(true);
+    try {
+      const response = await fetch('/api/admin/authors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newAuthorName.trim() })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        // Add new author to the list and select it
+        authors.push(result.author);
+        setFormData(prev => ({ ...prev, author_id: result.author.id.toString() }));
+        setNewAuthorName('');
+        setShowAddAuthor(false);
+        toast.success('Author added successfully!');
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to add author');
+      }
+    } catch (error) {
+      toast.error('Failed to add author');
+    } finally {
+      setAddingAuthor(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       title: '',
@@ -245,6 +278,8 @@ export default function ModernBookUploadModal({
     setErrors({});
     setCurrentStep(1);
     setUploadProgress(0);
+    setShowAddAuthor(false);
+    setNewAuthorName('');
   };
 
   const handleClose = () => {
@@ -319,20 +354,30 @@ export default function ModernBookUploadModal({
                   <label className="block text-sm font-semibold text-gray-800 mb-2">
                     Author *
                   </label>
-                  <select
-                    value={formData.author_id}
-                    onChange={(e) => handleInputChange('author_id', e.target.value)}
-                    className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none bg-white ${
-                      errors.author_id ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <option value="">Select an author</option>
-                    {authors.map(author => (
-                      <option key={author.id} value={author.id}>
-                        {author.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      value={formData.author_id}
+                      onChange={(e) => handleInputChange('author_id', e.target.value)}
+                      className={`flex-1 px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none bg-white ${
+                        errors.author_id ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <option value="">Select an author</option>
+                      {authors.map(author => (
+                        <option key={author.id} value={author.id}>
+                          {author.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddAuthor(true)}
+                      className="px-3 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+                      title="Add new author"
+                    >
+                      <i className="ri-add-line"></i>
+                    </button>
+                  </div>
                   {errors.author_id && <p className="text-red-500 text-sm mt-1 flex items-center"><i className="ri-error-warning-line mr-1"></i>{errors.author_id}</p>}
                 </div>
 
@@ -689,6 +734,38 @@ export default function ModernBookUploadModal({
             </div>
           )}
         </div>
+
+        {/* Add Author Modal */}
+        {showAddAuthor && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold mb-4">Add New Author</h3>
+              <input
+                type="text"
+                value={newAuthorName}
+                onChange={(e) => setNewAuthorName(e.target.value)}
+                placeholder="Enter author name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
+                onKeyPress={(e) => e.key === 'Enter' && handleAddAuthor()}
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowAddAuthor(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddAuthor}
+                  disabled={addingAuthor || !newAuthorName.trim()}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {addingAuthor ? 'Adding...' : 'Add Author'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50/50">

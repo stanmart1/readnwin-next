@@ -14,6 +14,25 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'year';
 
+    // Create tables if they don't exist
+    await query(`
+      CREATE TABLE IF NOT EXISTS reading_progress (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        book_id INTEGER NOT NULL,
+        progress_percentage DECIMAL(5,2) DEFAULT 0,
+        current_chapter_id VARCHAR(255),
+        current_position INTEGER DEFAULT 0,
+        pages_read INTEGER DEFAULT 0,
+        total_reading_time_seconds INTEGER DEFAULT 0,
+        last_read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, book_id)
+      )
+    `);
+
     const now = new Date();
     let startDate: Date;
     
@@ -35,7 +54,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         TO_CHAR(last_read_at, 'Mon') as month,
         COUNT(DISTINCT book_id) as books,
-        SUM(total_reading_time_seconds) / 3600.0 as hours
+        COALESCE(SUM(total_reading_time_seconds), 0) / 3600.0 as hours
       FROM reading_progress
       WHERE user_id = $1 AND last_read_at >= $2
       GROUP BY TO_CHAR(last_read_at, 'Mon'), EXTRACT(MONTH FROM last_read_at)

@@ -1,14 +1,6 @@
 # Use a more stable base image for production
 FROM node:20.18.1-slim AS base
 
-# Install dependencies only when needed
-FROM base AS deps
-WORKDIR /app
-
-# Install dependencies based on the preferred package manager
-COPY package.json package-lock.json* ./
-RUN npm ci --only=production && npm cache clean --force
-
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
@@ -31,7 +23,10 @@ RUN apt-get update && apt-get install -y \
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
-COPY --from=deps /app/node_modules ./node_modules
+# Install all dependencies (including dev) for build
+COPY package.json package-lock.json* ./
+RUN npm ci --legacy-peer-deps
+
 COPY . .
 
 # Set environment variables for build

@@ -65,25 +65,8 @@ const nextConfig = {
 
   // Webpack configuration
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-    // Fix chunk loading issues
-    if (!dev && !isServer) {
-      config.optimization.splitChunks = {
-        chunks: 'all',
-        cacheGroups: {
-          default: {
-            minChunks: 2,
-            priority: -20,
-            reuseExistingChunk: true
-          },
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            priority: -10,
-            chunks: 'all'
-          }
-        }
-      };
-    }
+    // Disable custom chunk splitting to prevent build issues
+    // Use Next.js default optimization
     // Path aliases
     config.resolve.alias = {
       ...config.resolve.alias,

@@ -1921,62 +1921,98 @@ class EcommerceService {
     return parseInt(result.rows[0]?.count || '0');
   }
 
-  // Admin Notification Management
+  // Admin Notification Management - Optimized
   async getAdminNotifications(filters: any = {}, page: number = 1, limit: number = 20): Promise<{ notifications: any[], total: number, pages: number }> {
     const offset = (page - 1) * limit;
     let whereClause = 'WHERE 1=1';
     let params: any[] = [];
     let paramIndex = 1;
+    let needsUserJoin = false;
 
+    // Build optimized WHERE clause
     if (filters.type) {
-      whereClause += ` AND un.type = $${paramIndex}`;
+      whereClause += ` AND type = $${paramIndex}`;
       params.push(filters.type);
       paramIndex++;
     }
 
     if (filters.is_read !== undefined) {
-      whereClause += ` AND un.is_read = $${paramIndex}`;
+      whereClause += ` AND is_read = $${paramIndex}`;
       params.push(filters.is_read);
       paramIndex++;
     }
 
     if (filters.user_id) {
-      whereClause += ` AND un.user_id = $${paramIndex}`;
+      whereClause += ` AND user_id = $${paramIndex}`;
       params.push(filters.user_id);
       paramIndex++;
     }
 
+    // Only add user search if needed to avoid unnecessary JOIN
     if (filters.search) {
-      whereClause += ` AND (un.title ILIKE $${paramIndex} OR un.message ILIKE $${paramIndex} OR u.first_name ILIKE $${paramIndex} OR u.last_name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`;
-      params.push(`%${filters.search}%`);
+      const searchPattern = `%${filters.search}%`;
+      whereClause += ` AND (title ILIKE $${paramIndex} OR message ILIKE $${paramIndex})`;
+      params.push(searchPattern);
       paramIndex++;
+      needsUserJoin = true; // We'll need user data for search results
     }
 
-    const countResult = await query(`
+    // Optimized count query without JOIN when possible
+    const countQuery = needsUserJoin ? `
       SELECT COUNT(*) as total
       FROM user_notifications un
       LEFT JOIN users u ON un.user_id = u.id
+      ${whereClause.replace(/\b(type|is_read|user_id|title|message)\b/g, 'un.$1')}
+    ` : `
+      SELECT COUNT(*) as total
+      FROM user_notifications
       ${whereClause}
-    `, params);
+    `;
 
-    const notificationsResult = await query(`
-      SELECT 
-        un.*,
-        u.first_name,
-        u.last_name,
-        u.email as user_email
-      FROM user_notifications un
-      LEFT JOIN users u ON un.user_id = u.id
+    const countResult = await query(countQuery, params);
+
+    // Optimized main query - fetch notifications first, then user data separately
+    const notificationsQuery = `
+      SELECT *
+      FROM user_notifications
       ${whereClause}
-      ORDER BY un.created_at DESC
+      ORDER BY created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `, [...params, limit, offset]);
+    `;
+
+    const notificationsResult = await query(notificationsQuery, [...params, limit, offset]);
+    
+    // If we have notifications and need user data, fetch it separately
+    let notifications = notificationsResult.rows;
+    if (notifications.length > 0) {
+      const userIds = [...new Set(notifications.map(n => n.user_id).filter(Boolean))];
+      
+      if (userIds.length > 0) {
+        const usersResult = await query(`
+          SELECT id, first_name, last_name, email
+          FROM users
+          WHERE id = ANY($1)
+        `, [userIds]);
+        
+        const usersMap = new Map(usersResult.rows.map(u => [u.id, u]));
+        
+        notifications = notifications.map(notification => {
+          const user = usersMap.get(notification.user_id);
+          return {
+            ...notification,
+            first_name: user?.first_name || null,
+            last_name: user?.last_name || null,
+            user_email: user?.email || null
+          };
+        });
+      }
+    }
 
     const total = parseInt(countResult.rows[0].total);
     const pages = Math.ceil(total / limit);
 
     return {
-      notifications: notificationsResult.rows,
+      notifications,
       total,
       pages
     };

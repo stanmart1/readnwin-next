@@ -1,4 +1,4 @@
-const { query, pool } = require('./database.js');
+import { query, pool } from './database';
 
 export interface User {
   id: number;
@@ -84,50 +84,82 @@ class RBACService {
   }
 
   async getUsers(page: number = 1, limit: number = 10, filters: any = {}, hideAdminUsers: boolean = false): Promise<{ users: User[], total: number }> {
-    let whereClause = 'WHERE 1=1';
-    const params: any[] = [];
-    let paramIndex = 1;
+    try {
+      console.log('🔍 RBAC getUsers - Starting with params:', { page, limit, filters, hideAdminUsers });
+      
+      let whereClause = 'WHERE 1=1';
+      const params: any[] = [];
+      let paramIndex = 1;
 
-    if (filters.search) {
-      whereClause += ` AND (email ILIKE $${paramIndex} OR username ILIKE $${paramIndex} OR first_name ILIKE $${paramIndex} OR last_name ILIKE $${paramIndex})`;
-      params.push(`%${filters.search}%`);
-      paramIndex++;
+      if (filters.search) {
+        whereClause += ` AND (email ILIKE $${paramIndex} OR username ILIKE $${paramIndex} OR first_name ILIKE $${paramIndex} OR last_name ILIKE $${paramIndex})`;
+        params.push(`%${filters.search}%`);
+        paramIndex++;
+      }
+
+      if (filters.status) {
+        whereClause += ` AND status = $${paramIndex}`;
+        params.push(filters.status);
+        paramIndex++;
+      }
+
+      if (filters.role) {
+        whereClause += ` AND id IN (SELECT user_id FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE r.name = $${paramIndex} AND ur.is_active = TRUE)`;
+        params.push(filters.role);
+        paramIndex++;
+      }
+
+      // Hide admin and super_admin users from non-super_admin users
+      if (hideAdminUsers) {
+        whereClause += ` AND id NOT IN (
+          SELECT DISTINCT u.id 
+          FROM users u 
+          LEFT JOIN user_roles ur ON u.id = ur.user_id AND ur.is_active = TRUE
+          LEFT JOIN roles r ON ur.role_id = r.id 
+          WHERE r.name IN ('admin', 'super_admin')
+        )`;
+      }
+
+      const offset = (page - 1) * limit;
+      
+      console.log('🔍 RBAC getUsers - Executing count query:', `SELECT COUNT(*) FROM users ${whereClause}`, params);
+      
+      // Get total count with error handling
+      let countResult;
+      try {
+        countResult = await query(`SELECT COUNT(*) FROM users ${whereClause}`, params);
+      } catch (countError) {
+        console.error('❌ RBAC getUsers - Count query failed:', countError);
+        throw new Error(`Failed to count users: ${countError instanceof Error ? countError.message : 'Unknown error'}`);
+      }
+      
+      const total = parseInt(countResult.rows[0]?.count || '0');
+      console.log('✅ RBAC getUsers - Count result:', total);
+
+      // Get users with error handling
+      const usersQuery = `SELECT id, email, username, first_name, last_name, avatar_url, status, email_verified, created_at, updated_at, last_login FROM users ${whereClause} ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      const usersParams = [...params, limit, offset];
+      
+      console.log('🔍 RBAC getUsers - Executing users query:', usersQuery, usersParams);
+      
+      let usersResult;
+      try {
+        usersResult = await query(usersQuery, usersParams);
+      } catch (usersError) {
+        console.error('❌ RBAC getUsers - Users query failed:', usersError);
+        throw new Error(`Failed to fetch users: ${usersError instanceof Error ? usersError.message : 'Unknown error'}`);
+      }
+
+      console.log('✅ RBAC getUsers - Users result:', usersResult.rows.length, 'users found');
+      
+      return { 
+        users: usersResult.rows || [], 
+        total: total || 0 
+      };
+    } catch (error) {
+      console.error('❌ RBAC getUsers - Unexpected error:', error);
+      throw error;
     }
-
-    if (filters.status) {
-      whereClause += ` AND status = $${paramIndex}`;
-      params.push(filters.status);
-      paramIndex++;
-    }
-
-    if (filters.role) {
-      whereClause += ` AND id IN (SELECT user_id FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE r.name = $${paramIndex})`;
-      params.push(filters.role);
-      paramIndex++;
-    }
-
-    // Hide admin and super_admin users from non-super_admin users
-    if (hideAdminUsers) {
-      whereClause += ` AND id NOT IN (
-        SELECT DISTINCT u.id 
-        FROM users u 
-        JOIN user_roles ur ON u.id = ur.user_id 
-        JOIN roles r ON ur.role_id = r.id 
-        WHERE r.name IN ('admin', 'super_admin')
-      )`;
-    }
-
-    const offset = (page - 1) * limit;
-    
-    const countResult = await query(`SELECT COUNT(*) FROM users ${whereClause}`, params);
-    const total = parseInt(countResult.rows[0].count);
-
-    const usersResult = await query(
-      `SELECT * FROM users ${whereClause} ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-      [...params, limit, offset]
-    );
-
-    return { users: usersResult.rows, total };
   }
 
   async createUser(userData: Partial<User>): Promise<User> {
@@ -152,24 +184,36 @@ class RBACService {
   }
 
   async updateUser(id: number, userData: Partial<User>): Promise<User | null> {
-    // Filter out undefined values and only update provided fields
-    const filteredData = Object.fromEntries(
-      Object.entries(userData).filter(([_, value]) => value !== undefined)
-    );
-    
-    if (Object.keys(filteredData).length === 0) {
-      // No valid fields to update, just return the current user
-      return this.getUserById(id);
+    try {
+      console.log('🔍 RBAC updateUser - Starting for user:', id, 'with data:', userData);
+      
+      // Filter out undefined values and only update provided fields
+      const filteredData = Object.fromEntries(
+        Object.entries(userData).filter(([_, value]) => value !== undefined)
+      );
+      
+      if (Object.keys(filteredData).length === 0) {
+        console.log('🔍 RBAC updateUser - No fields to update, returning current user');
+        // No valid fields to update, just return the current user
+        return this.getUserById(id);
+      }
+      
+      const fields = Object.keys(filteredData).map((key, index) => `${key} = $${index + 2}`).join(', ');
+      const values = Object.values(filteredData);
+      
+      console.log('🔍 RBAC updateUser - Executing query with fields:', fields);
+      
+      const result = await query(
+        `UPDATE users SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
+        [id, ...values]
+      );
+      
+      console.log('✅ RBAC updateUser - Success:', result.rows.length > 0 ? 'User updated' : 'No user found');
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('❌ RBAC updateUser - Error:', error);
+      throw error;
     }
-    
-    const fields = Object.keys(filteredData).map((key, index) => `${key} = $${index + 2}`).join(', ');
-    const values = Object.values(filteredData);
-    
-    const result = await query(
-      `UPDATE users SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
-      [id, ...values]
-    );
-    return result.rows[0] || null;
   }
 
   async deleteUser(id: number): Promise<boolean> {
@@ -348,17 +392,27 @@ class RBACService {
 
   // User Role Management
   async getUserRoles(userId: number): Promise<UserRole[]> {
-    const result = await query(
-      `SELECT ur.*, r.id as role_id, r.name as role_name, r.display_name as role_display_name, 
-              r.description as role_description, r.priority as role_priority, 
-              r.is_system_role as role_is_system_role, r.created_at as role_created_at
-       FROM user_roles ur
-       JOIN roles r ON ur.role_id = r.id
-       WHERE ur.user_id = $1 AND ur.is_active = TRUE
-       ORDER BY r.priority DESC`,
-      [userId]
-    );
-    return result.rows;
+    try {
+      console.log('🔍 RBAC getUserRoles - Starting for user:', userId);
+      
+      const result = await query(
+        `SELECT ur.*, r.id as role_id, r.name as role_name, r.display_name as role_display_name, 
+                r.description as role_description, r.priority as role_priority, 
+                r.is_system_role as role_is_system_role, r.created_at as role_created_at
+         FROM user_roles ur
+         JOIN roles r ON ur.role_id = r.id
+         WHERE ur.user_id = $1 AND ur.is_active = TRUE
+         ORDER BY r.priority DESC`,
+        [userId]
+      );
+      
+      console.log('✅ RBAC getUserRoles - Success:', result.rows.length, 'roles found');
+      return result.rows;
+    } catch (error) {
+      console.error('❌ RBAC getUserRoles - Error:', error);
+      // Return empty array instead of throwing to prevent API failures
+      return [];
+    }
   }
 
   async getUsersWithRole(roleName: string): Promise<User[]> {

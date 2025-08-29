@@ -34,17 +34,14 @@ export default function Header() {
     await signOut({ callbackUrl: '/' });
   };
 
-  const handleNavigation = async (href: string, linkId: string) => {
+  const handleNavigation = (href: string, linkId: string) => {
     setLoadingLink(linkId);
     setIsProfileDropdownOpen(false);
     setIsMenuOpen(false);
     
-    try {
-      await router.push(href);
-    } finally {
-      // Clear loading state after a short delay to show feedback
-      setTimeout(() => setLoadingLink(null), 500);
-    }
+    router.push(href);
+    // Clear loading state after navigation starts
+    setTimeout(() => setLoadingLink(null), 300);
   };
 
   return (
@@ -113,20 +110,14 @@ export default function Header() {
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                     {/* Show admin link for admin users */}
                     {(session.user.role === 'admin' || session.user.role === 'super_admin') && (
-                      <button 
-                        onClick={() => handleNavigation('/admin', 'admin')}
-                        disabled={loadingLink === 'admin'}
-                        className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
+                      <Link 
+                        href="/admin"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => setIsProfileDropdownOpen(false)}
                       >
-                        {loadingLink === 'admin' ? (
-                          <i className="ri-loader-4-line animate-spin mr-3"></i>
-                        ) : (
-                          <i className="ri-admin-line mr-3"></i>
-                        )}
-                        <span className="font-medium">
-                          {loadingLink === 'admin' ? 'Loading...' : 'Admin Dashboard'}
-                        </span>
-                      </button>
+                        <i className="ri-admin-line mr-3"></i>
+                        <span className="font-medium">Admin Dashboard</span>
+                      </Link>
                     )}
                     <Link href="/dashboard" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
                       <i className="ri-dashboard-line mr-3"></i>

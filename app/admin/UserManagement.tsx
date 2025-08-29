@@ -111,7 +111,27 @@ export default function UserManagement() {
       if (filterRole !== 'all') params.append('role', filterRole);
 
       const response = await fetch(`/api/admin/users?${params}`);
-      const data: ApiResponse = await response.json();
+      
+      // Check if response is ok and has content
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Users API error response:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText || 'Unknown error'}`);
+      }
+      
+      // Check if response has content before parsing JSON
+      const responseText = await response.text();
+      if (!responseText) {
+        throw new Error('Empty response from server');
+      }
+      
+      let data: ApiResponse;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError, 'Response text:', responseText);
+        throw new Error('Invalid JSON response from server');
+      }
 
       if (data.success) {
         // Fetch roles for each user
@@ -122,7 +142,15 @@ export default function UserManagement() {
               const rolesData = await rolesResponse.json();
               return {
                 ...user,
-                roles: rolesData.success ? rolesData.roles : []
+                roles: rolesData.success ? rolesData.roles.map((userRole: any) => ({
+                  id: userRole.role?.id || userRole.role_id,
+                  name: userRole.role?.name || userRole.role_name,
+                  display_name: userRole.role?.display_name || userRole.role_display_name,
+                  description: userRole.role?.description || userRole.role_description,
+                  priority: userRole.role?.priority || userRole.role_priority || 0,
+                  is_system_role: userRole.role?.is_system_role || userRole.role_is_system_role || false,
+                  created_at: userRole.role?.created_at || userRole.role_created_at
+                })) : []
               };
             } catch (error) {
               console.error(`Error fetching roles for user ${user.id}:`, error);
@@ -338,6 +366,8 @@ export default function UserManagement() {
       setEditUserLoading(true);
       setError('');
       
+      console.log('🔍 Saving user:', editingUser.id, 'with roles:', editingUserRoles);
+      
       // Update user details
       const userResponse = await fetch(`/api/admin/users/${editingUser.id}`, {
         method: 'PUT',
@@ -352,29 +382,34 @@ export default function UserManagement() {
       });
       const userData = await userResponse.json();
       
+      console.log('✅ User update response:', userData);
+      
       if (userData.success) {
-        // Update user roles if roles were changed
-        if (editingUserRoles.length > 0) {
-          const rolesResponse = await fetch(`/api/admin/users/${editingUser.id}/roles`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              role_ids: editingUserRoles
-            })
+        // Always update user roles (including empty array to remove all roles)
+        console.log('🔄 Updating roles for user:', editingUser.id, 'roles:', editingUserRoles);
+        
+        const rolesResponse = await fetch(`/api/admin/users/${editingUser.id}/roles`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            role_ids: editingUserRoles
+          })
+        });
+        
+        const rolesData = await rolesResponse.json();
+        console.log('✅ Roles update response:', rolesData);
+        
+        if (!rolesData.success) {
+          setError('User updated but failed to update roles: ' + rolesData.error);
+          addNotification({
+            type: 'warning',
+            title: 'Partial Success',
+            message: 'User updated but failed to update roles: ' + rolesData.error
           });
-          
-          const rolesData = await rolesResponse.json();
-          if (!rolesData.success) {
-            setError('User updated but failed to update roles: ' + rolesData.error);
-            addNotification({
-              type: 'warning',
-              title: 'Partial Success',
-              message: 'User updated but failed to update roles: ' + rolesData.error
-            });
-            return;
-          }
+          return;
         }
         
+        console.log('✅ User and roles updated successfully');
         setError('');
         setShowEditModal(false);
         setEditingUser(null);
@@ -423,8 +458,10 @@ export default function UserManagement() {
   };
 
   const handleEditUser = (user: User) => {
-    setEditingUser(user);
-    setEditingUserRoles(user.roles?.map(role => role.id) || []);
+    setEditingUser({...user});
+    // Map role IDs correctly from the user's roles
+    const currentRoleIds = user.roles?.map(role => role.id) || [];
+    setEditingUserRoles(currentRoleIds);
     setShowEditModal(true);
   };
 

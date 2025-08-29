@@ -77,45 +77,34 @@ export default function LoginPage() {
     }
   }, [searchParams]);
 
-  // Debounced email verification check
-  useEffect(() => {
-    const checkVerificationStatus = async (email: string) => {
-      if (!email || !/\S+@\S+\.\S+/.test(email)) {
-        setNeedsVerification(false);
-        return;
-      }
-
-      setCheckingVerification(true);
-      try {
-        const response = await fetch('/api/auth/check-verification-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setNeedsVerification(data.needsVerification);
-        } else {
-          setNeedsVerification(false);
-        }
-      } catch (error) {
-        console.error('Error checking verification status:', error);
-        setNeedsVerification(false);
-      } finally {
-        setCheckingVerification(false);
-      }
-    };
-
-    // Only check verification if not currently submitting login
-    if (!isSubmitting) {
-      const timeoutId = setTimeout(() => {
-        checkVerificationStatus(email);
-      }, 1000); // Increased debounce to 1 second
-
-      return () => clearTimeout(timeoutId);
+  // Only check verification status on login failure, not on every email change
+  const checkVerificationStatus = async (email: string) => {
+    if (!email || !/\S+@\S+\.\S+/.test(email)) {
+      setNeedsVerification(false);
+      return;
     }
-  }, [email, isSubmitting]); // Added isSubmitting dependency
+
+    setCheckingVerification(true);
+    try {
+      const response = await fetch('/api/auth/check-verification-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setNeedsVerification(data.needsVerification);
+      } else {
+        setNeedsVerification(false);
+      }
+    } catch (error) {
+      console.error('Error checking verification status:', error);
+      setNeedsVerification(false);
+    } finally {
+      setCheckingVerification(false);
+    }
+  };
 
   const validateForm = () => {
     const errors: { [key: string]: string } = {};
@@ -160,6 +149,8 @@ export default function LoginPage() {
         // The useEffect will trigger as soon as the session updates
       } else {
         setError('Invalid email or password. Please check your credentials and try again.');
+        // Only check verification status on login failure
+        await checkVerificationStatus(email);
       }
     } catch (error) {
       const loginDuration = Date.now() - loginStartTime;

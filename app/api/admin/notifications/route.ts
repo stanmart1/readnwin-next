@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { ecommerceService } from '@/utils/ecommerce-service';
+import { query } from '@/utils/database';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,25 +17,63 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const type = searchParams.get('type') || '';
-    const isRead = searchParams.get('isRead') || '';
-    const userId = searchParams.get('userId') || '';
-    const search = searchParams.get('search') || '';
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100); // Cap at 100
+    const type = searchParams.get('type');
+    const isRead = searchParams.get('isRead');
+    const userId = searchParams.get('userId');
+    const search = searchParams.get('search');
 
-    // Build filters
-    const filters: any = {};
-    if (type) filters.type = type;
-    if (isRead !== '') filters.is_read = isRead === 'true';
-    if (userId) filters.user_id = parseInt(userId);
-    if (search) filters.search = search;
+    const offset = (page - 1) * limit;
+    let whereClause = 'WHERE 1=1';
+    const params: any[] = [];
+    let paramIndex = 1;
 
-    // Get notifications with pagination and filters
-    const notifications = await ecommerceService.getAdminNotifications(filters, page, limit);
+    // Build optimized WHERE clause
+    if (type) {
+      whereClause += ` AND type = $${paramIndex++}`;
+      params.push(type);
+    }
+
+    if (isRead !== null && isRead !== undefined && isRead !== '') {
+      whereClause += ` AND is_read = $${paramIndex++}`;
+      params.push(isRead === 'true');
+    }
+
+    if (userId) {
+      whereClause += ` AND user_id = $${paramIndex++}`;
+      params.push(parseInt(userId));
+    }
+
+    if (search) {
+      whereClause += ` AND (title ILIKE $${paramIndex++} OR message ILIKE $${paramIndex++})`;
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    // Fast count query
+    const countResult = await query(`
+      SELECT COUNT(*) as total
+      FROM user_notifications
+      ${whereClause}
+    `, params);
+
+    // Fast notifications query - only essential fields
+    const notificationsResult = await query(`
+      SELECT 
+        id, user_id, type, title, message, is_read, created_at
+      FROM user_notifications
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+    `, [...params, limit, offset]);
+
+    const total = parseInt(countResult.rows[0].total);
+    const pages = Math.ceil(total / limit);
 
     return NextResponse.json({
       success: true,
-      ...notifications
+      notifications: notificationsResult.rows,
+      total,
+      pages
     });
 
   } catch (error) {
@@ -49,7 +87,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Get admin session
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.id || !(session.user.role === 'admin' || session.user.role === 'super_admin')) {
@@ -76,23 +113,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create notification(s)
     let result;
     if (sendToAll) {
-      result = await ecommerceService.createSystemNotification({
-        type,
-        title,
-        message,
-        metadata,
-        createdBy: session.user.id
-      });
+      // Get active users and create notifications in batch
+      const usersResult = await query('SELECT id FROM users WHERE status = $1', ['active']);
+      const userIds = usersResult.rows.map(u => u.id);
+      
+      if (userIds.length > 0) {
+        const values = userIds.map((uid, i) => 
+          `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`
+        ).join(',');
+        
+        const params = userIds.flatMap(uid => [uid, type, title, message]);
+        
+        await query(`
+          INSERT INTO user_notifications (user_id, type, title, message)
+          VALUES ${values}
+        `, params);
+        
+        result = { notifications_created: userIds.length };
+      }
     } else {
-      result = await ecommerceService.createNotification(userId, {
-        type,
-        title,
-        message,
-        metadata
-      });
+      const notificationResult = await query(`
+        INSERT INTO user_notifications (user_id, type, title, message, metadata)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+      `, [userId, type, title, message, metadata ? JSON.stringify(metadata) : null]);
+      
+      result = notificationResult.rows[0];
     }
 
     return NextResponse.json({
@@ -111,7 +159,6 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    // Get admin session
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.id || !(session.user.role === 'admin' || session.user.role === 'super_admin')) {
@@ -131,16 +178,45 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Update notification
-    const notification = await ecommerceService.updateNotification(notificationId, {
-      isRead,
-      title,
-      message
-    }, session.user.id);
+    const updateFields = [];
+    const params = [];
+    let paramIndex = 1;
+
+    if (isRead !== undefined) {
+      updateFields.push(`is_read = $${paramIndex++}`);
+      params.push(isRead);
+    }
+
+    if (title) {
+      updateFields.push(`title = $${paramIndex++}`);
+      params.push(title);
+    }
+
+    if (message) {
+      updateFields.push(`message = $${paramIndex++}`);
+      params.push(message);
+    }
+
+    if (updateFields.length === 0) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      );
+    }
+
+    updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+    params.push(notificationId);
+
+    const result = await query(`
+      UPDATE user_notifications 
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING *
+    `, params);
 
     return NextResponse.json({
       success: true,
-      notification
+      notification: result.rows[0]
     });
 
   } catch (error) {
@@ -154,7 +230,6 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    // Get admin session
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.id || !(session.user.role === 'admin' || session.user.role === 'super_admin')) {
@@ -174,12 +249,16 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Delete notification
-    const success = await ecommerceService.deleteNotification(parseInt(notificationId), session.user.id);
+    const result = await query(
+      'DELETE FROM user_notifications WHERE id = $1',
+      [parseInt(notificationId)]
+    );
+
+    const success = (result.rowCount || 0) > 0;
 
     return NextResponse.json({
       success,
-      message: success ? 'Notification deleted successfully' : 'Failed to delete notification'
+      message: success ? 'Notification deleted successfully' : 'Notification not found'
     });
 
   } catch (error) {

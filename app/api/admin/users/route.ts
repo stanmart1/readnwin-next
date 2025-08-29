@@ -45,18 +45,12 @@ export async function GET(request: NextRequest) {
     if (status) filters.status = status;
     if (role) filters.role = role;
 
-    // Check if current user is super_admin
-    const isSuperAdmin = session.user.role === 'super_admin';
-    
-    // Hide admin and super_admin users from non-super_admin users
-    const hideAdminUsers = !isSuperAdmin;
-    
     console.log('🔍 Users API - Calling rbacService.getUsers');
     
     // Get users with error handling
     let result;
     try {
-      result = await rbacService.getUsers(page, limit, filters, hideAdminUsers);
+      result = await rbacService.getUsers(page, limit, filters, session.user.role);
       console.log('✅ Users API - rbacService.getUsers success:', result.users.length, 'users');
     } catch (rbacError) {
       console.error('❌ Users API - rbacService.getUsers error:', rbacError);

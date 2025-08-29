@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { usePermissions } from '@/app/hooks/usePermissions';
 import { useAdminNotifications } from '@/hooks/useAdminNotifications';
-import { getVisibleTabs, canAccessTab } from '@/utils/permission-mapping';
+import { ADMIN_TAB_PERMISSIONS } from '@/utils/permission-mapping';
+import { rbacService } from '@/utils/rbac-service';
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -23,32 +24,53 @@ export default function AdminSidebar({ activeTab, onTabChange, isOpen, onToggle,
   const { notifications, stats, loading: notificationsLoading, markAsRead, markAllAsRead } = useAdminNotifications();
   const adminUser = session?.user;
 
-  // Get visible tabs based on user permissions
-  // Super admin and admin users see all tabs
-  const isAdminUser = session?.user?.role === 'admin' || session?.user?.role === 'super_admin';
-  const visibleTabs = isAdminUser ? 
-    // Show all tabs for admin users
-    [
-      { id: "overview", label: "Overview", icon: "ri-dashboard-line", requiredPermissions: [], description: "View system overview and analytics" },
-      { id: "users", label: "Users", icon: "ri-user-line", requiredPermissions: [], description: "Manage user accounts and profiles" },
-      { id: "roles", label: "Roles", icon: "ri-shield-user-line", requiredPermissions: [], description: "Manage user roles and permissions" },
-      { id: "audit", label: "Audit Log", icon: "ri-file-list-line", requiredPermissions: [], description: "View system audit logs" },
-      { id: "books", label: "Book Management", icon: "ri-book-line", requiredPermissions: [], description: "Manage books, assignments, and analytics" },
-      { id: "reviews", label: "Reviews", icon: "ri-star-line", requiredPermissions: [], description: "Moderate user reviews and ratings" },
-      { id: "notifications", label: "Notifications", icon: "ri-notification-line", requiredPermissions: [], description: "Manage system notifications" },
-      { id: "orders", label: "Orders", icon: "ri-shopping-cart-line", requiredPermissions: [], description: "View and manage customer orders" },
-      { id: "shipping", label: "Shipping", icon: "ri-truck-line", requiredPermissions: [], description: "Manage shipping and delivery" },
-      { id: "reading", label: "Reading Analytics", icon: "ri-line-chart-line", requiredPermissions: [], description: "View reading analytics and insights" },
-      { id: "reports", label: "Reports", icon: "ri-file-text-line", requiredPermissions: [], description: "Generate and view system reports" },
-      { id: "email-templates", label: "Email Templates", icon: "ri-mail-line", requiredPermissions: [], description: "Manage email templates" },
-      { id: "blog", label: "Blog Management", icon: "ri-file-text-line", requiredPermissions: [], description: "Manage blog posts and articles" },
-      { id: "works", label: "Works Management", icon: "ri-image-line", requiredPermissions: [], description: "Manage works and portfolios" },
-      { id: "about", label: "About Management", icon: "ri-information-line", requiredPermissions: [], description: "Manage about page content" },
-      { id: "contact", label: "Contact Management", icon: "ri-customer-service-line", requiredPermissions: [], description: "Manage contact information" },
-      { id: "faq-management", label: "FAQ Management", icon: "ri-question-line", requiredPermissions: [], description: "Manage frequently asked questions" },
-      { id: "settings", label: "Settings", icon: "ri-settings-line", requiredPermissions: [], description: "Manage system settings and configuration" }
-    ] : 
-    getVisibleTabs(permissions);
+  // Filter tabs based on user permissions using RBAC service
+  const [visibleTabs, setVisibleTabs] = useState(ADMIN_TAB_PERMISSIONS);
+  
+  useEffect(() => {
+    const filterTabs = async () => {
+      if (!session?.user?.id || permissionsLoading) return;
+      
+      // Super admin and admin users see all tabs
+      const isAdminUser = session.user.role === 'admin' || session.user.role === 'super_admin';
+      if (isAdminUser) {
+        setVisibleTabs(ADMIN_TAB_PERMISSIONS);
+        return;
+      }
+      
+      // For other users, check permissions for each tab
+      const userId = parseInt(session.user.id);
+      const filteredTabs = [];
+      
+      for (const tab of ADMIN_TAB_PERMISSIONS) {
+        if (tab.requiredPermissions.length === 0) {
+          // No permissions required, show tab
+          filteredTabs.push(tab);
+        } else {
+          // Check if user has at least one required permission
+          let hasPermission = false;
+          for (const permission of tab.requiredPermissions) {
+            try {
+              const canAccess = await rbacService.hasPermission(userId, permission);
+              if (canAccess) {
+                hasPermission = true;
+                break;
+              }
+            } catch (error) {
+              console.error(`Error checking permission ${permission}:`, error);
+            }
+          }
+          if (hasPermission) {
+            filteredTabs.push(tab);
+          }
+        }
+      }
+      
+      setVisibleTabs(filteredTabs);
+    };
+    
+    filterTabs();
+  }, [session?.user?.id, session?.user?.role, permissionsLoading, permissions]);
 
   const handleLogout = async () => {
     await signOut({ redirect: false });

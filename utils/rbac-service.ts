@@ -83,7 +83,7 @@ class RBACService {
     return result.rows[0] || null;
   }
 
-  async getUsers(page: number = 1, limit: number = 10, filters: any = {}, hideAdminUsers: boolean = false): Promise<{ users: User[], total: number }> {
+  async getUsers(page: number = 1, limit: number = 10, filters: any = {}, currentUserRole?: string): Promise<{ users: User[], total: number }> {
     try {
       console.log('🔍 RBAC getUsers - Starting with params:', { page, limit, filters, hideAdminUsers });
       
@@ -109,14 +109,14 @@ class RBACService {
         paramIndex++;
       }
 
-      // Hide admin and super_admin users from non-super_admin users
-      if (hideAdminUsers) {
+      // Hide super_admin users from non-super_admin users
+      if (currentUserRole && currentUserRole !== 'super_admin') {
         whereClause += ` AND id NOT IN (
           SELECT DISTINCT u.id 
           FROM users u 
           LEFT JOIN user_roles ur ON u.id = ur.user_id AND ur.is_active = TRUE
           LEFT JOIN roles r ON ur.role_id = r.id 
-          WHERE r.name IN ('admin', 'super_admin')
+          WHERE r.name = 'super_admin'
         )`;
       }
 

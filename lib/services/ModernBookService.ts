@@ -633,7 +633,14 @@ export class ModernBookService {
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
       `, [...params, limit, offset]);
 
-      const books = booksResult.rows;
+      const books = booksResult.rows.map(book => {
+        // Convert cover_image_url to use consistent API route
+        if (book.cover_image_url) {
+          const filename = book.cover_image_url.split('/').pop();
+          book.cover_image_url = `/api/images/covers/${filename}`;
+        }
+        return book;
+      });
 
       // Get formats for all books
       if (books.length > 0) {

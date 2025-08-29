@@ -87,15 +87,7 @@ export default function BookCard({
   const { addToCart: addToGuestCart } = useGuestCart();
 
   const getImageSrc = () => {
-    if (!displayCover) {
-      return '/api/images/covers/placeholder';
-    }
-    
-    // Extract filename from any path format
-    const filename = displayCover.split('/').pop() || displayCover;
-    
-    // Always use the consistent cover API route
-    return `/api/images/covers/${filename}`;
+    return displayCover || '/api/images/covers/placeholder';
   };
 
   const handleWishlist = () => {

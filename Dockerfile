@@ -95,10 +95,6 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Create startup script
-RUN echo '#!/bin/bash\nnode scripts/setup-production-storage.js\nnode scripts/migrate-covers-to-storage.js\nnode server.js' > /app/start.sh
-RUN chmod +x /app/start.sh
-
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["/app/start.sh"] 
+CMD ["bash", "-c", "node scripts/setup-production-storage.js && node scripts/migrate-covers-to-storage.js && node server.js"] 

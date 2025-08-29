@@ -23,7 +23,19 @@ function getFileUploadService() {
   return fileUploadService;
 }
 
-export const POST = withPermission('books.create', async (request: NextRequest, context: any, session: any) => {
+export async function POST(request: NextRequest) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin
+    const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
   const startTime = Date.now();
   
   try {
@@ -313,9 +325,19 @@ export const POST = withPermission('books.create', async (request: NextRequest, 
 
   } catch (error) {
     console.error('❌ UNEXPECTED ERROR in book creation:', error);
-    return handleApiError(error);
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
   }
-});
+  } catch (error) {
+    console.error('POST route error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
 
 export const GET = async (request: NextRequest) => {
   try {
@@ -494,12 +516,18 @@ export const GET = async (request: NextRequest) => {
   }
 };
 
-export async function DELETE(request: NextRequest, context?: any) {
-  return await withPermission('books.delete', async (request: NextRequest, context: any, session: any) => {
+export async function DELETE(request: NextRequest) {
   try {
-    // Session is already provided by withPermission middleware
+    // Check authentication
+    const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin
+    const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -578,5 +606,4 @@ export async function DELETE(request: NextRequest, context?: any) {
       { status: 500 }
     );
   }
-  })(request, context);
 }

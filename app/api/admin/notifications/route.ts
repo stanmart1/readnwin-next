@@ -15,6 +15,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Check if notifications table exists
+    try {
+      await query('SELECT 1 FROM user_notifications LIMIT 1');
+    } catch (tableError) {
+      // Return empty notifications if table doesn't exist
+      return NextResponse.json({
+        success: true,
+        notifications: [],
+        total: 0,
+        pages: 0
+      });
+    }
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100); // Cap at 100

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { usePermissions } from "@/app/hooks/usePermissions";
 import ModernAboutManagement from "./ModernAboutManagement";
 import AboutUsSectionsManagement from "./AboutUsSectionsManagement";
 
@@ -33,13 +34,16 @@ export default function EnhancedAboutManagement() {
   const [activeTab, setActiveTab] = useState<TabType>("modern");
 
   // Check if user has proper permissions for about management
-  const [hasPermission, setHasPermission] = useState(true);
+  const { hasAnyPermission, loading } = usePermissions();
+  const hasPermission = hasAnyPermission(['content.aboutus', 'content.update']);
 
-  useEffect(() => {
-    // In a real app, you'd check user permissions here
-    // For now, we'll assume the user has permission
-    setHasPermission(true);
-  }, []);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   if (!hasPermission) {
     return (

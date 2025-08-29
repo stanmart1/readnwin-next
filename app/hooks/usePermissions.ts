@@ -26,12 +26,7 @@ export function usePermissions(skipForAdmin: boolean = false): UsePermissionsRet
       return;
     }
 
-    // Skip API call for admin users - they have all permissions
-    if (skipForAdmin && (session.user.role === 'admin' || session.user.role === 'super_admin')) {
-      setPermissions(['*']); // Wildcard permission for admins
-      setLoading(false);
-      return;
-    }
+    // Note: Removed admin bypass - all users now get permissions from database
 
     try {
       setLoading(true);
@@ -78,6 +73,13 @@ export function usePermissions(skipForAdmin: boolean = false): UsePermissionsRet
 
   useEffect(() => {
     fetchPermissions();
+    
+    // Set up periodic refresh every 5 minutes to catch permission changes
+    const interval = setInterval(() => {
+      fetchPermissions();
+    }, 5 * 60 * 1000); // 5 minutes
+    
+    return () => clearInterval(interval);
   }, [fetchPermissions]);
 
   return {

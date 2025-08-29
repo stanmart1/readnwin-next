@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
     const content = await request.json();
 
     // Validate required fields
-    if (!content.hero || !content.mission || !content.missionGrid || !content.stats || !content.values || !content.story || !content.team || !content.cta || !content.aboutSection) {
+    if (!content.hero || !content.mission) {
       return NextResponse.json({ error: 'Missing required content sections' }, { status: 400 });
     }
 

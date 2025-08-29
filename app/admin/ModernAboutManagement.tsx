@@ -4,14 +4,18 @@ import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Rich text editor component
-const QuillEditor = React.lazy(() => import("react-quill"));
-import "react-quill/dist/quill.snow.css";
+// Simple rich text editor replacement
 
 interface AboutContent {
   hero: {
     title: string;
     subtitle: string;
+  };
+  aboutSection: {
+    image: string;
+    imageAlt: string;
+    overlayTitle: string;
+    overlayDescription: string;
   };
   mission: {
     title: string;
@@ -63,6 +67,12 @@ const defaultContent: AboutContent = {
     title: "About ReadnWin",
     subtitle:
       "Revolutionizing the way people read, learn, and grow through technology",
+  },
+  aboutSection: {
+    image: "/images/about.png",
+    imageAlt: "ReadnWin about section - Empowering minds through reading",
+    overlayTitle: "About ReadnWin",
+    overlayDescription: "Empowering minds through reading and technology"
   },
   mission: {
     title: "Our Mission",
@@ -232,19 +242,7 @@ const colorOptions = [
   "text-indigo-600",
 ];
 
-const quillModules = {
-  toolbar: [
-    [{ header: [1, 2, 3, 4, 5, 6, false] }],
-    ["bold", "italic", "underline", "strike"],
-    [{ list: "ordered" }, { list: "bullet" }],
-    [{ script: "sub" }, { script: "super" }],
-    [{ indent: "-1" }, { indent: "+1" }],
-    ["link", "image"],
-    [{ color: [] }, { background: [] }],
-    [{ align: [] }],
-    ["clean"],
-  ],
-};
+
 
 export default function ModernAboutManagement() {
   const [content, setContent] = useState<AboutContent>(defaultContent);
@@ -357,13 +355,19 @@ export default function ModernAboutManagement() {
     }
   };
 
-  const updateContent = (section: keyof AboutContent, data: any) => {
-    setContent((prev) => ({
-      ...prev,
-      [section]: data,
-    }));
+  const updateContent = useCallback((section: keyof AboutContent, data: any) => {
+    setContent((prev) => {
+      // Prevent unnecessary updates if data is the same
+      if (JSON.stringify(prev[section]) === JSON.stringify(data)) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [section]: data,
+      };
+    });
     setUnsavedChanges(true);
-  };
+  }, []);
 
   const handleImageUpload = async (file: File): Promise<string> => {
     const formData = new FormData();
@@ -385,6 +389,7 @@ export default function ModernAboutManagement() {
 
   const sections = [
     { id: "hero", label: "Hero Section", icon: "ri-home-line" },
+    { id: "aboutSection", label: "About Section", icon: "ri-image-line" },
     { id: "mission", label: "Mission", icon: "ri-target-line" },
     { id: "missionGrid", label: "Mission Grid", icon: "ri-grid-line" },
     { id: "stats", label: "Statistics", icon: "ri-bar-chart-line" },
@@ -550,6 +555,92 @@ export default function ModernAboutManagement() {
                   </div>
                 )}
 
+                {/* About Section */}
+                {activeSection === "aboutSection" && (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 mb-6">
+                      <i className="ri-image-line text-2xl text-blue-600"></i>
+                      <h2 className="text-2xl font-bold text-gray-900">
+                        About Section
+                      </h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Image URL
+                        </label>
+                        <input
+                          type="text"
+                          value={content.aboutSection.image}
+                          onChange={(e) =>
+                            updateContent("aboutSection", {
+                              ...content.aboutSection,
+                              image: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter image URL"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Image Alt Text
+                        </label>
+                        <input
+                          type="text"
+                          value={content.aboutSection.imageAlt}
+                          onChange={(e) =>
+                            updateContent("aboutSection", {
+                              ...content.aboutSection,
+                              imageAlt: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter alt text for accessibility"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Overlay Title
+                        </label>
+                        <input
+                          type="text"
+                          value={content.aboutSection.overlayTitle}
+                          onChange={(e) =>
+                            updateContent("aboutSection", {
+                              ...content.aboutSection,
+                              overlayTitle: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter overlay title"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Overlay Description
+                        </label>
+                        <textarea
+                          value={content.aboutSection.overlayDescription}
+                          onChange={(e) =>
+                            updateContent("aboutSection", {
+                              ...content.aboutSection,
+                              overlayDescription: e.target.value,
+                            })
+                          }
+                          rows={3}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter overlay description"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Mission Section */}
                 {activeSection === "mission" && (
                   <div className="space-y-6">
@@ -582,19 +673,18 @@ export default function ModernAboutManagement() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Mission Description
                         </label>
-                        <React.Suspense fallback={<div>Loading editor...</div>}>
-                          <QuillEditor
-                            value={content.mission.description}
-                            onChange={(value) =>
-                              updateContent("mission", {
-                                ...content.mission,
-                                description: value,
-                              })
-                            }
-                            modules={quillModules}
-                            className="bg-white"
-                          />
-                        </React.Suspense>
+                        <textarea
+                          value={content.mission.description}
+                          onChange={(e) =>
+                            updateContent("mission", {
+                              ...content.mission,
+                              description: e.target.value,
+                            })
+                          }
+                          rows={6}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter mission description"
+                        />
                       </div>
 
                       <div>
@@ -955,23 +1045,20 @@ export default function ModernAboutManagement() {
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                               Description
                             </label>
-                            <React.Suspense
-                              fallback={<div>Loading editor...</div>}
-                            >
-                              <QuillEditor
-                                value={value.description}
-                                onChange={(desc) => {
-                                  const newValues = [...content.values];
-                                  newValues[index] = {
-                                    ...value,
-                                    description: desc,
-                                  };
-                                  updateContent("values", newValues);
-                                }}
-                                modules={quillModules}
-                                className="bg-white"
-                              />
-                            </React.Suspense>
+                            <textarea
+                              value={value.description}
+                              onChange={(e) => {
+                                const newValues = [...content.values];
+                                newValues[index] = {
+                                  ...value,
+                                  description: e.target.value,
+                                };
+                                updateContent("values", newValues);
+                              }}
+                              rows={4}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              placeholder="Enter value description"
+                            />
                           </div>
                         </div>
                       ))}
@@ -1029,19 +1116,18 @@ export default function ModernAboutManagement() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Story Description
                         </label>
-                        <React.Suspense fallback={<div>Loading editor...</div>}>
-                          <QuillEditor
-                            value={content.story.description}
-                            onChange={(value) =>
-                              updateContent("story", {
-                                ...content.story,
-                                description: value,
-                              })
-                            }
-                            modules={quillModules}
-                            className="bg-white"
-                          />
-                        </React.Suspense>
+                        <textarea
+                          value={content.story.description}
+                          onChange={(e) =>
+                            updateContent("story", {
+                              ...content.story,
+                              description: e.target.value,
+                            })
+                          }
+                          rows={6}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter story description"
+                        />
                       </div>
 
                       <div>
@@ -1341,19 +1427,18 @@ export default function ModernAboutManagement() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           CTA Description
                         </label>
-                        <React.Suspense fallback={<div>Loading editor...</div>}>
-                          <QuillEditor
-                            value={content.cta.description}
-                            onChange={(value) =>
-                              updateContent("cta", {
-                                ...content.cta,
-                                description: value,
-                              })
-                            }
-                            modules={quillModules}
-                            className="bg-white"
-                          />
-                        </React.Suspense>
+                        <textarea
+                          value={content.cta.description}
+                          onChange={(e) =>
+                            updateContent("cta", {
+                              ...content.cta,
+                              description: e.target.value,
+                            })
+                          }
+                          rows={4}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter CTA description"
+                        />
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">

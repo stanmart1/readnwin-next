@@ -93,8 +93,8 @@ USER pptruser
 EXPOSE 3000
 
 ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+ENV HOSTNAME=0.0.0.0
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["bash", "-c", "node scripts/setup-production-storage.js && node scripts/migrate-covers-to-storage.js && node server.js"] 
+CMD ["sh", "-c", "node scripts/setup-production-storage.js && node scripts/migrate-covers-to-storage.js && exec node server.js"] 

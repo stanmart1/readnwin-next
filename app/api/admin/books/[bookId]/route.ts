@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withPermission } from '@/utils/api-protection';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 import { sanitizeInt, sanitizeHtml } from '@/utils/security';
 
-export const PUT = withPermission('books.update', async (request: NextRequest, context: any, session: any) => {
+export async function PUT(request: NextRequest, context: any) {
   try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin
+    const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const { params } = context;
     const bookId = sanitizeInt(params.bookId);
     
@@ -156,4 +169,4 @@ export const PUT = withPermission('books.update', async (request: NextRequest, c
       { status: 500 }
     );
   }
-});
+}

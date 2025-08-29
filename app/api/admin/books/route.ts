@@ -517,23 +517,34 @@ export const GET = async (request: NextRequest) => {
 };
 
 export async function DELETE(request: NextRequest) {
+  console.log('🗑️ DELETE /api/admin/books - Starting request...');
+  
   try {
     // Check authentication
+    console.log('🔐 Checking authentication...');
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
+      console.log('❌ No session found');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    console.log(`✅ User authenticated: ${session.user.id} (${session.user.role})`);
 
     // Check if user is admin
     const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
     if (!isAdmin) {
+      console.log(`❌ User ${session.user.id} is not admin (role: ${session.user.role})`);
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    console.log('✅ Admin permissions verified');
 
+    // Parse request URL
+    console.log('📋 Parsing request parameters...');
     const { searchParams } = new URL(request.url);
     const bookIds = searchParams.get('ids');
+    console.log(`📋 Raw book IDs parameter: ${bookIds}`);
 
     if (!bookIds) {
+      console.log('❌ No book IDs provided');
       return NextResponse.json(
         { error: 'Book IDs are required' },
         { status: 400 }
@@ -541,8 +552,10 @@ export async function DELETE(request: NextRequest) {
     }
 
     const bookIdArray = bookIds.split(',').map(id => sanitizeInt(id.trim())).filter(id => id > 0);
+    console.log(`📋 Parsed book IDs: [${bookIdArray.join(', ')}]`);
 
     if (bookIdArray.length === 0) {
+      console.log('❌ No valid book IDs after parsing');
       return NextResponse.json(
         { error: 'No valid book IDs provided' },
         { status: 400 }
@@ -553,7 +566,10 @@ export async function DELETE(request: NextRequest) {
     const failedIds: number[] = [];
     const errors: string[] = [];
 
+    console.log(`🗑️ Starting deletion process for ${bookIdArray.length} books...`);
+
     for (const bookId of bookIdArray) {
+      console.log(`🗑️ Processing book ID: ${bookId}`);
       try {
         // Delete book files first (with error handling)
         try {
@@ -570,6 +586,7 @@ export async function DELETE(request: NextRequest) {
         }
 
         // Delete book record
+        console.log(`🗑️ Deleting book record ${bookId} from database...`);
         const result = await query(`
           DELETE FROM books 
           WHERE id = $1
@@ -578,8 +595,9 @@ export async function DELETE(request: NextRequest) {
 
         if (result.rows.length > 0) {
           deletedCount++;
-          console.log(`✅ Deleted book ${sanitizeForLog(bookId)}`);
+          console.log(`✅ Successfully deleted book ${sanitizeForLog(bookId)}`);
         } else {
+          console.log(`❌ Book ${bookId} not found in database`);
           failedIds.push(bookId);
           errors.push(`Book ${sanitizeHtml(String(bookId))} not found`);
         }
@@ -589,6 +607,8 @@ export async function DELETE(request: NextRequest) {
         errors.push(`Failed to delete book ${sanitizeHtml(String(bookId))}: ${sanitizeHtml(error instanceof Error ? error.message : 'Unknown error')}`);
       }
     }
+
+    console.log(`🎉 Deletion process completed. Deleted: ${deletedCount}, Failed: ${failedIds.length}`);
 
     return NextResponse.json({
       success: true,
@@ -600,9 +620,13 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error in bulk delete books:', sanitizeForLog(error));
+    console.error('❌ CRITICAL ERROR in DELETE /api/admin/books:', error);
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { error: 'Failed to delete books' },
+      { 
+        error: 'Failed to delete books',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

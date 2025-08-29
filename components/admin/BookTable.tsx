@@ -62,8 +62,8 @@ export default function BookTable({
 
       {/* Desktop Table Header */}
       <div className="hidden sm:block bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 px-4 md:px-6 py-3 border-b border-gray-200">
-          <div className="grid grid-cols-12 lg:grid-cols-14 gap-3 md:gap-4 items-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+        <div className="bg-gray-50 px-3 md:px-6 py-3 border-b border-gray-200">
+          <div className="grid grid-cols-10 md:grid-cols-12 lg:grid-cols-14 gap-2 md:gap-4 items-center text-xs font-medium text-gray-500 uppercase tracking-wider">
             <div className="col-span-1">
               <input
                 type="checkbox"
@@ -73,21 +73,21 @@ export default function BookTable({
               />
             </div>
             <div className="col-span-1">Cover</div>
-            <div className="col-span-3 lg:col-span-2">Title</div>
+            <div className="col-span-2 lg:col-span-2">Title</div>
             <div className="col-span-2">Author</div>
-            <div className="col-span-2 hidden md:block">Category</div>
+            <div className="col-span-1 hidden md:block">Category</div>
             <div className="col-span-1">Price</div>
             <div className="col-span-1">Status</div>
             <div className="col-span-1 hidden lg:block">Stock</div>
-            <div className="col-span-2 lg:col-span-3">Actions</div>
+            <div className="col-span-2 md:col-span-3 lg:col-span-3">Actions</div>
           </div>
         </div>
 
         {/* Desktop Table Body */}
         <div className="divide-y divide-gray-200">
           {books.map((book) => (
-            <div key={book.id} className="px-4 md:px-6 py-4 hover:bg-gray-50 transition-colors">
-              <div className="grid grid-cols-12 lg:grid-cols-14 gap-3 md:gap-4 items-center">
+            <div key={book.id} className="px-3 md:px-6 py-4 hover:bg-gray-50 transition-colors">
+              <div className="grid grid-cols-10 md:grid-cols-12 lg:grid-cols-14 gap-2 md:gap-4 items-center">
                 {/* Checkbox */}
                 <div className="col-span-1 flex justify-center">
                   <input
@@ -118,7 +118,7 @@ export default function BookTable({
                 </div>
 
                 {/* Title */}
-                <div className="col-span-3 lg:col-span-2 min-w-0">
+                <div className="col-span-2 lg:col-span-2 min-w-0">
                   <h3 className="text-sm font-medium text-gray-900 leading-tight truncate" title={book.title}>
                     {book.title}
                   </h3>
@@ -133,7 +133,7 @@ export default function BookTable({
                 </div>
 
                 {/* Category - Hidden on small screens */}
-                <div className="col-span-2 hidden md:block min-w-0">
+                <div className="col-span-1 hidden md:block min-w-0">
                   <p className="text-sm text-gray-900 leading-tight truncate" title={book.category_name}>
                     {book.category_name}
                   </p>
@@ -163,48 +163,46 @@ export default function BookTable({
                 </div>
 
                 {/* Actions */}
-                <div className="col-span-2 lg:col-span-3">
-                  <div className="flex items-center gap-1 justify-end">
+                <div className="col-span-2 md:col-span-3 lg:col-span-3">
+                  <div className="flex items-center gap-0.5 md:gap-1 justify-end">
                     <button
                       onClick={() => onBookAction('toggleFeature', book)}
-                      className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
+                      className={`p-1.5 md:p-2 rounded-lg transition-colors flex-shrink-0 ${
                         book.is_featured 
                           ? 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100' 
                           : 'text-gray-400 hover:text-yellow-600 hover:bg-yellow-50'
                       }`}
                       title={book.is_featured ? 'Remove from Featured' : 'Add to Featured'}
                     >
-                      <i className="ri-star-line text-sm"></i>
+                      <i className="ri-star-line text-xs md:text-sm"></i>
                     </button>
-                    {book.format === 'ebook' && (
-                      <button
-                        onClick={() => onBookAction('assign', book)}
-                        className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex-shrink-0"
-                        title="Assign to User"
-                      >
-                        <i className="ri-user-add-line text-sm"></i>
-                      </button>
-                    )}
+                    <button
+                      onClick={() => onBookAction('assign', book)}
+                      className="p-1.5 md:p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex-shrink-0"
+                      title="Assign to Users"
+                    >
+                      <i className="ri-user-add-line text-xs md:text-sm"></i>
+                    </button>
                     <button
                       onClick={() => onBookAction('edit', book)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0"
+                      className="p-1.5 md:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0"
                       title="Edit Book"
                     >
-                      <i className="ri-edit-line text-sm"></i>
+                      <i className="ri-edit-line text-xs md:text-sm"></i>
                     </button>
                     <button
                       onClick={() => onBookAction('view', book)}
-                      className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors flex-shrink-0"
+                      className="p-1.5 md:p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors flex-shrink-0 hidden lg:block"
                       title="View Details"
                     >
-                      <i className="ri-eye-line text-sm"></i>
+                      <i className="ri-eye-line text-xs md:text-sm"></i>
                     </button>
                     <button
                       onClick={() => onBookAction('delete', book)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                      className="p-1.5 md:p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
                       title="Delete Book"
                     >
-                      <i className="ri-delete-bin-line text-sm"></i>
+                      <i className="ri-delete-bin-line text-xs md:text-sm"></i>
                     </button>
                   </div>
                 </div>
@@ -317,15 +315,13 @@ export default function BookTable({
                   </div>
                   
                   <div className="flex items-center gap-1">
-                    {book.format === 'ebook' && (
-                      <button
-                        onClick={() => onBookAction('assign', book)}
-                        className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex-shrink-0"
-                        title="Assign to User"
-                      >
-                        <i className="ri-user-add-line text-sm"></i>
-                      </button>
-                    )}
+                    <button
+                      onClick={() => onBookAction('assign', book)}
+                      className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex-shrink-0"
+                      title="Assign to Users"
+                    >
+                      <i className="ri-user-add-line text-sm"></i>
+                    </button>
                     <button
                       onClick={() => onBookAction('view', book)}
                       className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors flex-shrink-0"

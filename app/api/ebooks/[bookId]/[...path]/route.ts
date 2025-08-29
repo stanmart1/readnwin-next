@@ -7,7 +7,7 @@ import { query } from '@/utils/database';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { bookId: string; filename: string } }
+  { params }: { params: { bookId: string; path: string[] } }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -15,7 +15,7 @@ export async function GET(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const { bookId, filename } = params;
+    const { bookId, path } = params;
     
     // Check if user has access to this book
     const accessResult = await query(`
@@ -41,11 +41,11 @@ export async function GET(
       return new NextResponse('Access denied', { status: 403 });
     }
 
-    // Handle path traversal for naked EPUB files
-    const requestPath = decodeURIComponent(filename);
+    // Construct file path from array
+    const requestPath = path.join('/');
     const sanitizedPath = requestPath.replace(/\.\./g, '').replace(/^\/+/, '');
     
-    // Determine file path for naked EPUB structure
+    // Determine base path for naked EPUB structure
     const basePath = process.env.NODE_ENV === 'production'
       ? join('/app/storage/books', bookId)
       : join(process.cwd(), 'storage', 'books', bookId);
@@ -81,13 +81,23 @@ export async function GET(
 function getContentType(filename: string): string {
   const ext = filename.toLowerCase().split('.').pop();
   switch (ext) {
-    case 'epub':
-      return 'application/epub+zip';
     case 'html':
     case 'htm':
+    case 'xhtml':
       return 'text/html';
-    case 'pdf':
-      return 'application/pdf';
+    case 'xml':
+      return 'text/xml';
+    case 'css':
+      return 'text/css';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'gif':
+      return 'image/gif';
+    case 'svg':
+      return 'image/svg+xml';
     default:
       return 'application/octet-stream';
   }

@@ -15,14 +15,10 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check permission for managing user libraries
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'users.manage_roles'
-    );
-    
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    // Check if user is admin
+    const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
     const userId = parseInt(params.id);
@@ -66,14 +62,10 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check permission for managing user libraries
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'users.manage_roles'
-    );
-    
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    // Check if user is admin
+    const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
     const userId = parseInt(params.id);
@@ -151,14 +143,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check permission for managing user libraries
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'users.manage_roles'
-    );
-    
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    // Check if user is admin
+    const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
     const userId = parseInt(params.id);

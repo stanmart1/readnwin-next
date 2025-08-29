@@ -471,7 +471,8 @@ export const GET = async (request: NextRequest) => {
       category_name: book.category_name || 'Uncategorized',
       price: book.price || 0,
       book_type: book.book_type || 'ebook',
-      format: book.format || 'unknown',
+      format: book.book_type || 'ebook', // Use book_type for format classification
+      file_format: book.format || 'unknown', // Keep file_format separate
       parsing_status: book.parsing_status || 'pending',
       word_count: book.word_count || 0,
       estimated_reading_time: book.estimated_reading_time || 0,

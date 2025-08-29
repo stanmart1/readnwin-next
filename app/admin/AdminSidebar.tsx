@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { usePermissions } from '@/app/hooks/usePermissions';
 
-import { ADMIN_TAB_PERMISSIONS, canAccessTab } from '@/utils/permission-mapping';
+import { getVisibleTabs } from '@/utils/permission-mapping';
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -20,7 +20,7 @@ export default function AdminSidebar({ activeTab, onTabChange, isOpen, onToggle,
   const [showProfile, setShowProfile] = useState(false);
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'super_admin';
-  const { permissions, loading: permissionsLoading } = usePermissions(isAdmin);
+  const { permissions, loading: permissionsLoading } = usePermissions(false);
 
   const adminUser = session?.user;
 
@@ -28,21 +28,18 @@ export default function AdminSidebar({ activeTab, onTabChange, isOpen, onToggle,
   const visibleTabs = (() => {
     if (!session?.user?.id) return [];
     
-    // Admin users can see all tabs
-    if (isAdmin) {
-      return ADMIN_TAB_PERMISSIONS;
-    }
-    
-    // For non-admin users, wait for permissions to load
+    // Wait for permissions to load for all users
     if (permissionsLoading) return [];
     
-    // Filter tabs based on actual permissions from database
-    return ADMIN_TAB_PERMISSIONS.filter(tab => {
-      if (tab.requiredPermissions.length === 0) {
-        return true; // No permissions required
-      }
-      return canAccessTab(tab.id, permissions);
-    });
+    // Debug logging
+    console.log('🔍 AdminSidebar - User permissions:', permissions);
+    console.log('🔍 AdminSidebar - User role:', session?.user?.role);
+    
+    // Use getVisibleTabs function for permission-based filtering
+    const tabs = getVisibleTabs(permissions);
+    console.log('🔍 AdminSidebar - Visible tabs:', tabs.map(t => t.id));
+    
+    return tabs;
   })();
 
   const handleLogout = async () => {

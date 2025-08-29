@@ -12,6 +12,7 @@ import LibraryManagement from './LibraryManagement';
 import BookAnalytics from './BookAnalytics';
 import CategoriesManagement from './CategoriesManagement';
 import AuthorsManagement from './AuthorsManagement';
+import BulkLibraryManagement from './BulkLibraryManagement';
 import BookFilters from '@/components/admin/BookFilters';
 import BookTable from '@/components/admin/BookTable';
 import { useBookManagement } from '@/hooks/useBookManagement';
@@ -89,6 +90,7 @@ export default function BookManagementEnhanced() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showBatchUpdateModal, setShowBatchUpdateModal] = useState(false);
   const [selectedBookForAction, setSelectedBookForAction] = useState<Book | null>(null);
+  const [showBookAssignModal, setShowBookAssignModal] = useState(false);
   const [batchUpdateData, setBatchUpdateData] = useState({
     status: '',
     category_id: '',
@@ -248,8 +250,7 @@ export default function BookManagementEnhanced() {
         break;
       case 'assign':
         setSelectedBookForAction(book);
-        setShowAssignModal(true);
-        loadUsers();
+        setShowBookAssignModal(true);
         break;
     }
   };
@@ -797,6 +798,17 @@ export default function BookManagementEnhanced() {
             </div>
           </div>
         </Modal>
+
+        {/* Book Assignment Modal */}
+        {showBookAssignModal && selectedBookForAction && (
+          <BulkLibraryManagement
+            preSelectedBook={selectedBookForAction}
+            onClose={() => {
+              setShowBookAssignModal(false);
+              setSelectedBookForAction(null);
+            }}
+          />
+        )}
 
         {/* Batch Update Modal */}
         <Modal 

@@ -1,3 +1,5 @@
+import { DOMParser } from '@xmldom/xmldom';
+
 interface FileInfo {
   filename: string;
   fileFormat: string;
@@ -7,6 +9,18 @@ interface FileInfo {
     estimatedReadingTime: number;
     pages: number;
   };
+}
+
+interface EpubChapter {
+  id: string;
+  href: string;
+  title: string;
+  content: string;
+}
+
+interface EpubManifest {
+  items: { [key: string]: { href: string; mediaType: string } };
+  spine: string[];
 }
 
 export class EbookContentLoader {
@@ -34,31 +48,54 @@ export class EbookContentLoader {
   }
 
   private static async loadEpubBook(bookId: string, fileInfo: FileInfo) {
-    const contentUrl = `/api/ebooks/${bookId}/${fileInfo.filename}`;
+    const baseUrl = `/api/ebooks/${bookId}`;
     
-    return {
-      id: bookId,
-      title: fileInfo.bookMetadata.title,
-      format: 'epub',
-      contentUrl,
-      metadata: {
-        wordCount: fileInfo.bookMetadata.wordCount,
-        estimatedReadingTime: fileInfo.bookMetadata.estimatedReadingTime,
-        pages: fileInfo.bookMetadata.pages
-      },
-      chapters: [{
-        id: '1',
-        chapter_number: 1,
-        chapter_title: 'Chapter 1',
-        content_html: '<p>Loading EPUB content...</p>',
-        reading_time_minutes: Math.ceil(fileInfo.bookMetadata.estimatedReadingTime / 60)
-      }],
-      loadContent: async () => {
-        const response = await fetch(contentUrl);
-        if (!response.ok) throw new Error(`Failed to load EPUB content: ${response.status} ${response.statusText}`);
-        return await response.arrayBuffer();
-      }
-    };
+    try {
+      // Parse EPUB structure from naked files
+      const { manifest, chapters } = await this.parseNakedEpubStructure(baseUrl);
+      
+      return {
+        id: bookId,
+        title: fileInfo.bookMetadata.title,
+        format: 'epub',
+        contentUrl: baseUrl,
+        metadata: {
+          wordCount: fileInfo.bookMetadata.wordCount,
+          estimatedReadingTime: fileInfo.bookMetadata.estimatedReadingTime,
+          pages: fileInfo.bookMetadata.pages
+        },
+        chapters: chapters.map((chapter, index) => ({
+          id: chapter.id,
+          chapter_number: index + 1,
+          chapter_title: chapter.title || `Chapter ${index + 1}`,
+          content_html: chapter.content,
+          reading_time_minutes: Math.ceil(this.estimateReadingTime(chapter.content))
+        })),
+        loadContent: async () => chapters
+      };
+    } catch (error) {
+      console.error('EPUB parsing failed:', error);
+      // Fallback to single chapter
+      return {
+        id: bookId,
+        title: fileInfo.bookMetadata.title,
+        format: 'epub',
+        contentUrl: baseUrl,
+        metadata: {
+          wordCount: fileInfo.bookMetadata.wordCount,
+          estimatedReadingTime: fileInfo.bookMetadata.estimatedReadingTime,
+          pages: fileInfo.bookMetadata.pages
+        },
+        chapters: [{
+          id: '1',
+          chapter_number: 1,
+          chapter_title: fileInfo.bookMetadata.title,
+          content_html: '<p>EPUB content loading failed. Please contact support.</p>',
+          reading_time_minutes: Math.ceil(fileInfo.bookMetadata.estimatedReadingTime / 60)
+        }],
+        loadContent: async () => []
+      };
+    }
   }
 
   private static async loadHtmlBook(bookId: string, fileInfo: FileInfo) {
@@ -91,6 +128,136 @@ export class EbookContentLoader {
     } catch (error) {
       throw new Error(`Failed to load HTML book: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  private static async parseNakedEpubStructure(baseUrl: string): Promise<{ manifest: EpubManifest; chapters: EpubChapter[] }> {
+    // Parse container.xml to find OPF file
+    const containerResponse = await fetch(`${baseUrl}/META-INF/container.xml`);
+    if (!containerResponse.ok) throw new Error('Missing container.xml');
+    
+    const containerXml = await containerResponse.text();
+    const containerDoc = new DOMParser().parseFromString(containerXml, 'text/xml');
+    const opfPath = containerDoc.getElementsByTagName('rootfile')[0]?.getAttribute('full-path');
+    if (!opfPath) throw new Error('No OPF file found');
+    
+    // Parse OPF file
+    const opfResponse = await fetch(`${baseUrl}/${opfPath}`);
+    if (!opfResponse.ok) throw new Error('OPF file not found');
+    
+    const opfXml = await opfResponse.text();
+    const opfDoc = new DOMParser().parseFromString(opfXml, 'text/xml');
+    
+    // Extract manifest
+    const manifest = this.parseManifest(opfDoc);
+    
+    // Extract chapters
+    const chapters = await this.extractNakedChapters(baseUrl, manifest, opfPath);
+    
+    return { manifest, chapters };
+  }
+  
+  private static parseManifest(opfDoc: Document): EpubManifest {
+    const manifest: EpubManifest = { items: {}, spine: [] };
+    
+    // Parse manifest items
+    const manifestItems = opfDoc.getElementsByTagName('item');
+    for (let i = 0; i < manifestItems.length; i++) {
+      const item = manifestItems[i];
+      const id = item.getAttribute('id');
+      const href = item.getAttribute('href');
+      const mediaType = item.getAttribute('media-type');
+      
+      if (id && href && mediaType) {
+        manifest.items[id] = { href, mediaType };
+      }
+    }
+    
+    // Parse spine
+    const spineItems = opfDoc.getElementsByTagName('itemref');
+    for (let i = 0; i < spineItems.length; i++) {
+      const idref = spineItems[i].getAttribute('idref');
+      if (idref) manifest.spine.push(idref);
+    }
+    
+    return manifest;
+  }
+  
+  private static async extractNakedChapters(baseUrl: string, manifest: EpubManifest, opfPath: string): Promise<EpubChapter[]> {
+    const chapters: EpubChapter[] = [];
+    const basePath = opfPath.substring(0, opfPath.lastIndexOf('/') + 1);
+    
+    for (const idref of manifest.spine) {
+      const item = manifest.items[idref];
+      if (!item || !item.href) continue;
+      
+      const chapterUrl = `${baseUrl}/${basePath}${item.href}`;
+      
+      try {
+        const response = await fetch(chapterUrl);
+        if (!response.ok) continue;
+        
+        const content = await response.text();
+        const cleanContent = this.cleanHtmlContent(content);
+        const title = this.extractChapterTitle(content) || `Chapter ${chapters.length + 1}`;
+        
+        chapters.push({
+          id: idref,
+          href: item.href,
+          title,
+          content: cleanContent
+        });
+      } catch (error) {
+        console.error(`Failed to extract chapter ${idref}:`, error);
+      }
+    }
+    
+    return chapters;
+  }
+  
+  private static cleanHtmlContent(html: string): string {
+    // Remove XML declaration and DOCTYPE
+    let cleaned = html.replace(/<\?xml[^>]*\?>/gi, '');
+    cleaned = cleaned.replace(/<!DOCTYPE[^>]*>/gi, '');
+    
+    // Extract body content if present
+    const bodyMatch = cleaned.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) {
+      cleaned = bodyMatch[1];
+    }
+    
+    // Remove namespace attributes
+    cleaned = cleaned.replace(/\s+xmlns[^=]*="[^"]*"/gi, '');
+    
+    // Clean up whitespace
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    
+    return cleaned;
+  }
+  
+  private static extractChapterTitle(html: string): string | null {
+    // Try to find title in h1, h2, or title tags
+    const titleMatches = [
+      /<h1[^>]*>([^<]+)<\/h1>/i,
+      /<h2[^>]*>([^<]+)<\/h2>/i,
+      /<title[^>]*>([^<]+)<\/title>/i
+    ];
+    
+    for (const regex of titleMatches) {
+      const match = html.match(regex);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+    
+    return null;
+  }
+  
+  private static estimateReadingTime(content: string): number {
+    // Remove HTML tags and count words
+    const text = content.replace(/<[^>]*>/g, ' ');
+    const words = text.split(/\s+/).filter(word => word.length > 0).length;
+    // Average reading speed: 200 words per minute
+    return Math.max(1, Math.ceil(words / 200));
   }
 
   static async getBookStructure(bookId: string) {

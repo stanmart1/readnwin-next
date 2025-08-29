@@ -12,14 +12,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check permission for managing user libraries
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'users.manage_roles'
-    );
-    
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    // Check if user is admin
+    const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
     const { userIds, bookIds, reason } = await request.json();
@@ -34,8 +30,8 @@ export async function POST(request: NextRequest) {
 
     // Verify all books exist and are ebooks
     const bookResult = await query(`
-      SELECT id, title, format FROM books 
-      WHERE id = ANY($1) AND format = 'ebook'
+      SELECT id, title, book_type FROM books 
+      WHERE id = ANY($1) AND book_type = 'ebook'
     `, [bookIds]);
 
     if (bookResult.rows.length !== bookIds.length) {

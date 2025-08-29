@@ -46,7 +46,7 @@ export default function AdminDashboard() {
   const { data: session, status } = useSession();
   // Skip permission loading for admin users to improve performance
   const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'super_admin';
-  const { permissions, loading: permissionsLoading } = usePermissions(isAdmin);
+  const { permissions, loading: permissionsLoading } = usePermissions(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 

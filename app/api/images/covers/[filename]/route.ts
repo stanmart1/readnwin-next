@@ -9,6 +9,20 @@ export async function GET(
   try {
     const { filename } = params;
     
+    // Handle placeholder request
+    if (filename === 'placeholder') {
+      const placeholderPath = join(process.cwd(), 'public', 'placeholder-book.jpg');
+      if (existsSync(placeholderPath)) {
+        const placeholderBuffer = readFileSync(placeholderPath);
+        return new NextResponse(placeholderBuffer, {
+          headers: {
+            'Content-Type': 'image/jpeg',
+            'Cache-Control': 'public, max-age=86400'
+          }
+        });
+      }
+    }
+    
     // Sanitize filename to prevent path traversal
     const sanitizedFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '');
     

@@ -87,25 +87,15 @@ export default function BookCard({
   const { addToCart: addToGuestCart } = useGuestCart();
 
   const getImageSrc = () => {
-    if (!displayCover) return '/placeholder-book.jpg';
-    
-    // If already using API route, return as is
-    if (displayCover.startsWith('/api/')) {
-      return displayCover;
+    if (!displayCover) {
+      return '/api/images/covers/placeholder';
     }
     
-    // Handle legacy paths - convert to API route
-    if (displayCover.includes('/uploads/covers/') || displayCover.includes('covers/')) {
-      const filename = displayCover.split('/').pop();
-      return `/api/images/covers/${filename}`;
-    }
+    // Extract filename from any path format
+    const filename = displayCover.split('/').pop() || displayCover;
     
-    // Handle direct filenames without path
-    if (!displayCover.startsWith('/') && !displayCover.startsWith('http')) {
-      return `/api/images/covers/${displayCover}`;
-    }
-    
-    return displayCover;
+    // Always use the consistent cover API route
+    return `/api/images/covers/${filename}`;
   };
 
   const handleWishlist = () => {
@@ -210,7 +200,7 @@ export default function BookCard({
             alt={title}
             className="w-full h-72 object-cover object-top"
             onError={(e) => {
-              e.currentTarget.src = '/placeholder-book.jpg';
+              e.currentTarget.src = '/api/images/covers/placeholder';
             }}
           />
           

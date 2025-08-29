@@ -103,7 +103,7 @@ const nextConfig = {
       use: 'node-loader',
     })
 
-    // Fix epub2 module resolution issues
+    // Fix epub2 module resolution issues and prevent Node.js modules in client
     config.resolve.fallback = {
       ...config.resolve.fallback,
       'zipfile': false, // Disable zipfile module that epub2 tries to use
@@ -111,6 +111,23 @@ const nextConfig = {
       'colors': false,
       'optimist': false,
       'portfinder': false,
+      // Prevent Node.js core modules from being bundled on client-side
+      'dns': false,
+      'net': false,
+      'tls': false,
+      'fs': false,
+      'path': false,
+      'os': false,
+      'crypto': false,
+      'stream': false,
+      'util': false,
+      'url': false,
+      'querystring': false,
+      'http': false,
+      'https': false,
+      'zlib': false,
+      'pg': false,
+      'pg-native': false,
     }
 
     // Only ignore puppeteer on client-side builds

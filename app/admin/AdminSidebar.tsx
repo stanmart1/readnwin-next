@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { usePermissions } from '@/app/hooks/usePermissions';
 import { useAdminNotifications } from '@/hooks/useAdminNotifications';
-import { ADMIN_TAB_PERMISSIONS } from '@/utils/permission-mapping';
-import { rbacService } from '@/utils/rbac-service';
+import { ADMIN_TAB_PERMISSIONS, canAccessTab } from '@/utils/permission-mapping';
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -24,53 +23,24 @@ export default function AdminSidebar({ activeTab, onTabChange, isOpen, onToggle,
   const { notifications, stats, loading: notificationsLoading, markAsRead, markAllAsRead } = useAdminNotifications();
   const adminUser = session?.user;
 
-  // Filter tabs based on user permissions using RBAC service
-  const [visibleTabs, setVisibleTabs] = useState(ADMIN_TAB_PERMISSIONS);
-  
-  useEffect(() => {
-    const filterTabs = async () => {
-      if (!session?.user?.id || permissionsLoading) return;
-      
-      // Super admin and admin users see all tabs
-      const isAdminUser = session.user.role === 'admin' || session.user.role === 'super_admin';
-      if (isAdminUser) {
-        setVisibleTabs(ADMIN_TAB_PERMISSIONS);
-        return;
-      }
-      
-      // For other users, check permissions for each tab
-      const userId = parseInt(session.user.id);
-      const filteredTabs = [];
-      
-      for (const tab of ADMIN_TAB_PERMISSIONS) {
-        if (tab.requiredPermissions.length === 0) {
-          // No permissions required, show tab
-          filteredTabs.push(tab);
-        } else {
-          // Check if user has at least one required permission
-          let hasPermission = false;
-          for (const permission of tab.requiredPermissions) {
-            try {
-              const canAccess = await rbacService.hasPermission(userId, permission);
-              if (canAccess) {
-                hasPermission = true;
-                break;
-              }
-            } catch (error) {
-              console.error(`Error checking permission ${permission}:`, error);
-            }
-          }
-          if (hasPermission) {
-            filteredTabs.push(tab);
-          }
-        }
-      }
-      
-      setVisibleTabs(filteredTabs);
-    };
+  // Filter tabs based on user permissions
+  const visibleTabs = (() => {
+    if (!session?.user?.id || permissionsLoading) return ADMIN_TAB_PERMISSIONS;
     
-    filterTabs();
-  }, [session?.user?.id, session?.user?.role, permissionsLoading, permissions]);
+    // Super admin and admin users see all tabs
+    const isAdminUser = session.user.role === 'admin' || session.user.role === 'super_admin';
+    if (isAdminUser) {
+      return ADMIN_TAB_PERMISSIONS;
+    }
+    
+    // For other users, filter tabs based on permissions
+    return ADMIN_TAB_PERMISSIONS.filter(tab => {
+      if (tab.requiredPermissions.length === 0) {
+        return true; // No permissions required
+      }
+      return canAccessTab(tab.id, permissions);
+    });
+  })();
 
   const handleLogout = async () => {
     await signOut({ redirect: false });

@@ -27,17 +27,35 @@ export default function SafeImage({
   style,
   ...props
 }: SafeImageProps) {
-  const [imgSrc, setImgSrc] = useState<string>(src || fallbackSrc);
+  const getImageSrc = (originalSrc?: string | null) => {
+    if (!originalSrc) return fallbackSrc;
+    
+    // If already using API route, return as is
+    if (originalSrc.startsWith('/api/images/covers/')) {
+      return originalSrc;
+    }
+    
+    // Handle legacy paths - convert to API route
+    if (originalSrc.includes('/uploads/covers/') || originalSrc.includes('covers/')) {
+      const filename = originalSrc.split('/').pop();
+      return `/api/images/covers/${filename}`;
+    }
+    
+    return originalSrc;
+  };
+
+  const [imgSrc, setImgSrc] = useState<string>(getImageSrc(src));
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    if (src && src !== imgSrc) {
-      setImgSrc(src);
+    const newSrc = getImageSrc(src);
+    if (src && newSrc !== imgSrc) {
+      setImgSrc(newSrc);
       setHasError(false);
       setRetryCount(0);
     }
-  }, [src]);
+  }, [src, imgSrc]);
 
   const handleError = async () => {
     if (hasError || retryCount >= 3) {
@@ -52,17 +70,13 @@ export default function SafeImage({
     setRetryCount(prev => prev + 1);
     
     if (retryCount === 0 && src) {
-      if (src.includes('readnwin.com')) {
+      // Try API route if not already using it
+      if (!src.startsWith('/api/images/covers/')) {
         const filename = src.split('/').pop();
         if (filename) {
-          setImgSrc(`/uploads/covers/${filename}`);
+          setImgSrc(`/api/images/covers/${filename}`);
           return;
         }
-      }
-      
-      if (src.startsWith('/uploads/')) {
-        setImgSrc(`/api${src}`);
-        return;
       }
     }
     

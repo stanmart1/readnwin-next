@@ -53,9 +53,12 @@ export default function OrderSummary({
             {/* Book Cover */}
             <div className="flex-shrink-0">
               <img 
-                src={item.book?.cover_image_url || '/placeholder-book.png'} 
+                src={item.book?.cover_image_url?.startsWith('/api/images/covers/') ? item.book.cover_image_url : `/api/images/covers/${item.book?.cover_image_url?.split('/').pop() || 'placeholder.jpg'}`}
                 alt={item.book?.title || 'Book'}
                 className="w-16 h-20 object-cover rounded-md shadow-sm"
+                onError={(e) => {
+                  e.currentTarget.src = '/placeholder-book.jpg';
+                }}
               />
             </div>
             

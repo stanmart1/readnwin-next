@@ -1,343 +1,159 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { rbacService } from '@/utils/rbac-service';
-import { ecommerceService } from '@/utils/ecommerce-service';
-import ModernBookService from '@/lib/services/ModernBookService';
+import { withPermission } from '@/utils/api-protection';
+import { query } from '@/utils/database';
+import { sanitizeInt, sanitizeHtml } from '@/utils/security';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { bookId: string } }
-) {
+export const PUT = withPermission('books.update', async (request: NextRequest, context: any, session: any) => {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check permission
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'content.read'
-    );
+    const { params } = context;
+    const bookId = sanitizeInt(params.bookId);
     
-    if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    if (!bookId || bookId <= 0) {
+      return NextResponse.json({ error: 'Invalid book ID' }, { status: 400 });
     }
 
-    const id = parseInt(params.bookId);
-    
-    if (isNaN(id)) {
-      return NextResponse.json(
-        { error: 'Invalid book ID' },
-        { status: 400 }
-      );
-    }
-
-    const book = await ecommerceService.getBookById(id);
-    
-    if (!book) {
-      return NextResponse.json(
-        { error: 'Book not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      book
-    });
-
-  } catch (error) {
-    console.error('Error fetching book:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { bookId: string } }
-) {
-  try {
-    console.log(`🔍 Book update request received for ID: ${params.bookId}`);
-    
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      console.log('❌ Unauthorized - no session');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    console.log('🔍 User ID:', session.user.id);
-
-    // Check permission
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'content.update'
-    );
-    
-    if (!hasPermission) {
-      console.log('❌ Insufficient permissions for user:', session.user.id);
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    const id = parseInt(params.bookId);
-    
-    if (isNaN(id)) {
-      console.log('❌ Invalid book ID:', params.bookId);
-      return NextResponse.json(
-        { error: 'Invalid book ID' },
-        { status: 400 }
-      );
-    }
-
-    console.log('🔍 Parsing request body...');
     const body = await request.json();
-    console.log('🔍 Request body:', JSON.stringify(body, null, 2));
+    const { 
+      title, 
+      author_id, 
+      category_id, 
+      price, 
+      status, 
+      stock_quantity, 
+      is_featured,
+      description,
+      isbn,
+      language,
+      pages,
+      publisher
+    } = body;
+
+    // Build dynamic update query
+    const updates: string[] = [];
+    const values: (string | number | boolean)[] = [];
+    let paramIndex = 1;
+
+    if (title !== undefined) {
+      updates.push(`title = $${paramIndex}`);
+      values.push(sanitizeHtml(title));
+      paramIndex++;
+    }
+
+    if (author_id !== undefined) {
+      const authorIdNum = sanitizeInt(author_id);
+      if (authorIdNum > 0) {
+        updates.push(`author_id = $${paramIndex}`);
+        values.push(authorIdNum);
+        paramIndex++;
+      }
+    }
+
+    if (category_id !== undefined) {
+      const categoryIdNum = sanitizeInt(category_id);
+      if (categoryIdNum > 0) {
+        updates.push(`category_id = $${paramIndex}`);
+        values.push(categoryIdNum);
+        paramIndex++;
+      }
+    }
+
+    if (price !== undefined) {
+      const priceNum = parseFloat(price);
+      if (!isNaN(priceNum) && priceNum >= 0) {
+        updates.push(`price = $${paramIndex}`);
+        values.push(priceNum);
+        paramIndex++;
+      }
+    }
+
+    if (status !== undefined && ['published', 'draft', 'archived'].includes(status)) {
+      updates.push(`status = $${paramIndex}`);
+      values.push(status);
+      paramIndex++;
+    }
+
+    if (stock_quantity !== undefined) {
+      const stockNum = sanitizeInt(stock_quantity);
+      if (stockNum >= 0) {
+        updates.push(`stock_quantity = $${paramIndex}`);
+        values.push(stockNum);
+        paramIndex++;
+      }
+    }
+
+    if (is_featured !== undefined) {
+      updates.push(`is_featured = $${paramIndex}`);
+      values.push(Boolean(is_featured));
+      paramIndex++;
+    }
+
+    if (description !== undefined) {
+      updates.push(`description = $${paramIndex}`);
+      values.push(sanitizeHtml(description));
+      paramIndex++;
+    }
+
+    if (isbn !== undefined) {
+      updates.push(`isbn = $${paramIndex}`);
+      values.push(sanitizeHtml(isbn));
+      paramIndex++;
+    }
+
+    if (language !== undefined) {
+      updates.push(`language = $${paramIndex}`);
+      values.push(sanitizeHtml(language));
+      paramIndex++;
+    }
+
+    if (pages !== undefined) {
+      const pagesNum = sanitizeInt(pages);
+      if (pagesNum > 0) {
+        updates.push(`pages = $${paramIndex}`);
+        values.push(pagesNum);
+        paramIndex++;
+      }
+    }
+
+    if (publisher !== undefined) {
+      updates.push(`publisher = $${paramIndex}`);
+      values.push(sanitizeHtml(publisher));
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'No valid updates provided' }, { status: 400 });
+    }
+
+    // Add updated_at timestamp
+    updates.push(`updated_at = NOW()`);
     
-    // Check if book exists before attempting update
-    const existingBook = await ecommerceService.getBookById(id);
-    if (!existingBook) {
-      console.log('❌ Book not found:', id);
-      return NextResponse.json(
-        { error: 'Book not found' },
-        { status: 404 }
-      );
-    }
-    
-    console.log('🔍 Found existing book:', existingBook.title);
-    
-    // Validate required fields only if they're being updated
-    if (body.title !== undefined && (!body.title || body.title.trim() === '')) {
-      console.log('❌ Missing or empty title');
-      return NextResponse.json(
-        { error: 'Title is required' },
-        { status: 400 }
-      );
-    }
+    // Add book ID as the last parameter
+    values.push(bookId);
 
-    if (body.price !== undefined && (!body.price || isNaN(parseFloat(body.price)) || parseFloat(body.price) < 0)) {
-      console.log('❌ Invalid price:', body.price);
-      return NextResponse.json(
-        { error: 'Valid price is required' },
-        { status: 400 }
-      );
-    }
+    const updateQuery = `
+      UPDATE books 
+      SET ${updates.join(', ')} 
+      WHERE id = $${paramIndex}
+      RETURNING id, title, status, is_featured
+    `;
 
-    // Validate boolean fields
-    if (body.is_featured !== undefined && typeof body.is_featured !== 'boolean') {
-      console.log('❌ Invalid is_featured value:', body.is_featured);
-      return NextResponse.json(
-        { error: 'is_featured must be a boolean value' },
-        { status: 400 }
-      );
-    }
+    const result = await query(updateQuery, values);
 
-    if (body.is_bestseller !== undefined && typeof body.is_bestseller !== 'boolean') {
-      console.log('❌ Invalid is_bestseller value:', body.is_bestseller);
-      return NextResponse.json(
-        { error: 'is_bestseller must be a boolean value' },
-        { status: 400 }
-      );
-    }
-
-    if (body.is_new_release !== undefined && typeof body.is_new_release !== 'boolean') {
-      console.log('❌ Invalid is_new_release value:', body.is_new_release);
-      return NextResponse.json(
-        { error: 'is_new_release must be a boolean value' },
-        { status: 400 }
-      );
-    }
-
-    console.log('🔍 Attempting to update book...');
-    
-    // Update book
-    const book = await ecommerceService.updateBook(id, body);
-    
-    if (!book) {
-      console.log('❌ Book update failed - book not found after update');
-      return NextResponse.json(
-        { error: 'Book update failed - book not found' },
-        { status: 404 }
-      );
-    }
-
-    console.log('✅ Book updated successfully');
-
-    // Log audit event
-    try {
-      await rbacService.logAuditEvent(
-        parseInt(session.user.id),
-        'content.update',
-        'books',
-        book.id,
-        { 
-          title: book.title, 
-          changes: body,
-          previous_values: {
-            is_featured: existingBook.is_featured,
-            is_bestseller: existingBook.is_bestseller,
-            is_new_release: existingBook.is_new_release,
-            status: existingBook.status,
-            price: existingBook.price
-          }
-        },
-        request.headers.get('x-forwarded-for') || request.ip || undefined,
-        request.headers.get('user-agent') || undefined
-      );
-      console.log('✅ Audit event logged');
-    } catch (auditError) {
-      console.warn('⚠️ Failed to log audit event:', auditError);
-      // Don't fail the update if audit logging fails
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'Book not found' }, { status: 404 });
     }
 
     return NextResponse.json({
       success: true,
-      book,
       message: 'Book updated successfully',
-      changes: body
+      book: result.rows[0]
     });
 
   } catch (error) {
-    console.error('❌ Error updating book:', error);
-    console.error('❌ Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : 'No stack trace',
-      code: (error as any)?.code || 'Unknown'
-    });
-    
-    // Provide more specific error messages based on the error type
-    if (error instanceof Error) {
-      if (error.message.includes('duplicate key')) {
-        return NextResponse.json(
-          { error: 'A book with this ISBN already exists' },
-          { status: 400 }
-        );
-      }
-      
-      if (error.message.includes('foreign key')) {
-        return NextResponse.json(
-          { error: 'Invalid author or category selected' },
-          { status: 400 }
-        );
-      }
-      
-      if (error.message.includes('not null')) {
-        return NextResponse.json(
-          { error: 'Required fields cannot be empty' },
-          { status: 400 }
-        );
-      }
-      
-      if (error.message.includes('database') || error.message.includes('connection')) {
-        return NextResponse.json(
-          { error: 'Database connection error. Please try again.' },
-          { status: 500 }
-        );
-      }
-    }
-    
+    console.error('Error updating book:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to update book',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Failed to update book' },
       { status: 500 }
     );
   }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { bookId: string } }
-) {
-  try {
-    console.log('🔍 Book deletion request received');
-    
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      console.log('❌ Unauthorized - no session');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    console.log('🔍 User ID:', session.user.id);
-
-    // Check permission
-    const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
-      'content.delete'
-    );
-    
-    if (!hasPermission) {
-      console.log('❌ Insufficient permissions for user:', session.user.id);
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    const id = parseInt(params.bookId);
-    console.log('🔍 Book ID to delete:', id);
-    
-    if (isNaN(id)) {
-      console.log('❌ Invalid book ID:', params.bookId);
-      return NextResponse.json(
-        { error: 'Invalid book ID' },
-        { status: 400 }
-      );
-    }
-
-    console.log('🔍 Attempting to delete book...');
-    const deleted = await ecommerceService.deleteBook(id);
-    
-    if (!deleted) {
-      console.log('❌ Book deletion failed - book not found or could not be deleted');
-      return NextResponse.json(
-        { 
-          error: 'Book not found or could not be deleted',
-          details: 'The book may not exist or there may be database constraints preventing deletion'
-        },
-        { status: 404 }
-      );
-    }
-
-    console.log('✅ Book deleted successfully');
-
-    // Log audit event
-    try {
-      await rbacService.logAuditEvent(
-        parseInt(session.user.id),
-        'content.delete',
-        'books',
-        id,
-        { book_id: id },
-        request.headers.get('x-forwarded-for') || request.ip || undefined,
-        request.headers.get('user-agent') || undefined
-      );
-      console.log('✅ Audit event logged');
-    } catch (auditError) {
-      console.warn('⚠️ Failed to log audit event:', auditError);
-      // Don't fail the deletion if audit logging fails
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Book deleted successfully'
-    });
-
-  } catch (error) {
-    console.error('❌ Error deleting book:', error);
-    console.error('❌ Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : 'No stack trace',
-      code: (error as any)?.code || 'Unknown'
-    });
-    
-    return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
-  }
-} 
+});

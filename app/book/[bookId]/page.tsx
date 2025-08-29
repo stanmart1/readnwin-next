@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import Header from '@/components/Header';
 import { formatNumber } from '@/utils/dateUtils';
 import { useCart } from '@/contexts/CartContextNew';
+
 
 interface BookDetails {
   id: number;
@@ -38,18 +39,14 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
   const [quantity, setQuantity] = useState(1);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [book, setBook] = useState<BookDetails | null>(null);
-  const [relatedBooks, setRelatedBooks] = useState<any[]>([]);
+  const [relatedBooks, setRelatedBooks] = useState<BookDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { data: session } = useSession();
   const { addToCart } = useCart();
 
   // Load book data from API
-  useEffect(() => {
-    loadBookData();
-  }, [params.bookId]);
-
-  const loadBookData = async () => {
+  const loadBookData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/books/${params.bookId}`);
@@ -60,12 +57,18 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
         
         // Load related books from the same category
         if (data.book?.category_id) {
-          const relatedResponse = await fetch(`/api/books?category_id=${data.book.category_id}&limit=3`);
-          if (relatedResponse.ok) {
-            const relatedData = await relatedResponse.json();
-            // Filter out the current book from related books
-            const filteredRelatedBooks = relatedData.books?.filter((relatedBook: any) => relatedBook.id !== data.book.id) || [];
-            setRelatedBooks(filteredRelatedBooks.slice(0, 3));
+          try {
+            const relatedResponse = await fetch(`/api/books?category_id=${data.book.category_id}&limit=3`);
+            if (relatedResponse.ok) {
+              const relatedData = await relatedResponse.json();
+              // Filter out the current book from related books
+              const filteredRelatedBooks = relatedData.books?.filter((relatedBook: BookDetails) => relatedBook.id !== data.book.id) || [];
+              setRelatedBooks(filteredRelatedBooks.slice(0, 3));
+            } else {
+              console.error('Failed to load related books:', relatedResponse.status);
+            }
+          } catch (relatedError) {
+            console.error('Error loading related books:', relatedError);
           }
         }
       } else {
@@ -77,7 +80,11 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.bookId]);
+
+  useEffect(() => {
+    loadBookData();
+  }, [loadBookData]);
 
   const handleWishlist = () => {
     if (!session) {
@@ -186,7 +193,10 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
             <div className="lg:col-span-1">
               <div className="relative group">
                 <img 
-                  src={book.cover_image_url} 
+                  src={book.cover_image_url?.startsWith('/api/images/covers/') ? book.cover_image_url : `/api/images/covers/${book.cover_image_url?.split('/').pop() || 'placeholder.jpg'}`}
+                  onError={(e) => {
+                    e.currentTarget.src = '/placeholder-book.jpg';
+                  }} 
                   alt={book.title}
                   className="w-full rounded-2xl shadow-2xl transition-transform duration-300 group-hover:scale-105"
                 />
@@ -452,7 +462,10 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                       <div className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
                         <div className="relative">
                           <img 
-                            src={relatedBook.cover_image_url} 
+                            src={relatedBook.cover_image_url?.startsWith('/api/images/covers/') ? relatedBook.cover_image_url : `/api/images/covers/${relatedBook.cover_image_url?.split('/').pop() || 'placeholder.jpg'}`}
+                            onError={(e) => {
+                              e.currentTarget.src = '/placeholder-book.jpg';
+                            }} 
                             alt={relatedBook.title}
                             className="w-full h-56 object-cover object-top"
                           />

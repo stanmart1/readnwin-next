@@ -78,6 +78,15 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
   const [lastInteraction, setLastInteraction] = useState(Date.now());
   const [scrollProgress, setScrollProgress] = useState(0);
 
+  const loadEbook = useCallback(async (bookId: string, userId: string) => {
+    try {
+      const bookData = await EbookContentLoader.loadBook(bookId, userId);
+      loadBook(bookId, userId, bookData);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to load book');
+    }
+  }, [loadBook, setError]);
+
   // Load book on mount
   useEffect(() => {
     if (bookId && session?.user?.id) {
@@ -87,16 +96,7 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
     return () => {
       unloadBook();
     };
-  }, [bookId, session?.user?.id]);
-
-  const loadEbook = async (bookId: string, userId: string) => {
-    try {
-      const bookData = await EbookContentLoader.loadBook(bookId, userId);
-      loadBook(bookId, userId, bookData);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to load book');
-    }
-  };
+  }, [bookId, session?.user?.id, loadEbook, unloadBook]);
 
   // Auto-hide menu after inactivity
   useEffect(() => {

@@ -13,7 +13,7 @@ interface UsePermissionsReturn {
   refreshPermissions: () => Promise<void>;
 }
 
-export function usePermissions(): UsePermissionsReturn {
+export function usePermissions(skipForAdmin: boolean = false): UsePermissionsReturn {
   const { data: session } = useSession();
   const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +22,13 @@ export function usePermissions(): UsePermissionsReturn {
   const fetchPermissions = useCallback(async () => {
     if (!session?.user?.id) {
       setPermissions([]);
+      setLoading(false);
+      return;
+    }
+
+    // Skip API call for admin users - they have all permissions
+    if (skipForAdmin && (session.user.role === 'admin' || session.user.role === 'super_admin')) {
+      setPermissions(['*']); // Wildcard permission for admins
       setLoading(false);
       return;
     }
@@ -45,17 +52,23 @@ export function usePermissions(): UsePermissionsReturn {
     } finally {
       setLoading(false);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, session?.user?.role, skipForAdmin]);
 
   const hasPermission = useCallback((permission: string): boolean => {
+    // Admin users have all permissions
+    if (permissions.includes('*')) return true;
     return permissions.includes(permission);
   }, [permissions]);
 
   const hasAnyPermission = useCallback((permissionsToCheck: string[]): boolean => {
+    // Admin users have all permissions
+    if (permissions.includes('*')) return true;
     return permissionsToCheck.some(permission => permissions.includes(permission));
   }, [permissions]);
 
   const hasAllPermissions = useCallback((permissionsToCheck: string[]): boolean => {
+    // Admin users have all permissions
+    if (permissions.includes('*')) return true;
     return permissionsToCheck.every(permission => permissions.includes(permission));
   }, [permissions]);
 

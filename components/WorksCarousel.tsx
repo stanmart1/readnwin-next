@@ -16,6 +16,7 @@ export default function WorksCarousel() {
     description: string;
   } | null>(null);
   const [truncatedWorks, setTruncatedWorks] = useState<Set<number>>(new Set());
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
 
 
@@ -33,13 +34,49 @@ export default function WorksCarousel() {
     fetchWorks();
   }, []);
 
+  // Initialize infinite scroll position
+  useEffect(() => {
+    if (worksImages.length > 0 && carouselRef.current) {
+      // Start at the first real item (skip the cloned last item)
+      const cardWidth = getCardWidth();
+      const gap = 24;
+      const initialScroll = cardWidth + gap;
+      carouselRef.current.scrollLeft = initialScroll;
+    }
+  }, [worksImages]);
+
+  // Handle infinite scroll boundaries
+  useEffect(() => {
+    const carousel = carouselRef.current;
+    if (!carousel || worksImages.length === 0) return;
+
+    const handleScroll = () => {
+      const cardWidth = getCardWidth();
+      const gap = 24;
+      const scrollLeft = carousel.scrollLeft;
+      const maxScroll = (cardWidth + gap) * (worksImages.length + 1);
+      
+      // If scrolled to the cloned first item at the end
+      if (scrollLeft >= maxScroll) {
+        carousel.scrollLeft = cardWidth + gap; // Jump to real first item
+      }
+      // If scrolled to the cloned last item at the beginning
+      else if (scrollLeft <= 0) {
+        carousel.scrollLeft = (cardWidth + gap) * worksImages.length; // Jump to real last item
+      }
+    };
+
+    carousel.addEventListener('scroll', handleScroll);
+    return () => carousel.removeEventListener('scroll', handleScroll);
+  }, [worksImages]);
+
   // Additional check for text truncation after component mounts and DOM is ready
   useEffect(() => {
     if (worksImages.length > 0) {
       // Small delay to ensure DOM is fully rendered
       const timer = setTimeout(() => {
         worksImages.forEach((work) => {
-          const cardElement = document.querySelector(`[data-work-id="${work.id}"] .line-clamp-3`);
+          const cardElement = document.querySelector(`[data-work-id="${work.id}"] .line-clamp-2`);
           if (cardElement) {
             const isActuallyTruncated = cardElement.scrollHeight > cardElement.clientHeight;
             if (isActuallyTruncated && !truncatedWorks.has(work.id)) {
@@ -89,43 +126,62 @@ export default function WorksCarousel() {
 
   // Auto-scroll carousel every 4 seconds
   useEffect(() => {
-    if (!isAutoPlaying) return;
+    if (!isAutoPlaying || worksImages.length === 0) return;
 
     const interval = setInterval(() => {
-      setCurrentIndex((prevIndex) => {
-        const nextIndex = (prevIndex + 1) % worksImages.length;
-        scrollToIndex(nextIndex);
-        return nextIndex;
-      });
+      if (!isTransitioning) {
+        scrollToNext();
+      }
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [isAutoPlaying, worksImages.length]);
+  }, [isAutoPlaying, worksImages.length, isTransitioning]);
+
+  const getCardWidth = () => {
+    if (!carouselRef.current) return 0;
+    const containerWidth = carouselRef.current.offsetWidth;
+    const gap = 24; // 1.5rem = 24px
+    
+    if (containerWidth >= 1024) return (containerWidth - gap * 2) / 3; // lg: 3 cards
+    if (containerWidth >= 768) return (containerWidth - gap) / 2; // md: 2 cards
+    return containerWidth; // sm: 1 card
+  };
 
   const scrollToIndex = (index: number) => {
-    if (carouselRef.current) {
-      const scrollAmount = carouselRef.current.offsetWidth * index;
-      carouselRef.current.scrollTo({ left: scrollAmount, behavior: 'smooth' });
-    }
+    if (!carouselRef.current || worksImages.length === 0) return;
+    
+    setIsTransitioning(true);
+    const cardWidth = getCardWidth();
+    const gap = 24;
+    // Add 1 to account for the cloned last item at the beginning
+    const scrollAmount = (cardWidth + gap) * (index + 1);
+    
+    carouselRef.current.scrollTo({ 
+      left: scrollAmount, 
+      behavior: 'smooth' 
+    });
+    
+    setTimeout(() => setIsTransitioning(false), 300);
   };
 
   const scrollToNext = () => {
-    setCurrentIndex((prevIndex) => {
-      const nextIndex = (prevIndex + 1) % worksImages.length;
-      scrollToIndex(nextIndex);
-      return nextIndex;
-    });
+    if (isTransitioning || worksImages.length === 0) return;
+    
+    const nextIndex = (currentIndex + 1) % worksImages.length;
+    setCurrentIndex(nextIndex);
+    scrollToIndex(nextIndex);
   };
 
   const scrollToPrev = () => {
-    setCurrentIndex((prevIndex) => {
-      const prevIndexValue = prevIndex === 0 ? worksImages.length - 1 : prevIndex - 1;
-      scrollToIndex(prevIndexValue);
-      return prevIndexValue;
-    });
+    if (isTransitioning || worksImages.length === 0) return;
+    
+    const prevIndex = currentIndex === 0 ? worksImages.length - 1 : currentIndex - 1;
+    setCurrentIndex(prevIndex);
+    scrollToIndex(prevIndex);
   };
 
   const handleDotClick = (index: number) => {
+    if (isTransitioning) return;
     setCurrentIndex(index);
     scrollToIndex(index);
   };
@@ -149,32 +205,12 @@ export default function WorksCarousel() {
     setSelectedWork(null);
   };
 
-  const isTextTruncated = (element: HTMLElement | null) => {
-    if (!element) return false;
-    
-    // Create a temporary element to measure the full text height
-    const tempElement = element.cloneNode(true) as HTMLElement;
-    tempElement.style.position = 'absolute';
-    tempElement.style.visibility = 'hidden';
-    tempElement.style.height = 'auto';
-    tempElement.style.maxHeight = 'none';
-    tempElement.style.webkitLineClamp = 'none';
-    tempElement.style.display = 'block';
-    
-    document.body.appendChild(tempElement);
-    const fullHeight = tempElement.scrollHeight;
-    document.body.removeChild(tempElement);
-    
-    // Compare with the original element's height
-    const originalHeight = element.scrollHeight;
-    
-    return fullHeight > originalHeight;
-  };
+
 
   const checkTextTruncation = (workId: number, description: string, title: string) => {
-    // Check if description is longer than ~100 characters (definitely more than 3 lines)
-    // Using a very conservative character count to ensure consistent 3-line display
-    const isLongDescription = description.length > 100;
+    // Check if description is longer than ~60 characters (definitely more than 2 lines)
+    // Using a very conservative character count to ensure consistent 2-line display
+    const isLongDescription = description.length > 60;
     
     if (isLongDescription) {
       setTruncatedWorks(prev => new Set(prev).add(workId));
@@ -287,13 +323,18 @@ export default function WorksCarousel() {
           {/* Works Carousel */}
           <div 
             ref={carouselRef}
-            className="flex space-x-6 overflow-x-auto scrollbar-hide pb-8 scroll-smooth"
+            className="flex gap-6 overflow-x-hidden pb-8"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
-            {worksImages.map((work, index) => (
-              <div key={work.id} className="flex-shrink-0 w-full md:w-1/2 lg:w-1/3" data-work-id={work.id}>
+            {/* Render infinite loop */}
+            {worksImages.length > 0 && [
+              ...worksImages.slice(-1), // Clone last item at beginning
+              ...worksImages, // Original items
+              ...worksImages.slice(0, 1) // Clone first item at end
+            ].map((work, index) => (
+              <div key={`${work.id}-${index}`} className="flex-shrink-0 w-full md:w-1/2 lg:w-1/3" data-work-id={work.id}>
                 <div className="relative bg-white rounded-2xl shadow-lg overflow-hidden h-[480px] flex flex-col">
                   <div className="relative overflow-hidden flex-shrink-0">
                     <img
@@ -304,20 +345,23 @@ export default function WorksCarousel() {
                   </div>
                   
                   <div className="p-6 flex-1 flex flex-col">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3 line-clamp-2 min-h-[3.5rem]">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3 line-clamp-2 h-14">
                       {work.title}
                     </h3>
-                    <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 flex-1">
-                      {work.description || 'Innovative solutions that enhance the digital reading experience and connect readers with their favorite books.'}
-                    </p>
-                    {truncatedWorks.has(work.id) && (
-                      <button
-                        onClick={() => openModal(work)}
-                        className="text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors duration-300 self-start mt-3"
-                      >
-                        Read More
-                      </button>
-                    )}
+                    <div className="flex-1 flex flex-col justify-between min-h-[100px]">
+                      <p className="text-gray-600 text-sm leading-relaxed line-clamp-2 h-10">
+                        {work.description || 'Innovative solutions that enhance the digital reading experience and connect readers with their favorite books.'}
+                      </p>
+                      {truncatedWorks.has(work.id) && (
+                        <button
+                          onClick={() => openModal(work)}
+                          className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-full font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 self-start mt-3 text-sm shadow-md hover:shadow-lg"
+                        >
+                          <span>Read More</span>
+                          <i className="ri-arrow-right-line text-sm"></i>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -325,20 +369,22 @@ export default function WorksCarousel() {
           </div>
 
           {/* Dots Indicator */}
-          <div className="flex justify-center space-x-2 mt-8">
-            {worksImages.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => handleDotClick(index)}
-                className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                  index === currentIndex 
-                    ? 'bg-blue-600 scale-125' 
-                    : 'bg-gray-300 hover:bg-gray-400'
-                }`}
-                aria-label={`Go to slide ${index + 1}`}
-              />
-            ))}
-          </div>
+          {worksImages.length > 1 && (
+            <div className="flex justify-center space-x-2 mt-8">
+              {worksImages.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleDotClick(index)}
+                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                    index === currentIndex 
+                      ? 'bg-blue-600 scale-125' 
+                      : 'bg-gray-300 hover:bg-gray-400'
+                  }`}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
                   {/* Auto-play toggle */}

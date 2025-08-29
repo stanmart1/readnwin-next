@@ -87,10 +87,17 @@ export default function BookCard({
   const { addToCart: addToGuestCart } = useGuestCart();
 
   const getImageSrc = () => {
-    // Handle storage paths - convert to storage endpoint
-    if (displayCover?.includes('/app/storage/covers/') || displayCover?.includes('covers/')) {
-      const cleanPath = displayCover.replace(/^\/?(app\/)?storage\/covers\//, '');
-      return `/storage/covers/${cleanPath}`;
+    if (!displayCover) return '/placeholder-book.jpg';
+    
+    // If already using API route, return as is
+    if (displayCover.startsWith('/api/images/covers/')) {
+      return displayCover;
+    }
+    
+    // Handle legacy paths - convert to API route
+    if (displayCover.includes('/uploads/covers/') || displayCover.includes('covers/')) {
+      const filename = displayCover.split('/').pop();
+      return `/api/images/covers/${filename}`;
     }
     
     return displayCover;
@@ -197,6 +204,9 @@ export default function BookCard({
             src={getImageSrc()} 
             alt={title}
             className="w-full h-72 object-cover object-top"
+            onError={(e) => {
+              e.currentTarget.src = '/placeholder-book.jpg';
+            }}
           />
           
           {/* Book Type Badge */}

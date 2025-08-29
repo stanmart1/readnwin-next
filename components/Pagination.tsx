@@ -58,58 +58,58 @@ export default function Pagination({
   }
 
   return (
-    <div className={`flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 ${className}`}>
+    <div className={`flex flex-col gap-3 xs:gap-4 ${className}`}>
+      {/* Page info - Mobile first */}
+      <div className="text-xs xs:text-sm text-gray-700 text-center break-words leading-relaxed">
+        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} items
+      </div>
+
       {/* Items per page selector */}
       {showItemsPerPage && onItemsPerPageChange && (
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-700">Show:</span>
+        <div className="flex items-center justify-center gap-1 xs:gap-2">
+          <span className="text-xs xs:text-sm text-gray-700">Show:</span>
           <select
             value={itemsPerPage}
             onChange={(e) => handleItemsPerPageChange(parseInt(e.target.value))}
-            className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-2 xs:px-3 py-1 text-xs xs:text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value={10}>10</option>
             <option value={20}>20</option>
             <option value={50}>50</option>
             <option value={100}>100</option>
           </select>
-          <span className="text-sm text-gray-700">per page</span>
+          <span className="text-xs xs:text-sm text-gray-700">per page</span>
         </div>
       )}
 
-      {/* Page info */}
-      <div className="text-sm text-gray-700">
-        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} items
-      </div>
-
       {/* Pagination controls */}
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center justify-center gap-0.5 xs:gap-1 overflow-x-auto scrollbar-thin pb-2">
         {/* First page */}
         <button
           onClick={() => handlePageChange(1)}
           disabled={currentPage === 1}
-          className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+          className={`flex-shrink-0 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium rounded-md transition-colors ${
             currentPage === 1
               ? 'text-gray-400 cursor-not-allowed'
               : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
           }`}
           title="First page"
         >
-          <i className="ri-skip-back-line"></i>
+          <i className="ri-skip-back-line text-sm xs:text-base"></i>
         </button>
 
         {/* Previous page */}
         <button
           onClick={() => handlePageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+          className={`flex-shrink-0 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium rounded-md transition-colors ${
             currentPage === 1
               ? 'text-gray-400 cursor-not-allowed'
               : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
           }`}
           title="Previous page"
         >
-          <i className="ri-arrow-left-s-line"></i>
+          <i className="ri-arrow-left-s-line text-sm xs:text-base"></i>
         </button>
 
         {/* Page numbers */}
@@ -117,38 +117,42 @@ export default function Pagination({
           <>
             <button
               onClick={() => handlePageChange(1)}
-              className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+              className="flex-shrink-0 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
             >
               1
             </button>
             {startPage > 2 && (
-              <span className="px-2 py-2 text-sm text-gray-500">...</span>
+              <span className="flex-shrink-0 px-1 xs:px-2 py-1.5 xs:py-2 text-xs xs:text-sm text-gray-500">...</span>
             )}
           </>
         )}
 
-        {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map((page) => (
-          <button
-            key={page}
-            onClick={() => handlePageChange(page)}
-            className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-              page === currentPage
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            {page}
-          </button>
-        ))}
+        {Array.from({ length: Math.min(3, endPage - startPage + 1) }, (_, i) => {
+          const page = startPage + i;
+          if (page > endPage) return null;
+          return (
+            <button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              className={`flex-shrink-0 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium rounded-md transition-colors ${
+                page === currentPage
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              {page}
+            </button>
+          );
+        })}
 
         {endPage < totalPages && (
           <>
             {endPage < totalPages - 1 && (
-              <span className="px-2 py-2 text-sm text-gray-500">...</span>
+              <span className="flex-shrink-0 px-1 xs:px-2 py-1.5 xs:py-2 text-xs xs:text-sm text-gray-500">...</span>
             )}
             <button
               onClick={() => handlePageChange(totalPages)}
-              className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+              className="flex-shrink-0 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
             >
               {totalPages}
             </button>
@@ -159,28 +163,28 @@ export default function Pagination({
         <button
           onClick={() => handlePageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+          className={`flex-shrink-0 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium rounded-md transition-colors ${
             currentPage === totalPages
               ? 'text-gray-400 cursor-not-allowed'
               : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
           }`}
           title="Next page"
         >
-          <i className="ri-arrow-right-s-line"></i>
+          <i className="ri-arrow-right-s-line text-sm xs:text-base"></i>
         </button>
 
         {/* Last page */}
         <button
           onClick={() => handlePageChange(totalPages)}
           disabled={currentPage === totalPages}
-          className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+          className={`flex-shrink-0 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium rounded-md transition-colors ${
             currentPage === totalPages
               ? 'text-gray-400 cursor-not-allowed'
               : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
           }`}
           title="Last page"
         >
-          <i className="ri-skip-forward-line"></i>
+          <i className="ri-skip-forward-line text-sm xs:text-base"></i>
         </button>
       </div>
     </div>

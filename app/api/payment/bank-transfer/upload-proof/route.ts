@@ -70,8 +70,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create uploads directory if it doesn't exist with proper error handling
-    const uploadsDir = join('/uploads', 'payment-proofs');
+    // Create uploads directory based on environment
+    const uploadsDir = process.env.NODE_ENV === 'production'
+      ? join('/app/storage/assets/payment-proofs')
+      : join(process.cwd(), 'storage', 'assets', 'payment-proofs');
+    
     console.log(`📁 Ensuring payment-proofs directory exists: ${uploadsDir}`);
     
     try {
@@ -79,16 +82,12 @@ export async function POST(request: NextRequest) {
         console.log(`📁 Creating payment-proofs directory: ${uploadsDir}`);
         await mkdir(uploadsDir, { recursive: true });
         
-        // Verify directory was created
         if (!existsSync(uploadsDir)) {
           throw new Error(`Failed to create payment-proofs directory: ${uploadsDir}`);
         }
         console.log(`✅ Payment-proofs directory created successfully: ${uploadsDir}`);
-      } else {
-        console.log(`✅ Payment-proofs directory already exists: ${uploadsDir}`);
       }
       
-      // Test write permissions by creating a temporary file
       const testFile = join(uploadsDir, '.test-write-permission');
       await writeFile(testFile, 'test');
       await unlink(testFile);
@@ -122,11 +121,11 @@ export async function POST(request: NextRequest) {
     const fileStats = await stat(filePath);
     console.log(`✅ File written successfully: ${filePath} (${fileStats.size} bytes)`);
 
-    // Save file info to database
+    // Save file info to database with API route path
     const proof = await bankTransferService.uploadPaymentProof(
       parseInt(bankTransferId as string),
       file.name,
-      `/uploads/payment-proofs/${fileName}`,
+      `/api/images/payment-proofs/${fileName}`,
       file.size,
       file.type
     );

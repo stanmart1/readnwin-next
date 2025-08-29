@@ -555,9 +555,12 @@ export default function OrderConfirmation({
             return (
               <div key={index} className="flex items-center space-x-3 sm:space-x-4 p-3 border border-gray-200 rounded-lg">
                 <img 
-                  src={book.cover_image_url || book.cover} 
+                  src={(book.cover_image_url || book.cover)?.startsWith('/api/images/covers/') ? (book.cover_image_url || book.cover) : `/api/images/covers/${(book.cover_image_url || book.cover)?.split('/').pop() || 'placeholder.jpg'}`}
                   alt={book.title}
                   className="w-12 h-16 sm:w-16 sm:h-20 object-cover rounded flex-shrink-0"
+                  onError={(e) => {
+                    e.currentTarget.src = '/placeholder-book.jpg';
+                  }}
                 />
                 <div className="flex-1 min-w-0">
                   <h4 className="font-medium text-gray-900 text-sm sm:text-base truncate">{book.title}</h4>

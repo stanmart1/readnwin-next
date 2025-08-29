@@ -7,19 +7,15 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'postgres',
   password: process.env.DB_PASSWORD,
   port: parseInt(process.env.DB_PORT || '5432'),
-  // SSL is disabled for the new database since it doesn't support it
   ssl: false,
-  // Optimized connection pool configuration for better performance
-  max: 10, // Increased from 5 to handle more concurrent connections
-  min: 2, // Increased from 1 to maintain more idle connections
-  connectionTimeoutMillis: 30000, // Increased to 30 seconds for cloud database
-  idleTimeoutMillis: 300000, // Increased to 5 minutes to keep connections alive longer
-  maxUses: 10000, // Increased from 7500 to reduce connection cycling
-  // Add statement timeout to prevent long-running queries
-  statement_timeout: 30000, // 30 seconds
-  // Add keepalive settings for cloud database
-  keepAlive: true,
-  keepAliveInitialDelayMillis: 10000
+  // Reduced connection pool to prevent exhaustion
+  max: 5, // Reduced max connections
+  min: 1, // Reduced min connections
+  connectionTimeoutMillis: 10000, // Reduced timeout
+  idleTimeoutMillis: 30000, // Reduced idle timeout
+  maxUses: 1000, // Reduced max uses
+  statement_timeout: 10000, // Reduced statement timeout
+  keepAlive: false // Disabled keepalive to reduce connection overhead
 });
 
 // Set timezone for all connections to Nigeria (UTC+1)
@@ -27,30 +23,44 @@ pool.on('connect', (client) => {
   client.query('SET timezone = \'Africa/Lagos\'');
 });
 
-// Handle pool errors
+// Handle pool errors without crashing
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  console.error('Database pool error:', err.message);
+  // Don't exit process, just log the error
+});
+
+// Handle process cleanup
+process.on('SIGINT', async () => {
+  console.log('Closing database pool...');
+  await pool.end();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('Closing database pool...');
+  await pool.end();
+  process.exit(0);
 });
 
 export const query = async (text: string, params?: any[]) => {
   const start = Date.now();
+  let client;
+  
   try {
+    // Use pool.query instead of getting a client manually
     const res = await pool.query(text, params);
     const duration = Date.now() - start;
     
-    // Log slow queries for performance monitoring
-    if (duration > 1000) {
-      console.warn(`⚠️ Slow query detected (${duration}ms):`, { text: text.substring(0, 100) + '...', duration, rows: res.rowCount });
-    } else {
-      console.log('Executed query', { text: text.substring(0, 100) + '...', duration, rows: res.rowCount });
+    // Only log slow queries to reduce noise
+    if (duration > 2000) {
+      console.warn(`⚠️ Slow query (${duration}ms):`, text.substring(0, 50) + '...');
     }
     
     return res;
   } catch (error) {
     const duration = Date.now() - start;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Database query error:', { error: errorMessage, duration, text: text.substring(0, 100) + '...' });
+    console.error('Database error:', { error: errorMessage, duration });
     throw error;
   }
 };

@@ -12,6 +12,9 @@ import LibraryManagement from './LibraryManagement';
 import BookAnalytics from './BookAnalytics';
 import CategoriesManagement from './CategoriesManagement';
 import AuthorsManagement from './AuthorsManagement';
+import BookFilters from '@/components/admin/BookFilters';
+import BookTable from '@/components/admin/BookTable';
+import { useBookManagement } from '@/hooks/useBookManagement';
 
 interface Book {
   id: number;
@@ -50,33 +53,37 @@ export default function BookManagementEnhanced() {
   const [activeSection, setActiveSection] = useState('books');
   const [showAddModal, setShowAddModal] = useState(false);
   
+  // Use custom hook for book management
+  const {
+    books,
+    loading,
+    error,
+    filters,
+    pagination,
+    setFilters,
+    setPagination,
+    updateBook,
+    deleteBooks,
+    batchUpdateBooks,
+    setError
+  } = useBookManagement();
+  
   // Loading states
-  const { loadingState, startLoading, stopLoading, updateProgress } = useLoadingState();
+  const { loadingState, startLoading, stopLoading } = useLoadingState();
   const { isLoading: skeletonLoading } = useSkeletonLoading();
   
-  // Error handling
-  const [error, setError] = useState<any>(null);
-  
   // State management
-  const [books, setBooks] = useState<Book[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-    pages: 0
-  });
-  const [filters, setFilters] = useState({
-    search: '',
-    status: '',
-    category_id: undefined as number | undefined
-  });
   const [selectedBooks, setSelectedBooks] = useState<number[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [bookToDelete, setBookToDelete] = useState<number | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [assignLoading, setAssignLoading] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -85,15 +92,10 @@ export default function BookManagementEnhanced() {
   const [batchUpdateData, setBatchUpdateData] = useState({
     status: '',
     category_id: '',
-    price_adjustment: '',
-    adjustment_type: 'percentage' // 'percentage' or 'fixed'
+    price_adjustment: { value: '', type: 'percentage' as 'percentage' | 'fixed' }
   });
 
-  // Load initial data
-  useEffect(() => {
-    loadData();
-  }, [pagination.page, filters.search, filters.status, filters.category_id]);
-
+  // Load authors and categories on mount
   useEffect(() => {
     loadAuthorsAndCategories();
   }, []);
@@ -101,40 +103,6 @@ export default function BookManagementEnhanced() {
   // Reload data when modal closes
   const handleModalClose = () => {
     setShowAddModal(false);
-    loadData();
-  };
-
-  const loadData = async () => {
-    try {
-      startLoading('Loading books...', 'spinner');
-      
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
-        search: filters.search,
-        status: filters.status
-      });
-      if (filters.category_id) params.append('category_id', filters.category_id.toString());
-      
-      const response = await fetch(`/api/admin/books?${params}`);
-      if (!response.ok) throw new Error('Failed to load books');
-      const result = await response.json();
-      
-      setBooks(result.books || []);
-      if (result.pagination) {
-        setPagination({
-          page: result.pagination.page || 1,
-          limit: result.pagination.limit || 20,
-          total: result.pagination.total || 0,
-          pages: result.pagination.pages || 0
-        });
-      }
-      
-      stopLoading();
-    } catch (error) {
-      setError(error);
-      stopLoading();
-    }
   };
 
   const loadAuthorsAndCategories = async () => {
@@ -158,6 +126,52 @@ export default function BookManagementEnhanced() {
     }
   };
 
+  const loadUsers = async () => {
+    try {
+      const response = await fetch('/api/admin/users');
+      if (response.ok) {
+        const result = await response.json();
+        setUsers(result.users || []);
+      }
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    }
+  };
+
+  const handleAssignBook = async () => {
+    if (!selectedUser || !selectedBookForAction) return;
+    
+    setAssignLoading(true);
+    try {
+      const response = await fetch('/api/admin/user-libraries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: selectedUser.id,
+          book_id: selectedBookForAction.id,
+          access_type: 'full'
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(`Book "${selectedBookForAction.title}" assigned to ${selectedUser.name} successfully!`);
+        setShowAssignModal(false);
+        setSelectedUser(null);
+        setUserSearchQuery('');
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to assign book');
+      }
+    } catch (error) {
+      console.error('Error assigning book:', error);
+      toast.error('Failed to assign book');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
   const handleDeleteBook = async (bookId: number) => {
     setBookToDelete(bookId);
     setShowDeleteConfirm(true);
@@ -166,27 +180,14 @@ export default function BookManagementEnhanced() {
   const confirmDeleteBook = async () => {
     if (!bookToDelete || deleteLoading) return;
     
-    try {
-      setDeleteLoading(true);
-      const params = new URLSearchParams({ ids: bookToDelete.toString() });
-      const response = await fetch(`/api/admin/books?${params}`, { method: 'DELETE' });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to delete book');
-      }
-      
+    setDeleteLoading(true);
+    const success = await deleteBooks([bookToDelete]);
+    if (success) {
       setShowDeleteConfirm(false);
       setBookToDelete(null);
-      loadData();
       toast.success('Book deleted successfully!');
-    } catch (error) {
-      console.error('Delete error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete book');
-      setShowDeleteConfirm(false);
-      setBookToDelete(null);
-    } finally {
-      setDeleteLoading(false);
     }
+    setDeleteLoading(false);
   };
 
   const handleBulkDelete = async () => {
@@ -199,21 +200,9 @@ export default function BookManagementEnhanced() {
       return;
     }
     
-    try {
-      const params = new URLSearchParams({ ids: selectedBooks.join(',') });
-      const response = await fetch(`/api/admin/books?${params}`, { method: 'DELETE' });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to delete books');
-      }
-      const result = await response.json();
-      
+    const success = await deleteBooks(selectedBooks);
+    if (success) {
       setSelectedBooks([]);
-      loadData();
-      toast.success(`Successfully deleted ${result.deleted_count || selectedBooks.length} books`);
-    } catch (error) {
-      console.error('Bulk delete error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete books');
     }
   };
 
@@ -223,88 +212,45 @@ export default function BookManagementEnhanced() {
       return;
     }
 
-    try {
-      const updatePayload: any = {
-        book_ids: selectedBooks
-      };
-
-      if (batchUpdateData.status) {
-        updatePayload.status = batchUpdateData.status;
-      }
-
-      if (batchUpdateData.category_id) {
-        updatePayload.category_id = parseInt(batchUpdateData.category_id);
-      }
-
-      if (batchUpdateData.price_adjustment) {
-        updatePayload.price_adjustment = {
-          value: parseFloat(batchUpdateData.price_adjustment),
-          type: batchUpdateData.adjustment_type
-        };
-      }
-
-      const response = await fetch('/api/admin/books/batch-update', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatePayload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to update books');
-      }
-
-      const result = await response.json();
+    const success = await batchUpdateBooks(selectedBooks, batchUpdateData);
+    if (success) {
       setSelectedBooks([]);
       setShowBatchUpdateModal(false);
-      setBatchUpdateData({ status: '', category_id: '', price_adjustment: '', adjustment_type: 'percentage' });
-      loadData();
-      toast.success(`Successfully updated ${result.updated_count || selectedBooks.length} books`);
-    } catch (error) {
-      console.error('Batch update error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update books');
+      setBatchUpdateData({ status: '', category_id: '', price_adjustment: { value: '', type: 'percentage' } });
     }
   };
 
-  const handleToggleFeature = async (bookId: number, isFeatured: boolean) => {
-    try {
-      const response = await fetch(`/api/admin/books/${bookId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_featured: isFeatured })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to update book');
-      }
-
-      loadData();
-      toast.success(isFeatured ? 'Book added to featured' : 'Book removed from featured');
-    } catch (error) {
-      console.error('Toggle feature error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update book');
-    }
-  };
-
-  const handleToggleStatus = async (bookId: number, status: string) => {
-    try {
-      const response = await fetch(`/api/admin/books/${bookId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to update book');
-      }
-
-      loadData();
-      toast.success(`Book ${status === 'published' ? 'activated' : 'deactivated'} successfully`);
-    } catch (error) {
-      console.error('Toggle status error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update book');
+  const handleBookAction = async (action: string, book: Book) => {
+    switch (action) {
+      case 'toggleFeature':
+        const success1 = await updateBook(book.id, { is_featured: !book.is_featured });
+        if (success1) {
+          toast.success(book.is_featured ? 'Book removed from featured' : 'Book added to featured');
+        }
+        break;
+      case 'toggleStatus':
+        const newStatus = book.status === 'published' ? 'draft' : 'published';
+        const success2 = await updateBook(book.id, { status: newStatus });
+        if (success2) {
+          toast.success(`Book ${newStatus === 'published' ? 'activated' : 'deactivated'} successfully`);
+        }
+        break;
+      case 'edit':
+        setSelectedBookForAction(book);
+        setShowEditModal(true);
+        break;
+      case 'view':
+        setSelectedBookForAction(book);
+        setShowDetailsModal(true);
+        break;
+      case 'delete':
+        handleDeleteBook(book.id);
+        break;
+      case 'assign':
+        setSelectedBookForAction(book);
+        setShowAssignModal(true);
+        loadUsers();
+        break;
     }
   };
 
@@ -312,12 +258,44 @@ export default function BookManagementEnhanced() {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-4xl mx-auto">
-          <EnhancedErrorDisplay
-            error={error}
-            onRetry={() => { setError(null); loadData(); }}
-            onDismiss={() => setError(null)}
-            className="mb-6"
-          />
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <i className="ri-error-warning-line text-red-600"></i>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-red-900">Failed to Load Books</h3>
+                <p className="text-sm text-red-700 mt-1">
+                  {error instanceof Error ? error.message : 'An unknown error occurred'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg p-4 mb-4">
+              <h4 className="font-medium text-gray-900 mb-2">Troubleshooting Steps:</h4>
+              <ol className="list-decimal list-inside space-y-1 text-sm text-gray-700">
+                <li>Check if the database is running and accessible</li>
+                <li>Verify your environment variables are set correctly</li>
+                <li>Ensure you have the required permissions</li>
+                <li>Check the browser console for additional error details</li>
+              </ol>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setError(null); }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => window.open('/api/debug/books', '_blank')}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+              >
+                Debug Info
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -325,28 +303,34 @@ export default function BookManagementEnhanced() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 text-balance">Book Management</h1>
-          <p className="mt-2 text-sm sm:text-base text-gray-600 text-balance">Manage your digital library collection</p>
+
+      
+      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-6 lg:py-8">
+        <div className="mb-4 sm:mb-6 md:mb-8">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 leading-tight break-words">
+            Book Management
+          </h1>
+          <p className="mt-2 text-sm sm:text-base text-gray-600 leading-relaxed break-words">
+            Manage your digital library collection
+          </p>
         </div>
 
-        {loadingState.isLoading && (
+        {loading && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 shadow-xl">
-              <LoadingSpinner size="lg" text={loadingState.message} />
+              <LoadingSpinner size="lg" text="Loading books..." />
             </div>
           </div>
         )}
 
-        <div className="card">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="border-b border-gray-200">
-            <nav className="-mb-px flex flex-wrap px-4 sm:px-6 overflow-x-auto scrollbar-thin">
+            <nav className="-mb-px flex overflow-x-auto scrollbar-thin px-3 sm:px-4 md:px-6">
               {['books', 'library', 'analytics', 'categories', 'authors'].map((section) => (
                 <button
                   key={section}
                   onClick={() => setActiveSection(section)}
-                  className={`mr-4 sm:mr-8 py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm capitalize whitespace-nowrap transition-colors duration-200 ${
+                  className={`flex-shrink-0 mr-3 sm:mr-4 md:mr-6 lg:mr-8 py-3 sm:py-4 px-2 border-b-2 font-medium text-sm sm:text-base capitalize whitespace-nowrap transition-colors duration-200 ${
                     activeSection === section
                       ? 'border-primary-500 text-primary-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -359,91 +343,62 @@ export default function BookManagementEnhanced() {
           </div>
 
           {activeSection === 'books' && (
-            <div className="p-4 sm:p-6">
-              <div className="flex flex-col gap-4 mb-6">
+            <div className="p-3 sm:p-4 md:p-6">
+              <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6">
                 {/* Search and Filters Row */}
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                  <div className="relative flex-1 min-w-0">
-                    <input
-                      type="text"
-                      placeholder="Search books..."
-                      value={filters.search}
-                      onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
-                    />
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <i className="ri-search-line text-gray-400"></i>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
-                    <select
-                      value={filters.status}
-                      onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                      className="px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors min-w-0 sm:min-w-[120px]"
-                    >
-                      <option value="">All Status</option>
-                      <option value="published">Published</option>
-                      <option value="draft">Draft</option>
-                      <option value="archived">Archived</option>
-                    </select>
-
-                    <select
-                      value={filters.category_id || ''}
-                      onChange={(e) => setFilters(prev => ({ ...prev, category_id: e.target.value ? parseInt(e.target.value) : undefined }))}
-                      className="px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors min-w-0 sm:min-w-[140px]"
-                    >
-                      <option value="">All Categories</option>
-                      {categories.map(category => (
-                        <option key={category.id} value={category.id}>{category.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="w-full">
+                  <BookFilters
+                    filters={filters}
+                    categories={categories}
+                    onFiltersChange={setFilters}
+                  />
                 </div>
 
                 {/* Action Buttons Row */}
-                <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    {selectedBooks.length > 0 && (
-                      <>
-                        <button
-                          onClick={() => setShowBatchUpdateModal(true)}
-                          className="px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                        >
-                          <i className="ri-edit-2-line"></i>
-                          <span className="truncate">Batch Update ({selectedBooks.length})</span>
-                        </button>
-                        <button
-                          onClick={handleBulkDelete}
-                          className="px-4 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-                        >
-                          <i className="ri-delete-bin-line"></i>
-                          <span className="truncate">Delete Selected ({selectedBooks.length})</span>
-                        </button>
-                      </>
-                    )}
+                <div className="flex flex-col gap-3">
+                  {selectedBooks.length > 0 && (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={() => setShowBatchUpdateModal(true)}
+                        className="w-full sm:w-auto px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <i className="ri-edit-2-line"></i>
+                        <span className="truncate">Update ({selectedBooks.length})</span>
+                      </button>
+                      <button
+                        onClick={handleBulkDelete}
+                        className="w-full sm:w-auto px-4 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <i className="ri-delete-bin-line"></i>
+                        <span className="truncate">Delete ({selectedBooks.length})</span>
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      className="w-full sm:w-auto btn-primary text-sm font-medium flex items-center justify-center gap-2 px-4 py-2.5"
+                    >
+                      <i className="ri-add-line"></i>
+                      <span>Add Book</span>
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    className="btn-primary text-sm font-medium flex items-center justify-center gap-2 px-4 py-2.5"
-                  >
-                    <i className="ri-add-line"></i>
-                    <span>Add Book</span>
-                  </button>
                 </div>
               </div>
 
               {skeletonLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
                   {Array.from({ length: 8 }).map((_, i) => (
                     <CardSkeleton key={i} />
                   ))}
                 </div>
               ) : books.length === 0 ? (
-                <div className="text-center py-12 px-4">
+                <div className="text-center py-8 sm:py-12 px-4">
                   <i className="ri-book-line text-4xl sm:text-5xl text-gray-400 mb-4 block"></i>
-                  <h3 className="text-base sm:text-lg font-medium text-gray-900 text-balance">No books found</h3>
-                  <p className="mt-2 text-sm text-gray-500 text-balance max-w-sm mx-auto">Get started by uploading your first book to build your digital library.</p>
+                  <h3 className="text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">No books found</h3>
+                  <p className="mt-2 text-sm text-gray-500 leading-relaxed break-words max-w-sm mx-auto">
+                    Get started by uploading your first book to build your digital library.
+                  </p>
                   <div className="mt-6">
                     <button
                       onClick={() => setShowAddModal(true)}
@@ -456,183 +411,15 @@ export default function BookManagementEnhanced() {
                 </div>
               ) : (
                 <>
-                  {/* List View */}
-                  <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                    {/* Table Header */}
-                    <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-                      <div className="grid grid-cols-12 gap-4 items-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="col-span-1">
-                          <input
-                            type="checkbox"
-                            checked={selectedBooks.length === books.length && books.length > 0}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedBooks(books.map(book => book.id));
-                              } else {
-                                setSelectedBooks([]);
-                              }
-                            }}
-                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                          />
-                        </div>
-                        <div className="col-span-1">Cover</div>
-                        <div className="col-span-2">Title</div>
-                        <div className="col-span-2">Author</div>
-                        <div className="col-span-1">Category</div>
-                        <div className="col-span-1">Price</div>
-                        <div className="col-span-1">Status</div>
-                        <div className="col-span-1">Stock</div>
-                        <div className="col-span-2">Actions</div>
-                      </div>
-                    </div>
-
-                    {/* Table Body */}
-                    <div className="divide-y divide-gray-200">
-                      {books.map((book) => (
-                        <div key={book.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                          <div className="grid grid-cols-12 gap-4 items-center">
-                            {/* Checkbox */}
-                            <div className="col-span-1">
-                              <input
-                                type="checkbox"
-                                checked={selectedBooks.includes(book.id)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedBooks(prev => [...prev, book.id]);
-                                  } else {
-                                    setSelectedBooks(prev => prev.filter(id => id !== book.id));
-                                  }
-                                }}
-                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                              />
-                            </div>
-
-                            {/* Cover Image */}
-                            <div className="col-span-1">
-                              <div className="w-12 h-16 bg-gray-100 rounded overflow-hidden relative">
-                                <img
-                                  src={book.cover_image_url || '/placeholder-book.jpg'}
-                                  alt={book.title}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    e.currentTarget.src = '/placeholder-book.jpg';
-                                  }}
-                                />
-                                {book.is_featured && (
-                                  <div className="absolute -top-1 -right-1">
-                                    <i className="ri-star-fill text-yellow-400 text-xs"></i>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Title */}
-                            <div className="col-span-2">
-                              <h3 className="text-sm font-medium text-gray-900 truncate" title={book.title}>
-                                {book.title}
-                              </h3>
-                              <p className="text-xs text-gray-500 capitalize">{book.format}</p>
-                            </div>
-
-                            {/* Author */}
-                            <div className="col-span-2">
-                              <p className="text-sm text-gray-900 truncate" title={book.author_name}>
-                                {book.author_name}
-                              </p>
-                            </div>
-
-                            {/* Category */}
-                            <div className="col-span-1">
-                              <p className="text-sm text-gray-900 truncate" title={book.category_name}>
-                                {book.category_name}
-                              </p>
-                            </div>
-
-                            {/* Price */}
-                            <div className="col-span-1">
-                              <span className="text-sm font-medium text-green-600">
-                                ₦{book.price.toLocaleString()}
-                              </span>
-                            </div>
-
-                            {/* Status */}
-                            <div className="col-span-1">
-                              <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                                book.status === 'published' ? 'bg-green-100 text-green-800' :
-                                book.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
-                                {book.status}
-                              </span>
-                            </div>
-
-                            {/* Stock */}
-                            <div className="col-span-1">
-                              <span className="text-sm text-gray-900">{book.stock_quantity}</span>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="col-span-2">
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleToggleFeature(book.id, !book.is_featured)}
-                                  className={`p-1.5 rounded-lg transition-colors ${
-                                    book.is_featured 
-                                      ? 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100' 
-                                      : 'text-gray-400 hover:text-yellow-600 hover:bg-yellow-50'
-                                  }`}
-                                  title={book.is_featured ? 'Remove from Featured' : 'Add to Featured'}
-                                >
-                                  <i className="ri-star-line text-sm"></i>
-                                </button>
-                                <button
-                                  onClick={() => handleToggleStatus(book.id, book.status === 'published' ? 'draft' : 'published')}
-                                  className={`p-1.5 rounded-lg transition-colors ${
-                                    book.status === 'published'
-                                      ? 'text-green-600 bg-green-50 hover:bg-green-100'
-                                      : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
-                                  }`}
-                                  title={book.status === 'published' ? 'Deactivate' : 'Activate'}
-                                >
-                                  <i className={`text-sm ${book.status === 'published' ? 'ri-toggle-line' : 'ri-toggle-fill'}`}></i>
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setSelectedBookForAction(book);
-                                    setShowEditModal(true);
-                                  }}
-                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                  title="Edit Book"
-                                >
-                                  <i className="ri-edit-line text-sm"></i>
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setSelectedBookForAction(book);
-                                    setShowDetailsModal(true);
-                                  }}
-                                  className="p-1.5 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                                  title="View Details"
-                                >
-                                  <i className="ri-eye-line text-sm"></i>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteBook(book.id)}
-                                  className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                  title="Delete Book"
-                                >
-                                  <i className="ri-delete-bin-line text-sm"></i>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <BookTable
+                    books={books}
+                    selectedBooks={selectedBooks}
+                    onSelectionChange={setSelectedBooks}
+                    onBookAction={handleBookAction}
+                  />
 
                   {pagination.pages > 1 && (
-                    <div className="mt-6 sm:mt-8">
+                    <div className="mt-6 md:mt-8">
                       <Pagination
                         currentPage={pagination.page}
                         totalPages={pagination.pages}
@@ -670,28 +457,30 @@ export default function BookManagementEnhanced() {
         <Modal 
           isOpen={showDeleteConfirm} 
           onClose={() => setShowDeleteConfirm(false)}
-          className="max-w-md w-full mx-4"
+          className="max-w-sm xs:max-w-md w-full mx-2 xs:mx-3 sm:mx-4"
         >
-          <div className="p-4 sm:p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                <i className="ri-alert-line text-red-600"></i>
+          <div className="p-3 xs:p-4 sm:p-6">
+            <div className="flex items-start xs:items-center gap-2 xs:gap-3 mb-3 xs:mb-4">
+              <div className="flex-shrink-0 w-8 xs:w-10 h-8 xs:h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <i className="ri-alert-line text-red-600 text-sm xs:text-base"></i>
               </div>
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 text-balance">Confirm Delete</h3>
+              <h3 className="text-sm xs:text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">Confirm Delete</h3>
             </div>
-            <p className="text-sm sm:text-base text-gray-600 mb-6 text-balance">Are you sure you want to delete this book? This action cannot be undone and will permanently remove the book from your library.</p>
-            <div className="flex flex-col sm:flex-row justify-end gap-3">
+            <p className="text-xs xs:text-sm sm:text-base text-gray-600 mb-4 xs:mb-5 sm:mb-6 leading-relaxed break-words">
+              Are you sure you want to delete this book? This action cannot be undone and will permanently remove the book from your library.
+            </p>
+            <div className="flex flex-col xs:flex-row justify-end gap-2 xs:gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs xs:text-sm font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDeleteBook}
-                className="px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs xs:text-sm font-medium flex items-center justify-center gap-1 xs:gap-2"
               >
-                <i className="ri-delete-bin-line"></i>
+                <i className="ri-delete-bin-line text-sm xs:text-base"></i>
                 Delete Book
               </button>
             </div>
@@ -701,46 +490,82 @@ export default function BookManagementEnhanced() {
         {/* Assign to User Modal */}
         <Modal 
           isOpen={showAssignModal} 
-          onClose={() => setShowAssignModal(false)}
-          className="max-w-lg w-full mx-4"
+          onClose={() => {
+            setShowAssignModal(false);
+            setSelectedUser(null);
+            setUserSearchQuery('');
+          }}
+          className="max-w-sm xs:max-w-md sm:max-w-lg w-full mx-2 xs:mx-3 sm:mx-4"
         >
-          <div className="p-4 sm:p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <i className="ri-user-add-line text-blue-600"></i>
+          <div className="p-3 xs:p-4 sm:p-6">
+            <div className="flex items-start xs:items-center gap-2 xs:gap-3 mb-3 xs:mb-4">
+              <div className="flex-shrink-0 w-8 xs:w-10 h-8 xs:h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <i className="ri-user-add-line text-blue-600 text-sm xs:text-base"></i>
               </div>
-              <h3 className="text-base sm:text-lg font-medium text-gray-900">Assign Book to User</h3>
+              <h3 className="text-sm xs:text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">Assign Book to User Library</h3>
             </div>
             {selectedBookForAction && (
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-900">{selectedBookForAction.title}</p>
-                <p className="text-xs text-gray-600">by {selectedBookForAction.author_name}</p>
+              <div className="mb-3 xs:mb-4 p-2 xs:p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs xs:text-sm font-medium text-gray-900 leading-tight break-words">{selectedBookForAction.title}</p>
+                <p className="text-xs text-gray-600 break-words">by {selectedBookForAction.author_name}</p>
               </div>
             )}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Select User</label>
+            <div className="mb-3 xs:mb-4">
+              <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Search and Select User</label>
               <input
                 type="text"
-                placeholder="Search users by name or email..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Search users..."
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+              {userSearchQuery && (
+                <div className="mt-1 xs:mt-2 max-h-32 xs:max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
+                  {users
+                    .filter(user => 
+                      user.name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+                      user.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
+                    )
+                    .slice(0, 5)
+                    .map(user => (
+                      <button
+                        key={user.id}
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setUserSearchQuery(`${user.name} (${user.email})`);
+                        }}
+                        className="w-full text-left px-2 xs:px-3 py-1.5 xs:py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                      >
+                        <p className="text-xs xs:text-sm font-medium text-gray-900 truncate">{user.name}</p>
+                        <p className="text-xs text-gray-600 truncate">{user.email}</p>
+                      </button>
+                    ))
+                  }
+                </div>
+              )}
             </div>
-            <div className="flex flex-col sm:flex-row justify-end gap-3">
+            <div className="flex flex-col xs:flex-row justify-end gap-2 xs:gap-3">
               <button
-                onClick={() => setShowAssignModal(false)}
-                className="px-4 py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                onClick={() => {
+                  setShowAssignModal(false);
+                  setSelectedUser(null);
+                  setUserSearchQuery('');
+                }}
+                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs xs:text-sm font-medium"
               >
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  toast.success('Book assigned successfully!');
-                  setShowAssignModal(false);
-                }}
-                className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+                onClick={handleAssignBook}
+                disabled={!selectedUser || assignLoading}
+                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs xs:text-sm font-medium flex items-center justify-center gap-1 xs:gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <i className="ri-user-add-line"></i>
-                Assign Book
+                {assignLoading ? (
+                  <i className="ri-loader-4-line animate-spin text-sm xs:text-base"></i>
+                ) : (
+                  <i className="ri-user-add-line text-sm xs:text-base"></i>
+                )}
+                <span className="truncate">{assignLoading ? 'Assigning...' : 'Assign Book'}</span>
               </button>
             </div>
           </div>
@@ -750,50 +575,50 @@ export default function BookManagementEnhanced() {
         <Modal 
           isOpen={showAnalyticsModal} 
           onClose={() => setShowAnalyticsModal(false)}
-          className="max-w-4xl w-full mx-4"
+          className="max-w-xs xs:max-w-sm sm:max-w-2xl md:max-w-4xl w-full mx-2 xs:mx-3 sm:mx-4"
         >
-          <div className="p-4 sm:p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <i className="ri-bar-chart-line text-purple-600"></i>
+          <div className="p-3 xs:p-4 sm:p-6">
+            <div className="flex items-start xs:items-center gap-2 xs:gap-3 mb-4 xs:mb-5 sm:mb-6">
+              <div className="flex-shrink-0 w-8 xs:w-10 h-8 xs:h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                <i className="ri-bar-chart-line text-purple-600 text-sm xs:text-base"></i>
               </div>
-              <h3 className="text-base sm:text-lg font-medium text-gray-900">Reading Analytics</h3>
+              <h3 className="text-sm xs:text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">Reading Analytics</h3>
             </div>
             {selectedBookForAction && (
-              <div className="mb-6">
-                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+              <div className="mb-4 xs:mb-5 sm:mb-6">
+                <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2 xs:gap-3 sm:gap-4 p-2 xs:p-3 sm:p-4 bg-gray-50 rounded-lg">
                   <img
                     src={selectedBookForAction.cover_image_url || '/placeholder-book.jpg'}
                     alt={selectedBookForAction.title}
-                    className="w-16 h-20 object-cover rounded"
+                    className="w-12 xs:w-14 sm:w-16 h-15 xs:h-17 sm:h-20 object-cover rounded mx-auto xs:mx-0"
                   />
-                  <div>
-                    <h4 className="font-medium text-gray-900">{selectedBookForAction.title}</h4>
-                    <p className="text-sm text-gray-600">by {selectedBookForAction.author_name}</p>
-                    <p className="text-xs text-gray-500">{selectedBookForAction.category_name}</p>
+                  <div className="text-center xs:text-left w-full">
+                    <h4 className="text-xs xs:text-sm sm:text-base font-medium text-gray-900 leading-tight break-words">{selectedBookForAction.title}</h4>
+                    <p className="text-xs sm:text-sm text-gray-600 break-words">by {selectedBookForAction.author_name}</p>
+                    <p className="text-xs text-gray-500 break-words">{selectedBookForAction.category_name}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                  <div className="bg-white p-4 rounded-lg border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <i className="ri-eye-line text-blue-600"></i>
-                      <span className="text-sm font-medium text-gray-700">Total Views</span>
+                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2 xs:gap-3 sm:gap-4 mt-3 xs:mt-4 sm:mt-6">
+                  <div className="bg-white p-2 xs:p-3 sm:p-4 rounded-lg border">
+                    <div className="flex items-center gap-1 xs:gap-2 mb-1 xs:mb-2">
+                      <i className="ri-eye-line text-blue-600 text-sm xs:text-base"></i>
+                      <span className="text-xs xs:text-sm font-medium text-gray-700">Total Views</span>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900">1,234</p>
+                    <p className="text-lg xs:text-xl sm:text-2xl font-bold text-gray-900">1,234</p>
                   </div>
-                  <div className="bg-white p-4 rounded-lg border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <i className="ri-time-line text-green-600"></i>
-                      <span className="text-sm font-medium text-gray-700">Reading Time</span>
+                  <div className="bg-white p-2 xs:p-3 sm:p-4 rounded-lg border">
+                    <div className="flex items-center gap-1 xs:gap-2 mb-1 xs:mb-2">
+                      <i className="ri-time-line text-green-600 text-sm xs:text-base"></i>
+                      <span className="text-xs xs:text-sm font-medium text-gray-700">Reading Time</span>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900">45h 30m</p>
+                    <p className="text-lg xs:text-xl sm:text-2xl font-bold text-gray-900">45h 30m</p>
                   </div>
-                  <div className="bg-white p-4 rounded-lg border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <i className="ri-user-line text-purple-600"></i>
-                      <span className="text-sm font-medium text-gray-700">Active Readers</span>
+                  <div className="bg-white p-2 xs:p-3 sm:p-4 rounded-lg border xs:col-span-2 sm:col-span-1">
+                    <div className="flex items-center gap-1 xs:gap-2 mb-1 xs:mb-2">
+                      <i className="ri-user-line text-purple-600 text-sm xs:text-base"></i>
+                      <span className="text-xs xs:text-sm font-medium text-gray-700">Active Readers</span>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900">89</p>
+                    <p className="text-lg xs:text-xl sm:text-2xl font-bold text-gray-900">89</p>
                   </div>
                 </div>
               </div>
@@ -801,7 +626,7 @@ export default function BookManagementEnhanced() {
             <div className="flex justify-end">
               <button
                 onClick={() => setShowAnalyticsModal(false)}
-                className="px-4 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs xs:text-sm font-medium"
               >
                 Close
               </button>
@@ -813,58 +638,58 @@ export default function BookManagementEnhanced() {
         <Modal 
           isOpen={showEditModal} 
           onClose={() => setShowEditModal(false)}
-          className="max-w-2xl w-full mx-4"
+          className="max-w-sm xs:max-w-md sm:max-w-lg md:max-w-2xl w-full mx-2 xs:mx-3 sm:mx-4"
         >
-          <div className="p-4 sm:p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <i className="ri-edit-line text-green-600"></i>
+          <div className="p-3 xs:p-4 sm:p-6">
+            <div className="flex items-start xs:items-center gap-2 xs:gap-3 mb-4 xs:mb-5 sm:mb-6">
+              <div className="flex-shrink-0 w-8 xs:w-10 h-8 xs:h-10 bg-green-100 rounded-full flex items-center justify-center">
+                <i className="ri-edit-line text-green-600 text-sm xs:text-base"></i>
               </div>
-              <h3 className="text-base sm:text-lg font-medium text-gray-900">Edit Book</h3>
+              <h3 className="text-sm xs:text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">Edit Book</h3>
             </div>
             {selectedBookForAction && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3 xs:space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 xs:gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                    <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Title</label>
                     <input
                       type="text"
                       defaultValue={selectedBookForAction.title}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Author</label>
+                    <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Author</label>
                     <input
                       type="text"
                       defaultValue={selectedBookForAction.author_name}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 xs:gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Price</label>
+                    <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Price</label>
                     <input
                       type="number"
                       defaultValue={selectedBookForAction.price}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Stock</label>
+                    <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Stock</label>
                     <input
                       type="number"
                       defaultValue={selectedBookForAction.stock_quantity}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Status</label>
                   <select
                     defaultValue={selectedBookForAction.status}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
                     <option value="published">Published</option>
                     <option value="draft">Draft</option>
@@ -873,10 +698,10 @@ export default function BookManagementEnhanced() {
                 </div>
               </div>
             )}
-            <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
+            <div className="flex flex-col xs:flex-row justify-end gap-2 xs:gap-3 mt-4 xs:mt-5 sm:mt-6">
               <button
                 onClick={() => setShowEditModal(false)}
-                className="px-4 py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs xs:text-sm font-medium"
               >
                 Cancel
               </button>
@@ -884,11 +709,10 @@ export default function BookManagementEnhanced() {
                 onClick={() => {
                   toast.success('Book updated successfully!');
                   setShowEditModal(false);
-                  loadData();
                 }}
-                className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
+                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs xs:text-sm font-medium flex items-center justify-center gap-1 xs:gap-2"
               >
-                <i className="ri-save-line"></i>
+                <i className="ri-save-line text-sm xs:text-base"></i>
                 Save Changes
               </button>
             </div>
@@ -899,50 +723,50 @@ export default function BookManagementEnhanced() {
         <Modal 
           isOpen={showDetailsModal} 
           onClose={() => setShowDetailsModal(false)}
-          className="max-w-3xl w-full mx-4"
+          className="max-w-sm xs:max-w-md sm:max-w-2xl md:max-w-3xl w-full mx-2 xs:mx-3 sm:mx-4"
         >
-          <div className="p-4 sm:p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex-shrink-0 w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                <i className="ri-book-line text-gray-600"></i>
+          <div className="p-3 xs:p-4 sm:p-6">
+            <div className="flex items-start xs:items-center gap-2 xs:gap-3 mb-4 xs:mb-5 sm:mb-6">
+              <div className="flex-shrink-0 w-8 xs:w-10 h-8 xs:h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                <i className="ri-book-line text-gray-600 text-sm xs:text-base"></i>
               </div>
-              <h3 className="text-base sm:text-lg font-medium text-gray-900">Book Details</h3>
+              <h3 className="text-sm xs:text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">Book Details</h3>
             </div>
             {selectedBookForAction && (
-              <div className="space-y-6">
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="flex-shrink-0">
+              <div className="space-y-4 xs:space-y-5 sm:space-y-6">
+                <div className="flex flex-col sm:flex-row gap-3 xs:gap-4 sm:gap-6">
+                  <div className="flex-shrink-0 mx-auto sm:mx-0">
                     <img
                       src={selectedBookForAction.cover_image_url || '/placeholder-book.jpg'}
                       alt={selectedBookForAction.title}
-                      className="w-32 h-40 object-cover rounded-lg shadow-md"
+                      className="w-24 xs:w-28 sm:w-32 h-30 xs:h-35 sm:h-40 object-cover rounded-lg shadow-md"
                     />
                   </div>
-                  <div className="flex-1 space-y-4">
-                    <div>
-                      <h4 className="text-xl font-bold text-gray-900">{selectedBookForAction.title}</h4>
-                      <p className="text-lg text-gray-600">by {selectedBookForAction.author_name}</p>
+                  <div className="flex-1 space-y-3 xs:space-y-4">
+                    <div className="text-center sm:text-left">
+                      <h4 className="text-base xs:text-lg sm:text-xl font-bold text-gray-900 leading-tight break-words">{selectedBookForAction.title}</h4>
+                      <p className="text-sm xs:text-base sm:text-lg text-gray-600 break-words">by {selectedBookForAction.author_name}</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 xs:gap-3 sm:gap-4">
                       <div>
-                        <span className="text-sm font-medium text-gray-500">Category</span>
-                        <p className="text-sm text-gray-900">{selectedBookForAction.category_name}</p>
+                        <span className="text-xs xs:text-sm font-medium text-gray-500">Category</span>
+                        <p className="text-xs xs:text-sm text-gray-900 break-words">{selectedBookForAction.category_name}</p>
                       </div>
                       <div>
-                        <span className="text-sm font-medium text-gray-500">Format</span>
-                        <p className="text-sm text-gray-900 capitalize">{selectedBookForAction.format}</p>
+                        <span className="text-xs xs:text-sm font-medium text-gray-500">Format</span>
+                        <p className="text-xs xs:text-sm text-gray-900 capitalize">{selectedBookForAction.format}</p>
                       </div>
                       <div>
-                        <span className="text-sm font-medium text-gray-500">Price</span>
-                        <p className="text-sm font-semibold text-green-600">₦{selectedBookForAction.price.toLocaleString()}</p>
+                        <span className="text-xs xs:text-sm font-medium text-gray-500">Price</span>
+                        <p className="text-xs xs:text-sm font-semibold text-green-600">₦{selectedBookForAction.price.toLocaleString()}</p>
                       </div>
                       <div>
-                        <span className="text-sm font-medium text-gray-500">Stock</span>
-                        <p className="text-sm text-gray-900">{selectedBookForAction.stock_quantity}</p>
+                        <span className="text-xs xs:text-sm font-medium text-gray-500">Stock</span>
+                        <p className="text-xs xs:text-sm text-gray-900">{selectedBookForAction.stock_quantity}</p>
                       </div>
                       <div>
-                        <span className="text-sm font-medium text-gray-500">Status</span>
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                        <span className="text-xs xs:text-sm font-medium text-gray-500">Status</span>
+                        <span className={`inline-flex px-1.5 xs:px-2 py-0.5 xs:py-1 text-xs font-medium rounded-full ${
                           selectedBookForAction.status === 'published' ? 'bg-green-100 text-green-800' :
                           selectedBookForAction.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
                           'bg-gray-100 text-gray-800'
@@ -951,22 +775,22 @@ export default function BookManagementEnhanced() {
                         </span>
                       </div>
                       <div>
-                        <span className="text-sm font-medium text-gray-500">Featured</span>
-                        <p className="text-sm text-gray-900">{selectedBookForAction.is_featured ? 'Yes' : 'No'}</p>
+                        <span className="text-xs xs:text-sm font-medium text-gray-500">Featured</span>
+                        <p className="text-xs xs:text-sm text-gray-900">{selectedBookForAction.is_featured ? 'Yes' : 'No'}</p>
                       </div>
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Created</span>
-                      <p className="text-sm text-gray-900">{new Date(selectedBookForAction.created_at).toLocaleDateString()}</p>
+                      <span className="text-xs xs:text-sm font-medium text-gray-500">Created</span>
+                      <p className="text-xs xs:text-sm text-gray-900">{new Date(selectedBookForAction.created_at).toLocaleDateString()}</p>
                     </div>
                   </div>
                 </div>
               </div>
             )}
-            <div className="flex justify-end mt-6">
+            <div className="flex justify-end mt-4 xs:mt-5 sm:mt-6">
               <button
                 onClick={() => setShowDetailsModal(false)}
-                className="px-4 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs xs:text-sm font-medium"
               >
                 Close
               </button>
@@ -978,25 +802,25 @@ export default function BookManagementEnhanced() {
         <Modal 
           isOpen={showBatchUpdateModal} 
           onClose={() => setShowBatchUpdateModal(false)}
-          className="max-w-lg w-full mx-4"
+          className="max-w-sm xs:max-w-md sm:max-w-lg w-full mx-2 xs:mx-3 sm:mx-4"
         >
-          <div className="p-4 sm:p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <i className="ri-edit-2-line text-blue-600"></i>
+          <div className="p-3 xs:p-4 sm:p-6">
+            <div className="flex items-start xs:items-center gap-2 xs:gap-3 mb-4 xs:mb-5 sm:mb-6">
+              <div className="flex-shrink-0 w-8 xs:w-10 h-8 xs:h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <i className="ri-edit-2-line text-blue-600 text-sm xs:text-base"></i>
               </div>
-              <h3 className="text-base sm:text-lg font-medium text-gray-900">Batch Update Books</h3>
+              <h3 className="text-sm xs:text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">Batch Update Books</h3>
             </div>
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600">Updating {selectedBooks.length} selected books</p>
+            <div className="mb-3 xs:mb-4 p-2 xs:p-3 bg-gray-50 rounded-lg">
+              <p className="text-xs xs:text-sm text-gray-600">Updating {selectedBooks.length} selected books</p>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3 xs:space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status (optional)</label>
+                <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Status (optional)</label>
                 <select
                   value={batchUpdateData.status}
                   onChange={(e) => setBatchUpdateData(prev => ({ ...prev, status: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Keep current status</option>
                   <option value="published">Published</option>
@@ -1005,11 +829,11 @@ export default function BookManagementEnhanced() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Category (optional)</label>
+                <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Category (optional)</label>
                 <select
                   value={batchUpdateData.category_id}
                   onChange={(e) => setBatchUpdateData(prev => ({ ...prev, category_id: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Keep current category</option>
                   {categories.map(category => (
@@ -1018,41 +842,41 @@ export default function BookManagementEnhanced() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Price Adjustment (optional)</label>
-                <div className="flex gap-2">
+                <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Price Adjustment (optional)</label>
+                <div className="flex gap-1 xs:gap-2">
                   <select
-                    value={batchUpdateData.adjustment_type}
-                    onChange={(e) => setBatchUpdateData(prev => ({ ...prev, adjustment_type: e.target.value }))}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={batchUpdateData.price_adjustment.type}
+                    onChange={(e) => setBatchUpdateData(prev => ({ ...prev, price_adjustment: { ...prev.price_adjustment, type: e.target.value as 'percentage' | 'fixed' } }))}
+                    className="w-16 xs:w-20 px-1 xs:px-2 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="percentage">%</option>
                     <option value="fixed">₦</option>
                   </select>
                   <input
                     type="number"
-                    placeholder={batchUpdateData.adjustment_type === 'percentage' ? '10' : '1000'}
-                    value={batchUpdateData.price_adjustment}
-                    onChange={(e) => setBatchUpdateData(prev => ({ ...prev, price_adjustment: e.target.value }))}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={batchUpdateData.price_adjustment.type === 'percentage' ? '10' : '1000'}
+                    value={batchUpdateData.price_adjustment.value}
+                    onChange={(e) => setBatchUpdateData(prev => ({ ...prev, price_adjustment: { ...prev.price_adjustment, value: e.target.value } }))}
+                    className="flex-1 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {batchUpdateData.adjustment_type === 'percentage' ? 'Increase/decrease by percentage (use negative for decrease)' : 'Add/subtract fixed amount (use negative to subtract)'}
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed break-words">
+                  {batchUpdateData.price_adjustment.type === 'percentage' ? 'Increase/decrease by percentage (use negative for decrease)' : 'Add/subtract fixed amount (use negative to subtract)'}
                 </p>
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
+            <div className="flex flex-col xs:flex-row justify-end gap-2 xs:gap-3 mt-4 xs:mt-5 sm:mt-6">
               <button
                 onClick={() => setShowBatchUpdateModal(false)}
-                className="px-4 py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs xs:text-sm font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleBatchUpdate}
-                className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs xs:text-sm font-medium flex items-center justify-center gap-1 xs:gap-2"
               >
-                <i className="ri-save-line"></i>
+                <i className="ri-save-line text-sm xs:text-base"></i>
                 Update Books
               </button>
             </div>

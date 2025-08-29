@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import AdminSidebar from "./AdminSidebar";
 import { usePermissions } from "@/app/hooks/usePermissions";
 import { canAccessTab } from "@/utils/permission-mapping";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 // Lazy load components for faster initial page load
 const OverviewStats = lazy(() => import("./OverviewStats"));
@@ -39,17 +40,19 @@ const ComponentLoader = () => (
 );
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { data: session, status } = useSession();
-  const { permissions, loading: permissionsLoading } = usePermissions();
+  // Skip permission loading for admin users to improve performance
+  const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'super_admin';
+  const { permissions, loading: permissionsLoading } = usePermissions(isAdmin);
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // Performance monitoring
   useEffect(() => {
-    const pageLoadTime = Date.now() - performance.timing.navigationStart;
+    const pageLoadTime = Date.now() - (performance.timeOrigin || Date.now());
     console.log(`⚡ Admin page load performance: ${pageLoadTime}ms`);
   }, []);
 
@@ -75,48 +78,35 @@ export default function AdminDashboard() {
 
   // Handle URL parameter for tab navigation with permission validation
   useEffect(() => {
-    if (permissionsLoading) return;
+    if (!isAdmin && permissionsLoading) return;
 
     const tabParam = searchParams.get("tab");
     if (tabParam) {
-      // Check if user has permission to access this tab
-      if (canAccessTab(tabParam, permissions)) {
+      // Admin users can access any tab
+      if (isAdmin || canAccessTab(tabParam, permissions)) {
         setActiveTab(tabParam);
       } else {
-        // Redirect to first available tab or overview
-        const availableTabs = [
-          "overview",
-          "users",
-          "roles",
-          "audit",
-          "books",
-          "reviews",
-          "notifications",
-          "orders",
-          "shipping",
-          "reading",
-          "reports",
-          "email-templates",
-          "blog",
-          "works",
-          "about",
-          "faq-management",
-          "contact",
-          "settings",
-        ];
-        const firstAccessibleTab =
-          availableTabs.find((tab) => canAccessTab(tab, permissions)) ||
-          "overview";
-        setActiveTab(firstAccessibleTab);
-        router.replace(`/admin?tab=${firstAccessibleTab}`);
+        // Redirect to overview for non-admin users
+        setActiveTab("overview");
+        router.replace(`/admin?tab=overview`);
       }
+    } else if (!activeTab) {
+      // Only default to overview if no tab is set (initial load without tab param)
+      setActiveTab("overview");
+      router.replace(`/admin?tab=overview`, { scroll: false });
     }
-  }, [searchParams, permissions, permissionsLoading, router]);
+  }, [searchParams, permissions, permissionsLoading, router, isAdmin, activeTab]);
+
+  // Handle tab changes and update URL
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    router.push(`/admin?tab=${tab}`, { scroll: false });
+  };
 
   // Listen for tab switch events from sidebar
   useEffect(() => {
     const handleTabSwitch = (event: CustomEvent) => {
-      setActiveTab(event.detail.tab);
+      handleTabChange(event.detail.tab);
     };
 
     window.addEventListener("switchTab", handleTabSwitch as EventListener);
@@ -126,8 +116,8 @@ export default function AdminDashboard() {
   }, []);
 
   const renderContent = () => {
-    // Check if user has permission to access the current tab
-    if (!permissionsLoading && !canAccessTab(activeTab, permissions)) {
+    // Check if user has permission to access the current tab (skip for admins)
+    if (!isAdmin && !permissionsLoading && !canAccessTab(activeTab, permissions)) {
       return (
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
@@ -171,7 +161,9 @@ export default function AdminDashboard() {
       case "books":
         return (
           <Suspense fallback={<ComponentLoader />}>
-            <BookManagementEnhanced />
+            <ErrorBoundary fallback={<div className="p-6 text-center"><p className="text-red-600">Failed to load Book Management. Please refresh the page.</p></div>}>
+              <BookManagementEnhanced />
+            </ErrorBoundary>
           </Suspense>
         );
       case "reviews":
@@ -267,11 +259,20 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-gray-50">
         <Header />
         <div className="flex h-screen">
+          <div className="w-64 bg-white border-r border-gray-200">
+            <div className="p-4">
+              <div className="animate-pulse space-y-3">
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+              </div>
+            </div>
+          </div>
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-2 text-xs text-gray-500">
-                Loading admin dashboard...
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-3 text-sm text-gray-600 font-medium">
+                Loading Admin Dashboard...
               </p>
             </div>
           </div>
@@ -302,7 +303,7 @@ export default function AdminDashboard() {
         {/* Sidebar */}
         <AdminSidebar
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={handleTabChange}
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen(!sidebarOpen)}
           isCollapsed={sidebarCollapsed}

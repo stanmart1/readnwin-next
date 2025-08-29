@@ -15,18 +15,18 @@ export default function FlutterwaveScriptLoader() {
     const originalConsoleError = console.error;
     console.error = (...args) => {
       const message = args[0]?.toString() || '';
-      // Suppress specific Flutterwave internal service errors
+      // Only suppress specific Flutterwave internal service errors
       if (
         message.includes('forter/events') ||
         message.includes('metrics.flutterwave.com') ||
         message.includes('api.fpjs.io') ||
-        message.includes('API key not found') ||
-        message.includes('400 (Bad Request)')
+        (message.includes('API key not found') && message.includes('flutterwave')) ||
+        (message.includes('400 (Bad Request)') && message.includes('flutterwave'))
       ) {
         // Suppress these errors silently
         return;
       }
-      // Log other errors normally
+      // Log other errors normally (including analytics errors)
       originalConsoleError.apply(console, args);
     };
 

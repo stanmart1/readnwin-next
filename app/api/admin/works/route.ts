@@ -18,15 +18,9 @@ const pool = new Pool({
 
 // Ensure upload directory exists
 async function ensureUploadDir() {
-  let uploadDir: string;
-  
-  if (process.env.NODE_ENV === 'production') {
-    // Production: use /uploads/works
-    uploadDir = '/uploads/works';
-  } else {
-    // Development: use local public/uploads/works
-    uploadDir = join(process.cwd(), 'public', 'uploads', 'works');
-  }
+  const uploadDir = process.env.NODE_ENV === 'production'
+    ? '/app/storage/uploads/works'
+    : join(process.cwd(), 'public', 'uploads', 'works');
   
   try {
     if (!existsSync(uploadDir)) {
@@ -35,11 +29,7 @@ async function ensureUploadDir() {
     }
   } catch (error) {
     console.error(`❌ Error creating upload directory: ${uploadDir}`, error);
-    // Fallback to public/uploads/works if uploads fails
-    uploadDir = join(process.cwd(), 'public', 'uploads', 'works');
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
+    throw error;
   }
   
   return uploadDir;
@@ -172,13 +162,8 @@ export async function POST(request: NextRequest) {
     const filename = generateFilename(image.name);
     const filePath = join(uploadDir, filename);
     
-    // Set relative path based on environment
-    let relativePath: string;
-    if (process.env.NODE_ENV === 'production') {
-      relativePath = `/uploads/works/${filename}`;
-    } else {
-      relativePath = `/uploads/works/${filename}`;
-    }
+    // Set API route path
+    const relativePath = `/api/images/works/${filename}`;
 
     const bytes = await image.arrayBuffer();
     const buffer = Buffer.from(bytes);

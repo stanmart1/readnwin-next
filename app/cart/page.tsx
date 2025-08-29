@@ -226,9 +226,12 @@ export default function CartPage() {
                         {/* Book Cover */}
                         <div className="flex-shrink-0">
                           <img 
-                            src={book.cover_image_url} 
+                            src={book.cover_image_url?.startsWith('/api/images/covers/') ? book.cover_image_url : `/api/images/covers/${book.cover_image_url?.split('/').pop() || 'placeholder.jpg'}`}
                             alt={book.title}
                             className="w-20 h-28 object-cover rounded-lg shadow-md"
+                            onError={(e) => {
+                              e.currentTarget.src = '/placeholder-book.jpg';
+                            }}
                           />
                         </div>
 

@@ -65,6 +65,22 @@ const nextConfig = {
 
   // Webpack configuration
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+    // Fix chunk loading issues
+    if (!dev && !isServer) {
+      config.optimization.splitChunks = {
+        ...config.optimization.splitChunks,
+        cacheGroups: {
+          ...config.optimization.splitChunks.cacheGroups,
+          admin: {
+            name: 'admin',
+            test: /[\\/]app[\\/]admin[\\/]/,
+            chunks: 'all',
+            priority: 10,
+            enforce: true
+          }
+        }
+      };
+    }
     // Path aliases
     config.resolve.alias = {
       ...config.resolve.alias,

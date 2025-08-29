@@ -7,15 +7,14 @@ export async function GET(request: NextRequest) {
     const isProduction = process.env.NODE_ENV === 'production';
     
     // Check various paths where uploads might be stored
+    const baseStoragePath = isProduction ? '/app/storage' : join(process.cwd(), 'storage');
     const pathsToCheck = [
-      '/app/storage/uploads/covers',
-      '/app/storage/public/uploads/covers',
-      '/app/storage/covers',
-      '/app/public/uploads/covers',
-      '/app/uploads/covers', 
-      '/app/.next/standalone/public/uploads/covers',
+      join(baseStoragePath, 'uploads/covers'),
+      join(baseStoragePath, 'public/uploads/covers'),
+      join(baseStoragePath, 'covers'),
       join(process.cwd(), 'public/uploads/covers'),
-      join(process.cwd(), 'uploads/covers')
+      join(process.cwd(), 'uploads/covers'),
+      join(process.cwd(), '.next/standalone/public/uploads/covers')
     ];
     
     const results = pathsToCheck.map(path => {

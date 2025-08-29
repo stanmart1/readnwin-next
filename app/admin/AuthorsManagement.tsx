@@ -84,10 +84,7 @@ export default function AuthorsManagement() {
       return;
     }
 
-    if (!formData.email.trim()) {
-      toast.error('Author email is required');
-      return;
-    }
+    // Email is now optional
 
     try {
       const url = editingAuthor 
@@ -321,7 +318,7 @@ export default function AuthorsManagement() {
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">{author.name}</div>
-                          <div className="text-sm text-gray-500">{author.email}</div>
+                          <div className="text-sm text-gray-500">{author.email || 'No email provided'}</div>
                         </div>
                       </div>
                     </td>
@@ -418,15 +415,14 @@ export default function AuthorsManagement() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email *
+                Email
               </label>
               <input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter author email"
-                required
+                placeholder="Enter author email (optional)"
               />
             </div>
             

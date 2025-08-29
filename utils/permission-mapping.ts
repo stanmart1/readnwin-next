@@ -199,6 +199,9 @@ export const ACTION_PERMISSIONS = {
 };
 
 export function getVisibleTabs(userPermissions: string[]): TabPermission[] {
+  // Admin users with wildcard permission can see all tabs
+  if (userPermissions.includes('*')) return ADMIN_TAB_PERMISSIONS;
+  
   return ADMIN_TAB_PERMISSIONS.filter((tab) => {
     // User must have at least one of the required permissions
     return tab.requiredPermissions.some((permission) =>
@@ -211,6 +214,9 @@ export function canAccessTab(
   tabId: string,
   userPermissions: string[],
 ): boolean {
+  // Admin users with wildcard permission can access all tabs
+  if (userPermissions.includes('*')) return true;
+  
   const tab = ADMIN_TAB_PERMISSIONS.find((t) => t.id === tabId);
   if (!tab) return false;
 
@@ -221,6 +227,9 @@ export function canAccessTab(
 
 // Check if user can perform a specific action
 export function canPerformAction(actionName: string, userPermissions: string[]): boolean {
+  // Admin users with wildcard permission can perform all actions
+  if (userPermissions.includes('*')) return true;
+  
   const requiredPermissions = ACTION_PERMISSIONS[actionName as keyof typeof ACTION_PERMISSIONS];
   
   // If no permissions defined for this action, deny access

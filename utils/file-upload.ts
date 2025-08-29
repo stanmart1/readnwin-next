@@ -19,8 +19,8 @@ export class FileUploadService {
     } else if (process.env.NODE_ENV === 'production') {
       this.uploadDir = '/app/storage';
     } else {
-      // Development: use public/uploads
-      this.uploadDir = join(process.cwd(), 'public', 'uploads');
+      // Development: use storage directory
+      this.uploadDir = join(process.cwd(), 'storage');
     }
   }
 
@@ -144,7 +144,7 @@ export class FileUploadService {
     // In production, this will be /app/book-files, in development it will be ./book-files
     const bookFilesDir = process.env.NODE_ENV === 'production' 
       ? '/app/storage/books' 
-      : join(process.cwd(), 'book-files');
+      : join(process.cwd(), 'storage', 'books');
     const customUploadService = new FileUploadService(bookFilesDir);
     return customUploadService.uploadFile(file, '');
   }
@@ -212,8 +212,8 @@ export class FileUploadService {
       if (filePath.startsWith('/book-files/')) {
         const relativePath = filePath.replace('/book-files/', '');
         const bookFilesDir = process.env.NODE_ENV === 'production' 
-          ? '/app/book-files' 
-          : join(process.cwd(), 'book-files');
+          ? '/app/storage/books' 
+          : join(process.cwd(), 'storage', 'books');
         fullPath = join(bookFilesDir, relativePath);
       } else if (process.env.NODE_ENV === 'production') {
         // In production, filePath is like "/uploads/covers/filename"
@@ -279,8 +279,8 @@ export class FileUploadService {
     if (relativePath.startsWith('/book-files/')) {
       pathWithoutPrefix = relativePath.replace('/book-files/', '');
       baseDir = process.env.NODE_ENV === 'production' 
-        ? '/app/book-files' 
-        : join(process.cwd(), 'book-files');
+        ? '/app/storage/books' 
+        : join(process.cwd(), 'storage', 'books');
     } else if (process.env.NODE_ENV === 'production') {
       if (relativePath.startsWith('/uploads/')) {
         pathWithoutPrefix = relativePath.replace('/uploads/', '');

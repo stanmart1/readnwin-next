@@ -168,7 +168,6 @@ class EcommerceService {
         CREATE TABLE IF NOT EXISTS authors (
           id SERIAL PRIMARY KEY,
           name VARCHAR(255) NOT NULL,
-          email VARCHAR(255),
           bio TEXT,
           avatar_url VARCHAR(500),
           website_url VARCHAR(500),
@@ -727,10 +726,8 @@ class EcommerceService {
   // Author Management
   async getAuthors(filters: any = {}): Promise<Author[] | { authors: Author[], pagination: any }> {
     try {
-      // Check if authors table exists, create if not
       await this.ensureAuthorsTable();
       
-      // If no pagination requested, return simple array for backward compatibility
       if (!filters.page && !filters.limit) {
         let whereClause = 'WHERE 1=1';
         const params: any[] = [];
@@ -743,15 +740,11 @@ class EcommerceService {
         const result = await query(`
           SELECT 
             a.*,
-            COUNT(b.id) as books_count,
-            COALESCE(SUM(oi.total_price), 0) as total_sales,
-            COALESCE(SUM(oi.total_price * 0.7), 0) as revenue
+            0 as books_count,
+            0 as total_sales,
+            0 as revenue
           FROM authors a
-          LEFT JOIN books b ON a.id = b.author_id
-          LEFT JOIN order_items oi ON b.id = oi.book_id
-          LEFT JOIN orders o ON oi.order_id = o.id AND o.status IN ('confirmed', 'processing', 'shipped', 'delivered')
           ${whereClause}
-          GROUP BY a.id
           ORDER BY a.name
         `, params);
 
@@ -763,72 +756,76 @@ class EcommerceService {
     }
 
     // Paginated version
-    const page = filters.page || 1;
-    const limit = filters.limit || 20;
-    const offset = (page - 1) * limit;
+    try {
+      const page = filters.page || 1;
+      const limit = filters.limit || 20;
+      const offset = (page - 1) * limit;
 
-    let whereClause = 'WHERE 1=1';
-    const params: any[] = [];
-    let paramIndex = 1;
+      let whereClause = 'WHERE 1=1';
+      const params: any[] = [];
+      let paramIndex = 1;
 
-    if (filters.search) {
-      whereClause += ` AND (a.name ILIKE $${paramIndex} OR a.email ILIKE $${paramIndex})`;
-      params.push(`%${filters.search}%`);
-      paramIndex++;
+      if (filters.search) {
+        whereClause += ` AND a.name ILIKE $${paramIndex}`;
+        params.push(`%${filters.search}%`);
+        paramIndex++;
+      }
+
+      if (filters.status) {
+        whereClause += ` AND a.status = $${paramIndex}`;
+        params.push(filters.status);
+        paramIndex++;
+      }
+
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM authors a
+        ${whereClause}
+      `;
+
+      const authorsQuery = `
+        SELECT 
+          a.*,
+          0 as books_count,
+          0 as total_sales,
+          0 as revenue
+        FROM authors a
+        ${whereClause}
+        ORDER BY a.name
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+
+      const countParams = params;
+      const authorsParams = [...params, limit, offset];
+
+      const [countResult, authorsResult] = await Promise.all([
+        query(countQuery, countParams),
+        query(authorsQuery, authorsParams)
+      ]);
+
+      const total = parseInt(countResult.rows[0].total);
+      const pages = Math.ceil(total / limit);
+
+      return {
+        authors: authorsResult.rows,
+        pagination: { page, limit, total, pages }
+      };
+    } catch (error) {
+      console.error('Error in paginated getAuthors:', error);
+      return {
+        authors: [],
+        pagination: { page: filters.page || 1, limit: filters.limit || 20, total: 0, pages: 0 }
+      };
     }
-
-    if (filters.status) {
-      whereClause += ` AND a.status = $${paramIndex}`;
-      params.push(filters.status);
-      paramIndex++;
-    }
-
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM authors a
-      ${whereClause}
-    `;
-
-    const authorsQuery = `
-      SELECT 
-        a.*,
-        COUNT(b.id) as books_count,
-        COALESCE(SUM(oi.total_price), 0) as total_sales,
-        COALESCE(SUM(oi.total_price * 0.7), 0) as revenue
-      FROM authors a
-      LEFT JOIN books b ON a.id = b.author_id
-      LEFT JOIN order_items oi ON b.id = oi.book_id
-      LEFT JOIN orders o ON oi.order_id = o.id AND o.status IN ('confirmed', 'processing', 'shipped', 'delivered')
-      ${whereClause}
-      GROUP BY a.id
-      ORDER BY a.name
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `;
-
-    const countParams = params;
-    const authorsParams = [...params, limit, offset];
-
-    const [countResult, authorsResult] = await Promise.all([
-      query(countQuery, countParams),
-      query(authorsQuery, authorsParams)
-    ]);
-
-    const total = parseInt(countResult.rows[0].total);
-    const pages = Math.ceil(total / limit);
-
-    return {
-      authors: authorsResult.rows,
-      pagination: { page, limit, total, pages }
-    };
   }
 
   async createAuthor(authorData: Partial<Author>): Promise<Author> {
     const result = await query(`
-      INSERT INTO authors (name, email, bio, avatar_url, website_url, social_media, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO authors (name, bio, avatar_url, website_url, social_media, status)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `, [
-      authorData.name, authorData.email || null, authorData.bio, authorData.avatar_url,
+      authorData.name, authorData.bio, authorData.avatar_url,
       authorData.website_url, authorData.social_media, authorData.status || 'active'
     ]);
     return result.rows[0];
@@ -838,17 +835,16 @@ class EcommerceService {
     const result = await query(`
       UPDATE authors SET
         name = COALESCE($2, name),
-        email = COALESCE($3, email),
-        bio = COALESCE($4, bio),
-        avatar_url = COALESCE($5, avatar_url),
-        website_url = COALESCE($6, website_url),
-        social_media = COALESCE($7, social_media),
-        status = COALESCE($8, status),
+        bio = COALESCE($3, bio),
+        avatar_url = COALESCE($4, avatar_url),
+        website_url = COALESCE($5, website_url),
+        social_media = COALESCE($6, social_media),
+        status = COALESCE($7, status),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
       RETURNING *
     `, [
-      id, authorData.name, authorData.email, authorData.bio, authorData.avatar_url,
+      id, authorData.name, authorData.bio, authorData.avatar_url,
       authorData.website_url, authorData.social_media, authorData.status
     ]);
     return result.rows[0] || null;

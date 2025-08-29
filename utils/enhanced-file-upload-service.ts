@@ -42,11 +42,15 @@ export class EnhancedFileUploadService {
     
     // In production, covers also go to persistent storage
     this.coversDir = process.env.NODE_ENV === 'production'
-      ? join('/app/storage/uploads/covers')
-      : join(process.cwd(), 'public', 'uploads', 'covers');
+      ? join('/app/storage/covers')
+      : join(process.cwd(), 'storage', 'covers');
     
-    // Ensure all directories exist
-    if (typeof window === 'undefined') {
+    this.bookParser = new EnhancedBookParser();
+  }
+
+  private initializeStorage() {
+    // Only create directories when actually needed, not during build
+    if (typeof window === 'undefined' && process.env.NODE_ENV !== 'development' || process.env.NEXT_PHASE !== 'phase-production-build') {
       [
         this.mediaRootDir,
         this.booksDir, 
@@ -59,8 +63,6 @@ export class EnhancedFileUploadService {
         }
       });
     }
-
-    this.bookParser = new EnhancedBookParser();
   }
 
   /**
@@ -72,6 +74,9 @@ export class EnhancedFileUploadService {
     fileType: 'cover' | 'ebook' | 'sample'
   ): Promise<FileUploadResult> {
     try {
+      // Initialize storage directories
+      this.initializeStorage();
+      
       console.log(`📁 Starting file upload for book ${bookId}: ${file.name}`);
       
       // Validate file
@@ -106,13 +111,13 @@ export class EnhancedFileUploadService {
       if (fileType === 'cover') {
         // Cover images go to covers directory (persistent storage in production)
         targetDir = this.coversDir;
-        relativePath = `/uploads/covers/${secureFilename}`;
+        relativePath = `/api/images/covers/${secureFilename}`;
         console.log(`📁 Cover image will be stored at: ${targetDir}/${secureFilename}`);
         console.log(`📁 Cover image URL will be: ${relativePath}`);
       } else {
         // Book files go to secure server-side directory
         targetDir = bookDir;
-        relativePath = `/secure/books/${bookId}/${secureFilename}`; // Secure path for API access
+        relativePath = `/api/ebooks/${bookId}/${secureFilename}`; // Secure path for API access
       }
       
       const filePath = join(targetDir, secureFilename);
@@ -247,7 +252,7 @@ export class EnhancedFileUploadService {
     
     // Generate appropriate relative URL based on file type
     if (fileType === 'cover') {
-      return `/uploads/covers/${filename}`;
+      return `/api/images/covers/${filename}`;
     } else if (fileType === 'ebook') {
       // For ebooks, we need to include the book ID in the path
       // This will be handled by the uploadBookFile method
@@ -263,12 +268,12 @@ export class EnhancedFileUploadService {
   private getAbsolutePath(relativeUrl: string): string {
     const filename = basename(relativeUrl);
     
-    if (relativeUrl.startsWith('/uploads/covers/')) {
+    if (relativeUrl.startsWith('/uploads/covers/') || relativeUrl.startsWith('/api/images/covers/')) {
       return join(this.coversDir, filename);
-    } else if (relativeUrl.startsWith('/uploads/books/')) {
-      // Extract book ID from path like /uploads/books/111/filename.epub
+    } else if (relativeUrl.startsWith('/uploads/books/') || relativeUrl.startsWith('/api/ebooks/')) {
+      // Extract book ID from path like /api/ebooks/111/filename.epub
       const pathParts = relativeUrl.split('/');
-      const bookId = pathParts[3]; // uploads/books/111/filename.epub -> 111
+      const bookId = pathParts[3]; // api/ebooks/111/filename.epub -> 111
       return join(this.booksDir, bookId, filename);
     } else if (relativeUrl.startsWith('/uploads/temp/')) {
       return join(this.tempDir, filename);

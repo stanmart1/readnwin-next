@@ -13,7 +13,8 @@ export async function GET(
     
     // Try storage system first for book covers
     if (imagePath.includes('covers/') || imagePath.includes('books/')) {
-      const storagePath = `/app/storage/${imagePath}`;
+      const baseStoragePath = process.env.NODE_ENV === 'production' ? '/app/storage' : join(process.cwd(), 'storage');
+      const storagePath = join(baseStoragePath, imagePath);
       
       if (existsSync(storagePath)) {
         const imageBuffer = await readFile(storagePath);

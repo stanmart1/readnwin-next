@@ -68,3 +68,44 @@ export function safeToISOString(dateString: string | null | undefined): string {
     return new Date().toISOString();
   }
 }
+
+/**
+ * Formats a number with locale-specific formatting
+ * @param num - The number to format
+ * @returns Formatted number string
+ */
+export function formatNumber(num: number): string {
+  return num.toLocaleString();
+}
+
+/**
+ * Formats a date to a readable date string
+ * @param dateString - The date string to format
+ * @returns Formatted date string
+ */
+export function formatDate(dateString: string | null | undefined): string {
+  if (!dateString) return 'N/A';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return date.toLocaleDateString();
+  } catch {
+    return 'Invalid Date';
+  }
+}
+
+/**
+ * Formats a date to a readable date and time string
+ * @param dateString - The date string to format
+ * @returns Formatted date and time string
+ */
+export function formatDateTime(dateString: string | null | undefined): string {
+  if (!dateString) return 'N/A';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return date.toLocaleString();
+  } catch {
+    return 'Invalid Date';
+  }
+}

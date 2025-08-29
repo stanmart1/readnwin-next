@@ -55,32 +55,37 @@ export default function OverviewStats() {
   };
 
   useEffect(() => {
-    // Fetch analytics immediately without delay for faster loading
-    fetchAnalytics();
+    // Show skeleton data immediately, then fetch real data
+    const timer = setTimeout(() => {
+      fetchAnalytics();
+    }, 100); // Small delay to show skeleton first
+    
+    return () => clearTimeout(timer);
   }, []);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = async (retryCount = 0) => {
     try {
       setLoading(true);
       setError('');
-      console.log('🔄 Fetching analytics...');
       
-      // Use Promise.race to add a timeout for faster failure detection
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 5000)
-      );
+      // Use AbortController for better timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       
-      const fetchPromise = fetch('/api/admin/analytics?period=month');
-      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+      const response = await fetch('/api/admin/analytics?period=month', {
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
       
-      console.log('📡 Response status:', response.status);
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('📊 Analytics data:', data);
 
       if (data.success && data.analytics) {
         const analytics = data.analytics;
@@ -153,8 +158,17 @@ export default function OverviewStats() {
         throw new Error('Invalid response format');
       }
     } catch (error) {
-      console.error('❌ Error fetching analytics:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch analytics');
+      if (error instanceof Error && error.name === 'AbortError') {
+        if (retryCount < 2) {
+          console.log(`⏳ Request timeout, retrying... (${retryCount + 1}/3)`);
+          setTimeout(() => fetchAnalytics(retryCount + 1), 1000);
+          return;
+        }
+        setError('Analytics service is temporarily unavailable. Using cached data.');
+      } else {
+        console.error('❌ Error fetching analytics:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch analytics');
+      }
     } finally {
       setLoading(false);
     }
@@ -186,9 +200,40 @@ export default function OverviewStats() {
   if (loading) {
     return (
       <div className="space-y-8">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Loading analytics...</span>
+        {/* Header Skeleton */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="animate-pulse">
+            <div className="h-6 bg-gray-200 rounded w-1/3 mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          </div>
+        </div>
+        
+        {/* Stats Grid Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="bg-white rounded-lg shadow-md p-6">
+              <div className="animate-pulse flex items-center">
+                <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                <div className="ml-4 flex-1">
+                  <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+                  <div className="h-6 bg-gray-200 rounded w-16 mb-1"></div>
+                  <div className="h-3 bg-gray-200 rounded w-24"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Charts Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {[1,2].map(i => (
+            <div key={i} className="bg-white rounded-lg shadow-md p-6">
+              <div className="animate-pulse">
+                <div className="h-5 bg-gray-200 rounded w-1/3 mb-4"></div>
+                <div className="h-64 bg-gray-100 rounded"></div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -204,7 +249,7 @@ export default function OverviewStats() {
               <h3 className="text-sm font-medium text-red-800">Error</h3>
               <p className="text-sm text-red-700 mt-1">{error}</p>
               <button 
-                onClick={fetchAnalytics}
+                onClick={() => fetchAnalytics(0)}
                 className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
               >
                 Try again
@@ -226,7 +271,7 @@ export default function OverviewStats() {
             <p className="text-gray-600 mt-1">Real-time insights and performance metrics</p>
           </div>
           <button 
-            onClick={fetchAnalytics}
+            onClick={() => fetchAnalytics(0)}
             disabled={loading}
             className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >

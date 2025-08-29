@@ -5,12 +5,14 @@ import { createReadStream, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 
 /**
- * Storage Service for handling file operations on persistent volume
- * Ensures all file operations account for the persistent volume mounted on /
+ * Storage Service for handling file operations
+ * Uses environment-appropriate storage paths
  */
 export class StorageService {
-  // Base paths - use persistent volume
-  private static readonly BASE_STORAGE_PATH = '/app/storage';
+  // Base paths - environment aware
+  private static readonly BASE_STORAGE_PATH = process.env.NODE_ENV === 'production' 
+    ? '/app/storage' 
+    : path.join(process.cwd(), 'storage');
   private static readonly BOOKS_PATH = `${this.BASE_STORAGE_PATH}/books`;
   private static readonly COVERS_PATH = `${this.BASE_STORAGE_PATH}/covers`;
   private static readonly ASSETS_PATH = `${this.BASE_STORAGE_PATH}/assets`;
@@ -18,7 +20,7 @@ export class StorageService {
   private static readonly PROCESSED_PATH = `${this.BASE_STORAGE_PATH}/processed`;
 
   /**
-   * Initialize storage directories on persistent volume
+   * Initialize storage directories
    */
   static async initializeStorage(): Promise<void> {
     const directories = [
@@ -49,7 +51,7 @@ export class StorageService {
   }
 
   /**
-   * Generate secure file path on persistent volume
+   * Generate secure file path
    */
   static generateSecureFilePath(
     type: 'book' | 'cover' | 'asset' | 'temp' | 'processed',
@@ -96,7 +98,7 @@ export class StorageService {
   }
 
   /**
-   * Store uploaded file securely on persistent volume
+   * Store uploaded file securely
    */
   static async storeFile(
     file: File | Buffer,
@@ -123,7 +125,7 @@ export class StorageService {
       // Calculate file hash
       const fileHash = crypto.createHash('sha256').update(buffer).digest('hex');
 
-      // Write file to persistent volume
+      // Write file to storage
       await fs.writeFile(targetPath, buffer);
 
       // Verify file was written correctly
@@ -148,11 +150,11 @@ export class StorageService {
   }
 
   /**
-   * Stream file from persistent volume
+   * Stream file from storage
    */
   static async streamFile(filePath: string): Promise<NodeJS.ReadableStream | null> {
     try {
-      // Verify file exists on persistent volume
+      // Verify file exists
       await fs.access(filePath);
       return createReadStream(filePath);
     } catch (error) {
@@ -162,7 +164,7 @@ export class StorageService {
   }
 
   /**
-   * Copy file within persistent volume
+   * Copy file within storage
    */
   static async copyFile(sourcePath: string, targetPath: string): Promise<boolean> {
     try {
@@ -180,7 +182,7 @@ export class StorageService {
   }
 
   /**
-   * Move file within persistent volume
+   * Move file within storage
    */
   static async moveFile(sourcePath: string, targetPath: string): Promise<boolean> {
     try {
@@ -198,7 +200,7 @@ export class StorageService {
   }
 
   /**
-   * Delete file from persistent volume
+   * Delete file from storage
    */
   static async deleteFile(filePath: string): Promise<boolean> {
     try {
@@ -211,7 +213,7 @@ export class StorageService {
   }
 
   /**
-   * Get file info from persistent volume
+   * Get file info from storage
    */
   static async getFileInfo(filePath: string): Promise<{
     exists: boolean;
@@ -235,7 +237,7 @@ export class StorageService {
   }
 
   /**
-   * List files in directory on persistent volume
+   * List files in directory
    */
   static async listFiles(directoryPath: string): Promise<string[]> {
     try {

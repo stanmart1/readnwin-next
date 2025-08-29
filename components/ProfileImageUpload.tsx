@@ -108,19 +108,28 @@ export default function ProfileImageUpload({ currentImage, onImageUpdate }: Prof
       setIsUploading(true);
       const croppedBlob = await getCroppedImg(imgRef.current, completedCrop);
       
-      // Convert blob to base64 for preview
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result as string;
-        onImageUpdate(base64);
-        setPreviewUrl(null);
-        setSelectedFile(null);
-        setCrop(undefined);
-        setCompletedCrop(undefined);
-      };
-      reader.readAsDataURL(croppedBlob);
+      // Upload to server
+      const formData = new FormData();
+      formData.append('image', croppedBlob, 'profile.jpg');
+      
+      const response = await fetch('/api/profile/upload-image', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        onImageUpdate(data.imageUrl);
+      } else {
+        throw new Error('Upload failed');
+      }
+      
+      setPreviewUrl(null);
+      setSelectedFile(null);
+      setCrop(undefined);
+      setCompletedCrop(undefined);
     } catch (error) {
-      console.error('Error cropping image:', error);
+      console.error('Error uploading image:', error);
     } finally {
       setIsUploading(false);
     }

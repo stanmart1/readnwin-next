@@ -126,6 +126,31 @@
     overflow: hidden;
   }
   
+  /* Prevent text overflow and ensure proper spacing */
+  .text-ellipsis-safe {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  
+  .flex-shrink-safe {
+    flex-shrink: 0;
+    min-width: fit-content;
+  }
+  
+  /* Grid utilities for better table layouts */
+  .grid-cols-14 {
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+  }
+  
+  /* Ensure buttons don't shrink */
+  .btn-no-shrink {
+    flex-shrink: 0;
+    min-width: 2rem;
+    min-height: 2rem;
+  }
+  
   .animate-fade-in {
     animation: fadeIn 0.3s ease-in-out;
   }
@@ -213,5 +238,34 @@
       transform: scale(1);
       opacity: 1;
     }
+  }
+  
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+    20%, 40%, 60%, 80% { transform: translateX(2px); }
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  
+  .animate-shake {
+    animation: shake 0.5s ease-in-out;
+  }
+  
+  .animate-slideUp {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-fadeIn {
+    animation: fadeIn 0.3s ease-out;
   }
 }

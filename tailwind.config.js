@@ -6,6 +6,14 @@ module.exports = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
+    screens: {
+      'xs': '475px',
+      'sm': '640px',
+      'md': '768px',
+      'lg': '1024px',
+      'xl': '1280px',
+      '2xl': '1536px',
+    },
     extend: {
       fontFamily: {
         'inter': ['var(--font-inter)', 'sans-serif'],
@@ -26,10 +34,33 @@ module.exports = {
           900: '#1e3a8a',
         },
       },
+      height: {
+        '15': '3.75rem',
+        '17': '4.25rem',
+        '30': '7.5rem',
+        '35': '8.75rem',
+      },
     },
   },
   plugins: [
     require('@tailwindcss/typography'),
+  ],
+  safelist: [
+    // Ensure responsive classes are included
+    'xs:text-sm',
+    'xs:text-base',
+    'xs:px-3',
+    'xs:py-2',
+    'xs:gap-3',
+    'xs:mb-4',
+    'xs:mt-4',
+    'xs:w-auto',
+    'xs:flex-row',
+    'xs:grid-cols-2',
+    'xs:space-y-4',
+    'break-words',
+    'leading-tight',
+    'leading-relaxed',
   ],
 }
 

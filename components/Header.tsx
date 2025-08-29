@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useCart } from '@/contexts/CartContextNew';
 import { useGuestCart } from '@/contexts/GuestCartContext';
@@ -10,7 +11,9 @@ import { useGuestCart } from '@/contexts/GuestCartContext';
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [loadingLink, setLoadingLink] = useState<string | null>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   const { data: session } = useSession();
   const { getTotalItems } = useCart();
   const { getTotalItems: getGuestTotalItems } = useGuestCart();
@@ -29,6 +32,19 @@ export default function Header() {
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/' });
+  };
+
+  const handleNavigation = async (href: string, linkId: string) => {
+    setLoadingLink(linkId);
+    setIsProfileDropdownOpen(false);
+    setIsMenuOpen(false);
+    
+    try {
+      await router.push(href);
+    } finally {
+      // Clear loading state after a short delay to show feedback
+      setTimeout(() => setLoadingLink(null), 500);
+    }
   };
 
   return (
@@ -97,10 +113,20 @@ export default function Header() {
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                     {/* Show admin link for admin users */}
                     {(session.user.role === 'admin' || session.user.role === 'super_admin') && (
-                      <Link href="/admin" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
-                        <i className="ri-admin-line mr-3"></i>
-                        <span className="font-medium">Admin Dashboard</span>
-                      </Link>
+                      <button 
+                        onClick={() => handleNavigation('/admin', 'admin')}
+                        disabled={loadingLink === 'admin'}
+                        className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {loadingLink === 'admin' ? (
+                          <i className="ri-loader-4-line animate-spin mr-3"></i>
+                        ) : (
+                          <i className="ri-admin-line mr-3"></i>
+                        )}
+                        <span className="font-medium">
+                          {loadingLink === 'admin' ? 'Loading...' : 'Admin Dashboard'}
+                        </span>
+                      </button>
                     )}
                     <Link href="/dashboard" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
                       <i className="ri-dashboard-line mr-3"></i>

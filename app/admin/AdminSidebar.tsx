@@ -23,17 +23,11 @@ export default function AdminSidebar({ activeTab, onTabChange, isOpen, onToggle,
   const { notifications, stats, loading: notificationsLoading, markAsRead, markAllAsRead } = useAdminNotifications();
   const adminUser = session?.user;
 
-  // Filter tabs based on user permissions
+  // Filter tabs based on actual user permissions from database
   const visibleTabs = (() => {
-    if (!session?.user?.id || permissionsLoading) return ADMIN_TAB_PERMISSIONS;
+    if (!session?.user?.id || permissionsLoading) return [];
     
-    // Super admin and admin users see all tabs
-    const isAdminUser = session.user.role === 'admin' || session.user.role === 'super_admin';
-    if (isAdminUser) {
-      return ADMIN_TAB_PERMISSIONS;
-    }
-    
-    // For other users, filter tabs based on permissions
+    // Filter tabs based on actual permissions from database
     return ADMIN_TAB_PERMISSIONS.filter(tab => {
       if (tab.requiredPermissions.length === 0) {
         return true; // No permissions required

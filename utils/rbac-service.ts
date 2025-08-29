@@ -300,6 +300,19 @@ class RBACService {
     return result.rows[0] || null;
   }
 
+  async updateUserPassword(id: number, hashedPassword: string): Promise<boolean> {
+    try {
+      const result = await query(
+        'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [hashedPassword, id]
+      );
+      return (result.rowCount || 0) > 0;
+    } catch (error) {
+      console.error('Error updating user password:', error);
+      return false;
+    }
+  }
+
   // Role Management
   async getRoles(): Promise<Role[]> {
     const result = await query('SELECT * FROM roles ORDER BY priority DESC, name');

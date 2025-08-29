@@ -7,7 +7,7 @@ const nextConfig = {
   swcMinify: true,
   
   // Production output configuration
-  output: 'standalone', // Enable for Docker deployments
+  // output: 'standalone', // Disabled for development - enable for Docker deployments
   
   // Image optimization
   images: {

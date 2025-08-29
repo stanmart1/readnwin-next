@@ -90,12 +90,16 @@ export default function UserManagement() {
   const [showUserLibraryManagement, setShowUserLibraryManagement] = useState(false);
   const [selectedUserForLibrary, setSelectedUserForLibrary] = useState<number | null>(null);
   const [showBulkLibraryManagement, setShowBulkLibraryManagement] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordUser, setPasswordUser] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState('');
   
   // Loading states for different actions
   const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({});
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [createUserLoading, setCreateUserLoading] = useState(false);
   const [editUserLoading, setEditUserLoading] = useState(false);
+  const [passwordUpdateLoading, setPasswordUpdateLoading] = useState(false);
 
   // Fetch users
   const fetchUsers = async (page: number = 1) => {
@@ -267,6 +271,10 @@ export default function UserManagement() {
     } else if (action === 'library-management') {
       setSelectedUserForLibrary(userId);
       setShowUserLibraryManagement(true);
+    } else if (action === 'password' && user) {
+      setPasswordUser(user);
+      setNewPassword('');
+      setShowPasswordModal(true);
     } else if (action === 'suspend' || action === 'activate') {
       const newStatus = action === 'suspend' ? 'suspended' : 'active';
       const actionText = action === 'suspend' ? 'suspended' : 'activated';
@@ -463,6 +471,55 @@ export default function UserManagement() {
     const currentRoleIds = user.roles?.map(role => role.id) || [];
     setEditingUserRoles(currentRoleIds);
     setShowEditModal(true);
+  };
+
+  const handlePasswordUpdate = async () => {
+    if (!passwordUser || !newPassword) return;
+    
+    if (newPassword.length < 6) {
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Password must be at least 6 characters long'
+      });
+      return;
+    }
+    
+    try {
+      setPasswordUpdateLoading(true);
+      
+      const response = await fetch(`/api/admin/users/${passwordUser.id}/password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPassword })
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        setShowPasswordModal(false);
+        setPasswordUser(null);
+        setNewPassword('');
+        addNotification({
+          type: 'success',
+          title: 'Success',
+          message: `Password updated successfully for ${passwordUser.first_name || passwordUser.username}`
+        });
+      } else {
+        addNotification({
+          type: 'error',
+          title: 'Error',
+          message: data.error || 'Failed to update password'
+        });
+      }
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to update password. Please try again.'
+      });
+    } finally {
+      setPasswordUpdateLoading(false);
+    }
   };
 
   const handleBulkAction = async (action: string) => {
@@ -788,6 +845,14 @@ export default function UserManagement() {
                 <i className="ri-edit-line mr-1"></i>
                 Edit
               </button>
+              <button
+                onClick={() => handleUserAction(user.id, 'password')}
+                className="text-orange-600 hover:text-orange-800 flex items-center text-sm whitespace-nowrap"
+                title="Update Password"
+              >
+                <i className="ri-lock-line mr-1"></i>
+                Password
+              </button>
               <LoadingButton
                 loading={actionLoading[`${user.status === 'active' ? 'suspend' : 'activate'}-${user.id}`]}
                 onClick={() => handleUserAction(user.id, user.status === 'active' ? 'suspend' : 'activate')}
@@ -931,6 +996,13 @@ export default function UserManagement() {
                         title="Edit User"
                       >
                         <i className="ri-edit-line"></i>
+                      </button>
+                      <button
+                        onClick={() => handleUserAction(user.id, 'password')}
+                        className="text-orange-600 hover:text-orange-800 cursor-pointer transition-colors duration-200"
+                        title="Update Password"
+                      >
+                        <i className="ri-lock-line"></i>
                       </button>
                       <LoadingButton
                         loading={actionLoading[`${user.status === 'active' ? 'suspend' : 'activate'}-${user.id}`]}
@@ -1433,6 +1505,65 @@ export default function UserManagement() {
             onClose={() => setShowBulkLibraryManagement(false)}
           />
         )}
+
+        {/* Password Update Modal */}
+        <Modal 
+          isOpen={showPasswordModal && !!passwordUser} 
+          onClose={() => {
+            setShowPasswordModal(false);
+            setPasswordUser(null);
+            setNewPassword('');
+          }}
+          className="max-w-md w-full mx-4"
+        >
+          {passwordUser && (
+            <div className="p-6">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Update Password</h2>
+                <p className="text-gray-600 mt-1">
+                  Update password for {passwordUser.first_name || ''} {passwordUser.last_name || ''}
+                </p>
+              </div>
+
+              <form className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter new password (min 6 characters)"
+                    minLength={6}
+                    required
+                  />
+                </div>
+
+                <div className="flex space-x-3 pt-4">
+                  <LoadingButton
+                    loading={passwordUpdateLoading}
+                    type="button"
+                    onClick={handlePasswordUpdate}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-full hover:from-orange-700 hover:to-red-700 transition-all duration-300"
+                  >
+                    Update Password
+                  </LoadingButton>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPasswordModal(false);
+                      setPasswordUser(null);
+                      setNewPassword('');
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors duration-200"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </Modal>
     </div>
   );
 }

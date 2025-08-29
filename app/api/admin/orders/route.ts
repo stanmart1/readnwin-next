@@ -16,8 +16,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user has admin permissions
-    const userRoles = session.user.roles || [];
-    const isAdmin = userRoles.includes('admin') || userRoles.includes('super_admin');
+    const userRole = session.user.role;
+    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+    
+    console.log('🔍 Orders API - User role:', userRole, 'Is Admin:', isAdmin);
     
     if (!isAdmin) {
       return NextResponse.json(
@@ -99,19 +101,42 @@ export async function GET(request: NextRequest) {
     }
 
     // Get orders with enhanced data
-    const result = await query(`
-      SELECT 
-        o.*,
-        u.first_name || ' ' || u.last_name as customer_name,
-        COUNT(oi.id) as item_count
-      FROM orders o
-      LEFT JOIN users u ON o.user_id = u.id
-      LEFT JOIN order_items oi ON o.id = oi.order_id
-      ${whereConditions}
-      GROUP BY o.id, u.first_name, u.last_name
-      ORDER BY o.created_at DESC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `, [...queryParams, limit, (page - 1) * limit]);
+    console.log('🔍 Orders API - Query params:', queryParams);
+    console.log('🔍 Orders API - Where conditions:', whereConditions);
+    
+    // First try with order_items, if it fails, try without
+    let result;
+    try {
+      result = await query(`
+        SELECT 
+          o.*,
+          u.first_name || ' ' || u.last_name as customer_name,
+          COUNT(oi.id) as item_count
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        LEFT JOIN order_items oi ON o.id = oi.order_id
+        ${whereConditions}
+        GROUP BY o.id, u.first_name, u.last_name
+        ORDER BY o.created_at DESC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `, [...queryParams, limit, (page - 1) * limit]);
+    } catch (orderItemsError) {
+      console.log('🔍 Orders API - order_items table not found, trying without it');
+      // Fallback query without order_items
+      result = await query(`
+        SELECT 
+          o.*,
+          u.first_name || ' ' || u.last_name as customer_name,
+          0 as item_count
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        ${whereConditions}
+        ORDER BY o.created_at DESC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `, [...queryParams, limit, (page - 1) * limit]);
+    }
+
+    console.log('🔍 Orders API - Query result count:', result.rows.length);
 
     // Get total count for pagination
     const countResult = await query(`
@@ -123,6 +148,8 @@ export async function GET(request: NextRequest) {
 
     const total = parseInt(countResult.rows[0]?.total || '0');
     const pages = Math.ceil(total / limit);
+    
+    console.log('🔍 Orders API - Total orders:', total, 'Pages:', pages);
 
     return NextResponse.json({
       success: true,

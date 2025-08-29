@@ -8,11 +8,23 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.id) {
-      console.log('❌ No session or user ID found in cart API');
-      return NextResponse.json(
-        { error: 'Unauthorized - Please log in to access this resource' },
-        { status: 401 }
-      );
+      // Return empty cart for unauthenticated users instead of error
+      return NextResponse.json({
+        success: true,
+        cartItems: [],
+        analytics: {
+          totalItems: 0,
+          totalValue: 0,
+          totalSavings: 0,
+          itemCount: 0,
+          averageItemValue: 0,
+          ebookCount: 0,
+          physicalCount: 0,
+          isEbookOnly: false,
+          isPhysicalOnly: false,
+          isMixedCart: false
+        }
+      });
     }
 
     const userId = parseInt(session.user.id);
@@ -27,10 +39,24 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error fetching cart:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    // Return empty cart on error to prevent UI breaking
+    return NextResponse.json({
+      success: false,
+      cartItems: [],
+      analytics: {
+        totalItems: 0,
+        totalValue: 0,
+        totalSavings: 0,
+        itemCount: 0,
+        averageItemValue: 0,
+        ebookCount: 0,
+        physicalCount: 0,
+        isEbookOnly: false,
+        isPhysicalOnly: false,
+        isMixedCart: false
+      },
+      error: 'Failed to load cart'
+    });
   }
 }
 

@@ -85,7 +85,7 @@ class RBACService {
 
   async getUsers(page: number = 1, limit: number = 10, filters: any = {}, currentUserRole?: string): Promise<{ users: User[], total: number }> {
     try {
-      console.log('🔍 RBAC getUsers - Starting with params:', { page, limit, filters, hideAdminUsers });
+      console.log('🔍 RBAC getUsers - Starting with params:', { page, limit, filters, currentUserRole });
       
       let whereClause = 'WHERE 1=1';
       const params: any[] = [];

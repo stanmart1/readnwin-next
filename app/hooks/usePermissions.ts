@@ -26,7 +26,12 @@ export function usePermissions(skipForAdmin: boolean = false): UsePermissionsRet
       return;
     }
 
-    // Note: Removed admin bypass - all users now get permissions from database
+    // Skip API call for admin users if skipForAdmin is true
+    if (skipForAdmin && (session?.user?.role === 'admin' || session?.user?.role === 'super_admin')) {
+      setPermissions(['*']); // Admin wildcard permission
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);

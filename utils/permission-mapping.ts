@@ -49,13 +49,7 @@ export const ADMIN_TAB_PERMISSIONS: TabPermission[] = [
     requiredPermissions: ["content.moderate"],
     description: "Moderate user reviews and ratings",
   },
-  {
-    id: "notifications",
-    label: "Notifications",
-    icon: "ri-notification-line",
-    requiredPermissions: ["system.settings"],
-    description: "Manage system notifications",
-  },
+
   {
     id: "orders",
     label: "Orders",

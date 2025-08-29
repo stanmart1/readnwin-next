@@ -16,7 +16,7 @@ const RoleManagement = lazy(() => import("./RoleManagement"));
 const AuditLog = lazy(() => import("./AuditLog"));
 const BookManagementEnhanced = lazy(() => import("./BookManagementEnhanced"));
 const ReviewManagement = lazy(() => import("./ReviewManagement"));
-const NotificationManagement = lazy(() => import("./NotificationManagement"));
+
 const OrdersManagement = lazy(() => import("./OrdersManagement"));
 const EnhancedShippingManagement = lazy(
   () => import("./EnhancedShippingManagement"),
@@ -81,7 +81,7 @@ export default function AdminDashboard() {
     if (!isAdmin && permissionsLoading) return;
 
     const tabParam = searchParams.get("tab");
-    if (tabParam) {
+    if (tabParam && tabParam !== activeTab) {
       // Admin users can access any tab
       if (isAdmin || canAccessTab(tabParam, permissions)) {
         setActiveTab(tabParam);
@@ -90,12 +90,12 @@ export default function AdminDashboard() {
         setActiveTab("overview");
         router.replace(`/admin?tab=overview`);
       }
-    } else if (!activeTab) {
+    } else if (!tabParam && !activeTab) {
       // Only default to overview if no tab is set (initial load without tab param)
       setActiveTab("overview");
       router.replace(`/admin?tab=overview`, { scroll: false });
     }
-  }, [searchParams, permissions, permissionsLoading, router, isAdmin, activeTab]);
+  }, [searchParams, permissions, permissionsLoading, router, isAdmin]);
 
   // Handle tab changes and update URL
   const handleTabChange = (tab: string) => {
@@ -172,12 +172,7 @@ export default function AdminDashboard() {
             <ReviewManagement />
           </Suspense>
         );
-      case "notifications":
-        return (
-          <Suspense fallback={<ComponentLoader />}>
-            <NotificationManagement />
-          </Suspense>
-        );
+
       case "orders":
         return (
           <Suspense fallback={<ComponentLoader />}>

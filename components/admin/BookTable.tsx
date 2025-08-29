@@ -176,6 +176,15 @@ export default function BookTable({
                     >
                       <i className="ri-star-line text-sm"></i>
                     </button>
+                    {book.format === 'ebook' && (
+                      <button
+                        onClick={() => onBookAction('assign', book)}
+                        className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex-shrink-0"
+                        title="Assign to User"
+                      >
+                        <i className="ri-user-add-line text-sm"></i>
+                      </button>
+                    )}
                     <button
                       onClick={() => onBookAction('edit', book)}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0"
@@ -308,13 +317,15 @@ export default function BookTable({
                   </div>
                   
                   <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => onBookAction('assign', book)}
-                      className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex-shrink-0"
-                      title="Assign to User"
-                    >
-                      <i className="ri-user-add-line text-sm"></i>
-                    </button>
+                    {book.format === 'ebook' && (
+                      <button
+                        onClick={() => onBookAction('assign', book)}
+                        className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex-shrink-0"
+                        title="Assign to User"
+                      >
+                        <i className="ri-user-add-line text-sm"></i>
+                      </button>
+                    )}
                     <button
                       onClick={() => onBookAction('view', book)}
                       className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors flex-shrink-0"

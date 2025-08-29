@@ -26,3 +26,27 @@ export function sanitizeInt(input: string | null, defaultValue: number = 0): num
   const parsed = parseInt(input, 10);
   return isNaN(parsed) ? defaultValue : parsed;
 }
+
+export function sanitizeForXSS(input: string): string {
+  return input
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/&/g, '&amp;');
+}
+
+export function safeJsonParse(input: string, defaultValue: any = null): any {
+  try {
+    return JSON.parse(input);
+  } catch {
+    return defaultValue;
+  }
+}
+
+export const SecurityUtils = {
+  sanitizeForXSS,
+  sanitizeHtml,
+  sanitizeForLog,
+  safeJsonParse
+};

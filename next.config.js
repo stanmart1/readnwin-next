@@ -7,7 +7,7 @@ const nextConfig = {
   swcMinify: true,
   
   // Production output configuration
-  // output: 'standalone', // Disabled for development - enable for Docker deployments
+  output: 'standalone', // Enable for Docker deployments
   
   // Image optimization
   images: {
@@ -68,15 +68,18 @@ const nextConfig = {
     // Fix chunk loading issues
     if (!dev && !isServer) {
       config.optimization.splitChunks = {
-        ...config.optimization.splitChunks,
+        chunks: 'all',
         cacheGroups: {
-          ...config.optimization.splitChunks.cacheGroups,
-          admin: {
-            name: 'admin',
-            test: /[\\/]app[\\/]admin[\\/]/,
-            chunks: 'all',
-            priority: 10,
-            enforce: true
+          default: {
+            minChunks: 2,
+            priority: -20,
+            reuseExistingChunk: true
+          },
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            priority: -10,
+            chunks: 'all'
           }
         }
       };

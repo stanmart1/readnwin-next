@@ -49,8 +49,15 @@ export class EnhancedFileUploadService {
   }
 
   private initializeStorage() {
-    // Only create directories when actually needed, not during build
-    if (typeof window === 'undefined' && process.env.NODE_ENV !== 'development' || process.env.NEXT_PHASE !== 'phase-production-build') {
+    // Skip directory creation during build phase
+    if (process.env.NEXT_PHASE === 'phase-production-build' || 
+        process.env.NODE_ENV === 'test' ||
+        typeof window !== 'undefined') {
+      return;
+    }
+
+    // Only create directories when actually needed at runtime
+    try {
       [
         this.mediaRootDir,
         this.booksDir, 
@@ -62,6 +69,8 @@ export class EnhancedFileUploadService {
           mkdirSync(dir, { recursive: true });
         }
       });
+    } catch (error) {
+      console.warn('Could not initialize storage directories:', error);
     }
   }
 

@@ -247,7 +247,7 @@ export default function FeaturedBooks() {
                     originalPrice={book.original_price}
                     rating={book.rating || 0}
                     reviewCount={book.review_count || 0}
-                    cover={book.cover_image_url}
+                    cover_image_url={book.cover_image_url}
                     isAvailable={book.status === 'published'}
                     genre={book.category_name}
                     format={book.format as 'ebook' | 'physical' | 'both'}

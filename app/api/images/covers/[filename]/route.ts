@@ -12,12 +12,29 @@ export async function GET(
     // Sanitize filename to prevent path traversal
     const sanitizedFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '');
     
-    // Determine cover path based on environment
-    const coverPath = process.env.NODE_ENV === 'production'
-      ? join('/app/storage/covers', sanitizedFilename)
-      : join(process.cwd(), 'storage', 'covers', sanitizedFilename);
+    // Try multiple possible paths for cover images
+    const possiblePaths = [
+      // New storage structure
+      process.env.NODE_ENV === 'production'
+        ? join('/app/storage/covers/original', sanitizedFilename)
+        : join(process.cwd(), 'storage', 'covers', 'original', sanitizedFilename),
+      process.env.NODE_ENV === 'production'
+        ? join('/app/storage/covers', sanitizedFilename)
+        : join(process.cwd(), 'storage', 'covers', sanitizedFilename),
+      // Legacy paths
+      join(process.cwd(), 'public', 'uploads', 'covers', sanitizedFilename),
+      join(process.cwd(), 'uploads', 'covers', sanitizedFilename)
+    ];
     
-    if (!existsSync(coverPath)) {
+    let coverPath = null;
+    for (const path of possiblePaths) {
+      if (existsSync(path)) {
+        coverPath = path;
+        break;
+      }
+    }
+    
+    if (!coverPath) {
       // Return placeholder image
       const placeholderPath = join(process.cwd(), 'public', 'placeholder-book.jpg');
       if (existsSync(placeholderPath)) {

@@ -23,6 +23,13 @@ export class StorageService {
    * Initialize storage directories
    */
   static async initializeStorage(): Promise<void> {
+    // Skip directory creation during build phase
+    if (process.env.NEXT_PHASE === 'phase-production-build' || 
+        process.env.NODE_ENV === 'test' ||
+        typeof window !== 'undefined') {
+      return;
+    }
+
     const directories = [
       this.BASE_STORAGE_PATH,
       this.BOOKS_PATH,
@@ -44,8 +51,12 @@ export class StorageService {
       try {
         await fs.access(dir);
       } catch {
-        await fs.mkdir(dir, { recursive: true });
-        console.log(`Created storage directory: ${dir}`);
+        try {
+          await fs.mkdir(dir, { recursive: true });
+          console.log(`Created storage directory: ${dir}`);
+        } catch (error) {
+          console.warn(`Could not create directory ${dir}:`, error);
+        }
       }
     }
   }
@@ -404,8 +415,5 @@ export class StorageService {
     return token === expectedToken;
   }
 }
-
-// Initialize storage on module load
-StorageService.initializeStorage().catch(console.error);
 
 export default StorageService;

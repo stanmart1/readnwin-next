@@ -90,7 +90,7 @@ export default function BookCard({
     if (!displayCover) return '/placeholder-book.jpg';
     
     // If already using API route, return as is
-    if (displayCover.startsWith('/api/images/covers/')) {
+    if (displayCover.startsWith('/api/')) {
       return displayCover;
     }
     
@@ -98,6 +98,11 @@ export default function BookCard({
     if (displayCover.includes('/uploads/covers/') || displayCover.includes('covers/')) {
       const filename = displayCover.split('/').pop();
       return `/api/images/covers/${filename}`;
+    }
+    
+    // Handle direct filenames without path
+    if (!displayCover.startsWith('/') && !displayCover.startsWith('http')) {
+      return `/api/images/covers/${displayCover}`;
     }
     
     return displayCover;

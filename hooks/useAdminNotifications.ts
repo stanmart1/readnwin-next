@@ -48,19 +48,14 @@ export function useAdminNotifications() {
   }, []);
 
   const fetchStats = useCallback(async () => {
-    try {
-      const response = await fetch('/api/admin/notifications/stats');
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch notification stats');
-      }
-      
-      const data = await response.json();
-      setStats(data.stats || { total: 0, unread: 0, read: 0 });
-    } catch (err) {
-      console.error('Error fetching notification stats:', err);
-    }
-  }, []);
+    // Stats feature removed - use local calculation
+    const unreadCount = notifications.filter(n => !n.is_read).length;
+    setStats({ 
+      total: notifications.length, 
+      unread: unreadCount, 
+      read: notifications.length - unreadCount 
+    });
+  }, [notifications]);
 
   const markAsRead = useCallback(async (notificationId: number) => {
     try {

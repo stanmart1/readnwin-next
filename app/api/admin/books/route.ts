@@ -12,8 +12,13 @@ let fileUploadService: any = null;
 
 function getFileUploadService() {
   if (!fileUploadService) {
-    const { EnhancedFileUploadService } = require('@/utils/enhanced-file-upload-service');
-    fileUploadService = new EnhancedFileUploadService();
+    try {
+      const { EnhancedFileUploadService } = require('@/utils/enhanced-file-upload-service');
+      fileUploadService = new EnhancedFileUploadService();
+    } catch (error) {
+      console.warn('File upload service not available:', error);
+      return null;
+    }
   }
   return fileUploadService;
 }
@@ -489,7 +494,8 @@ export const GET = async (request: NextRequest) => {
   }
 };
 
-export const DELETE = withPermission('books.delete', async (request: NextRequest, context: any, session: any) => {
+export async function DELETE(request: NextRequest, context?: any) {
+  return await withPermission('books.delete', async (request: NextRequest, context: any, session: any) => {
   try {
     // Session is already provided by withPermission middleware
     if (!session?.user?.id) {
@@ -523,8 +529,13 @@ export const DELETE = withPermission('books.delete', async (request: NextRequest
       try {
         // Delete book files first (with error handling)
         try {
-          await getFileUploadService().deleteBookFiles(bookId);
-          console.log(`🗑️ Deleted files for book ${bookId}`);
+          const fileService = getFileUploadService();
+          if (fileService && typeof fileService.deleteBookFiles === 'function') {
+            await fileService.deleteBookFiles(bookId);
+            console.log(`🗑️ Deleted files for book ${bookId}`);
+          } else {
+            console.log(`⚠️ File service not available for book ${bookId}`);
+          }
         } catch (fileError) {
           console.warn(`⚠️ Failed to delete files for book ${sanitizeForLog(bookId)}:`, sanitizeForLog(fileError));
           // Continue with book deletion even if file deletion fails
@@ -567,4 +578,5 @@ export const DELETE = withPermission('books.delete', async (request: NextRequest
       { status: 500 }
     );
   }
-});
+  })(request, context);
+}

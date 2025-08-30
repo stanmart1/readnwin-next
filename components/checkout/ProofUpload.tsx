@@ -134,11 +134,16 @@ export default function ProofUpload({
           fileInputRef.current.value = '';
         }
       } else {
-        const errorData = await response.json();
-        onUploadError(errorData.error || 'Upload failed');
+        const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
+        onUploadError(errorData.error || `Upload failed (${response.status})`);
       }
     } catch (error) {
-      onUploadError('Upload failed. Please try again.');
+      console.error('Upload error:', error);
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        onUploadError('Network error. Please check your connection and try again.');
+      } else {
+        onUploadError('Upload failed. Please try again.');
+      }
     } finally {
       setIsUploading(false);
       setUploadProgress(0);

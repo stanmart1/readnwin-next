@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 import StorageService from '@/lib/services/StorageService';
 import { readFile } from 'fs/promises';

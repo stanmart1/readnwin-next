@@ -114,14 +114,18 @@ export class EcommerceService {
 
   async addToCart(userId: number, bookId: number, quantity: number = 1): Promise<CartItem> {
     try {
+      if (quantity <= 0) {
+        throw new Error('Quantity must be positive');
+      }
+
       // Check if book exists and has stock
       const book = await this.getBookById(bookId);
       if (!book) {
         throw new Error('Book not found');
       }
 
-      // Only check stock for physical books with inventory tracking (stock_quantity > 0)
-      if (book.format === 'physical' && book.stock_quantity > 0 && book.stock_quantity < quantity) {
+      // Only check stock for physical books with inventory tracking
+      if (book.format === 'physical' && book.stock_quantity !== null && book.stock_quantity < quantity) {
         throw new Error('Insufficient stock');
       }
 
@@ -159,7 +163,7 @@ export class EcommerceService {
         return cartItem;
       }
     } catch (error) {
-      console.error('Error adding to cart:', error);
+      console.error('Error adding to cart:', error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }
@@ -168,12 +172,15 @@ export class EcommerceService {
     try {
       if (quantity <= 0) {
         await this.removeFromCart(userId, bookId);
-        throw new Error('Item removed from cart');
+        return { removed: true } as any;
       }
 
       // Check stock for physical books with inventory tracking
       const book = await this.getBookById(bookId);
-      if (book?.format === 'physical' && book.stock_quantity > 0 && book.stock_quantity < quantity) {
+      if (!book) {
+        throw new Error('Book not found');
+      }
+      if (book.format === 'physical' && book.stock_quantity !== null && book.stock_quantity < quantity) {
         throw new Error('Insufficient stock');
       }
 
@@ -188,7 +195,7 @@ export class EcommerceService {
       }
       return cartItem;
     } catch (error) {
-      console.error('Error updating cart item quantity:', error);
+      console.error('Error updating cart item quantity:', error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }
@@ -321,7 +328,7 @@ export class EcommerceService {
       return result.rows[0]?.name || 'Not specified';
     } catch (error) {
       console.error('Error getting shipping method name:', error);
-              return 'Not specified';
+        return 'Not specified';
     }
   }
 
@@ -373,17 +380,10 @@ export class EcommerceService {
 
       const shippingCost = baseCost + (perItemCost * totalItems);
       
-      // Debug logging for shipping
-      console.log('Shipping Cost Debug:', {
-        baseCost,
-        perItemCost,
-        totalItems,
-        shippingCost,
-        baseCost_type: typeof baseCost,
-        perItemCost_type: typeof perItemCost,
-        totalItems_type: typeof totalItems,
-        shippingCost_type: typeof shippingCost
-      });
+      // Production logging
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Shipping calculation:', { baseCost, perItemCost, totalItems, shippingCost });
+      }
 
       return shippingCost;
     } catch (error) {
@@ -404,7 +404,7 @@ export class EcommerceService {
         return 0;
       }
 
-      const taxRate = Number(result.rows[0].rate);
+      const taxRate = Number(result.rows[0].rate) || 0;
       return subtotal * taxRate;
     } catch (error) {
       console.error('Error calculating tax:', error);
@@ -594,9 +594,11 @@ export class EcommerceService {
   async addToUserLibrary(userId: number, bookId: number, orderId?: number): Promise<UserLibraryItem> {
     try {
       const result = await query(`
-        INSERT INTO user_library (user_id, book_id, order_id)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (user_id, book_id) DO NOTHING
+        INSERT INTO user_library (user_id, book_id, order_id, purchase_date)
+        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id, book_id) DO UPDATE SET
+          order_id = COALESCE(EXCLUDED.order_id, user_library.order_id),
+          purchase_date = COALESCE(user_library.purchase_date, EXCLUDED.purchase_date)
         RETURNING *
       `, [userId, bookId, orderId]);
 
@@ -610,7 +612,11 @@ export class EcommerceService {
   async getUserLibrary(userId: number): Promise<UserLibraryItem[]> {
     try {
       const result = await query(`
-        SELECT ul.*, b.*, a.name as author_name, c.name as category_name
+        SELECT 
+          ul.id, ul.user_id, ul.book_id, ul.order_id, ul.purchase_date, 
+          ul.download_count, ul.last_downloaded_at, ul.is_favorite,
+          b.title, b.cover_image_url, b.format, b.ebook_file_url,
+          a.name as author_name, c.name as category_name
         FROM user_library ul
         JOIN books b ON ul.book_id = b.id
         LEFT JOIN authors a ON b.author_id = a.id
@@ -789,18 +795,10 @@ export class EcommerceService {
 
       const totalAmount = Number(analytics.totalValue) + Number(shippingCost) + Number(taxAmount) - Number(discountAmount);
       
-      // Debug logging
-      console.log('Checkout Summary Debug:', {
-        analytics_totalValue: analytics.totalValue,
-        shippingCost,
-        taxAmount,
-        discountAmount,
-        totalAmount,
-        analytics_totalValue_type: typeof analytics.totalValue,
-        shippingCost_type: typeof shippingCost,
-        taxAmount_type: typeof taxAmount,
-        totalAmount_type: typeof totalAmount
-      });
+      // Production logging
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Checkout summary:', { subtotal: analytics.totalValue, shippingCost, taxAmount, totalAmount });
+      }
 
       // Get estimated delivery for shipping method
       let estimatedDelivery;

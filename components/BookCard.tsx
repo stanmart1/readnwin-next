@@ -199,7 +199,7 @@ export default function BookCard({
           {/* Book Type Badge */}
           <div className="absolute top-4 right-4 bg-green-800 text-white rounded-full px-3 py-1">
             <span className="text-sm font-medium">
-              {format === 'physical' ? 'Physical' : format === 'both' ? 'Both' : 'E-Book'}
+              {format === 'physical' ? 'Physical' : format === 'hybrid' || format === 'both' ? 'Hybrid' : 'Ebook'}
             </span>
           </div>
 

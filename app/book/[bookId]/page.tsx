@@ -352,7 +352,12 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                   </div>
                   <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-100">
                     <span className="text-gray-500 text-sm font-medium">Format</span>
-                    <p className="font-semibold text-gray-900 text-lg">{book.format}</p>
+                    <p className="font-semibold text-gray-900 text-lg">
+                      {book.format === 'ebook' ? 'Ebook' : 
+                       book.format === 'physical' ? 'Physical' :
+                       book.format === 'hybrid' ? 'Hybrid' :
+                       book.format}
+                    </p>
                   </div>
                   <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-xl border border-yellow-100">
                     <span className="text-gray-500 text-sm font-medium">Language</span>
@@ -502,7 +507,12 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                     </div>
                     <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-6 rounded-2xl border border-yellow-100">
                       <span className="text-gray-500 text-sm font-medium">Format</span>
-                      <p className="font-semibold text-gray-900 text-xl">{book.format}</p>
+                      <p className="font-semibold text-gray-900 text-xl">
+                        {book.format === 'ebook' ? 'Ebook' : 
+                         book.format === 'physical' ? 'Physical' :
+                         book.format === 'hybrid' ? 'Hybrid' :
+                         book.format}
+                      </p>
                     </div>
                   </div>
                   <div className="space-y-6">

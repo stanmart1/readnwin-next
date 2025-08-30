@@ -14,9 +14,35 @@ export async function GET(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
+    // Allow admins and users to view their own payment proofs
     const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
+    
     if (!isAdmin) {
-      return new NextResponse('Access denied', { status: 403 });
+      // For non-admin users, verify they own the payment proof
+      const { filename } = params;
+      const sanitizedFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '');
+      
+      // Extract bank transfer ID from filename (format: proof_{bankTransferId}_{timestamp}_{random}.{ext})
+      const filenameParts = sanitizedFilename.split('_');
+      if (filenameParts.length < 2 || filenameParts[0] !== 'proof') {
+        return new NextResponse('Access denied', { status: 403 });
+      }
+      
+      const bankTransferId = parseInt(filenameParts[1]);
+      if (isNaN(bankTransferId)) {
+        return new NextResponse('Access denied', { status: 403 });
+      }
+      
+      // Check if the bank transfer belongs to the user
+      const { query } = await import('@/utils/database');
+      const result = await query(
+        'SELECT user_id FROM bank_transfers WHERE id = $1',
+        [bankTransferId]
+      );
+      
+      if (!result.rows[0] || result.rows[0].user_id !== parseInt(session.user.id)) {
+        return new NextResponse('Access denied', { status: 403 });
+      }
     }
 
     const { filename } = params;

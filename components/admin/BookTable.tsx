@@ -122,7 +122,12 @@ export default function BookTable({
                   <h3 className="text-sm font-medium text-gray-900 leading-tight truncate" title={book.title}>
                     {book.title}
                   </h3>
-                  <p className="text-xs text-gray-500 capitalize mt-1">{book.format}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {book.format === 'ebook' ? 'Ebook' : 
+                     book.format === 'physical' ? 'Physical' :
+                     book.format === 'hybrid' ? 'Hybrid' :
+                     book.format}
+                  </p>
                 </div>
 
                 {/* Author */}
@@ -259,8 +264,11 @@ export default function BookTable({
                         {book.category_name}
                       </span>
                       <span className="text-xs text-gray-400">•</span>
-                      <span className="text-xs text-gray-500 capitalize">
-                        {book.format}
+                      <span className="text-xs text-gray-500">
+                        {book.format === 'ebook' ? 'Ebook' : 
+                         book.format === 'physical' ? 'Physical' :
+                         book.format === 'hybrid' ? 'Hybrid' :
+                         book.format}
                       </span>
                     </div>
                   </div>

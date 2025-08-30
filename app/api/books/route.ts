@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     if (filters.limit < 1 || filters.limit > 100) filters.limit = 20;
 
     console.log('Fetching books with filters:', sanitizeForLog(JSON.stringify(filters)));
-    console.log('Is public request:', isPublicRequest);
+    console.log('Is admin request:', isAdminRequest);
 
     const result = await ModernBookService.getBooks(filters);
 

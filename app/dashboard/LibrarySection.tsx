@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import SafeImage from '@/components/ui/SafeImage';
@@ -34,14 +34,43 @@ export default function LibrarySection() {
       }
 
       try {
-        const response = await fetch('/api/dashboard/library');
-        if (response.ok) {
-          const data = await response.json();
-          setBooks(data.books || []);
-        } else {
-          console.warn('Library API error:', response.status);
+        // Fetch library books
+        const libraryResponse = await fetch('/api/dashboard/library');
+        if (!libraryResponse.ok) {
+          console.warn('Library API error:', libraryResponse.status);
           setBooks([]);
+          return;
         }
+
+        const libraryData = await libraryResponse.json();
+        let libraryBooks = libraryData.books || [];
+
+        // Fetch reading progress for each book
+        if (libraryBooks.length > 0) {
+          try {
+            const progressResponse = await fetch('/api/reading/progress');
+            if (progressResponse.ok) {
+              const progressData = await progressResponse.json();
+              const progressMap = new Map(progressData.progress?.map((p: any) => [p.book_id, p]) || []);
+              
+              // Merge progress data with library books
+              libraryBooks = libraryBooks.map((book: LibraryBook) => {
+                const progress = progressMap.get(book.id);
+                return {
+                  ...book,
+                  progress_percentage: progress?.progress_percentage || 0,
+                  last_read_at: progress?.last_read_at,
+                  completed_at: progress?.completed_at,
+                  total_reading_time_seconds: progress?.total_reading_time_seconds || 0
+                };
+              });
+            }
+          } catch (progressError) {
+            console.warn('Failed to fetch reading progress:', progressError);
+          }
+        }
+
+        setBooks(libraryBooks);
       } catch (error) {
         console.error('Error fetching library:', error);
         setBooks([]);
@@ -53,26 +82,30 @@ export default function LibrarySection() {
     fetchLibrary();
   }, [session, status]);
 
-  const filteredBooks = books.filter(book => {
-    switch (filter) {
-      case 'reading':
-        return book.progress_percentage > 0 && book.progress_percentage < 100;
-      case 'completed':
-        return book.completed_at || book.progress_percentage >= 100;
-      default:
-        return true;
-    }
-  });
+  const { filteredBooks, counts } = useMemo(() => {
+    const readingBooks = books.filter(book => book.progress_percentage > 0 && book.progress_percentage < 100);
+    const completedBooks = books.filter(book => book.completed_at || book.progress_percentage >= 100);
+    
+    const filtered = (() => {
+      switch (filter) {
+        case 'reading':
+          return readingBooks;
+        case 'completed':
+          return completedBooks;
+        default:
+          return books;
+      }
+    })();
 
-  const getFilterCounts = () => {
     return {
-      all: books.length,
-      reading: books.filter(book => book.progress_percentage > 0 && book.progress_percentage < 100).length,
-      completed: books.filter(book => book.completed_at || book.progress_percentage >= 100).length
+      filteredBooks: filtered,
+      counts: {
+        all: books.length,
+        reading: readingBooks.length,
+        completed: completedBooks.length
+      }
     };
-  };
-
-  const counts = getFilterCounts();
+  }, [books, filter]);
 
   if (loading || status === 'loading') {
     return (
@@ -153,13 +186,13 @@ export default function LibrarySection() {
       {books.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {[
-            { key: 'all', label: 'All Books', icon: 'ri-book-line', count: counts.all },
-            { key: 'reading', label: 'Reading', icon: 'ri-play-line', count: counts.reading },
-            { key: 'completed', label: 'Completed', icon: 'ri-check-line', count: counts.completed }
+            { key: 'all' as const, label: 'All Books', icon: 'ri-book-line', count: counts.all },
+            { key: 'reading' as const, label: 'Reading', icon: 'ri-play-line', count: counts.reading },
+            { key: 'completed' as const, label: 'Completed', icon: 'ri-check-line', count: counts.completed }
           ].map(tab => (
             <button
               key={tab.key}
-              onClick={() => setFilter(tab.key as any)}
+              onClick={() => setFilter(tab.key)}
               className={`inline-flex items-center px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all ${
                 filter === tab.key
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'

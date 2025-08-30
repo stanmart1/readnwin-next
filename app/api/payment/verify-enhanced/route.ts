@@ -119,29 +119,13 @@ export async function GET(request: NextRequest) {
 
           console.log(`✅ Order ${order.order_number} payment confirmed`);
 
-          // Add eBooks to user library if this is an eBook order
-          const hasEbooks = parseInt(order.ebook_count) > 0;
-          if (hasEbooks) {
-            console.log('📚 Adding eBooks to user library...');
-            
-            try {
-              const orderItemsResult = await query(`
-                SELECT oi.book_id, b.title, b.format
-                FROM order_items oi
-                JOIN books b ON oi.book_id = b.id
-                WHERE oi.order_id = $1 AND b.format IN ('ebook', 'both')
-              `, [order.id]);
-
-              for (const item of orderItemsResult.rows) {
-                await ecommerceService.addToUserLibrary(userId, item.book_id, order.id);
-                console.log(`✅ Added eBook "${item.title}" to user library`);
-              }
-
-              console.log('✅ All eBooks added to user library');
-            } catch (libraryError) {
-              console.error('❌ Error adding eBooks to library:', libraryError);
-              // Don't fail the entire process for library issues
-            }
+          // Sync books to user library using the sync service
+          try {
+            const { LibrarySyncService } = await import('@/utils/library-sync-service');
+            await LibrarySyncService.syncOrderToLibrary(order.id, userId);
+          } catch (libraryError) {
+            console.error('❌ Error syncing books to library:', libraryError);
+            // Don't fail the entire process for library issues
           }
 
           // Clear user's cart after successful payment verification

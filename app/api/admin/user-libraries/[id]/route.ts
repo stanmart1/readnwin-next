@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 
 export async function DELETE(
@@ -19,7 +19,7 @@ export async function DELETE(
     }
 
     const deleteQuery = `
-      DELETE FROM user_libraries 
+      DELETE FROM user_library 
       WHERE id = $1
       RETURNING id
     `;

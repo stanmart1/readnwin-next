@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 
 export async function GET(request: NextRequest) {
@@ -48,15 +48,16 @@ export async function GET(request: NextRequest) {
       SELECT 
         b.id,
         b.title,
-        b.author_name as author,
+        COALESCE(a.name, 'Unknown Author') as author,
         b.cover_image_url,
         COALESCE(ul.read_count, 0) as reads,
         4.5 as rating
       FROM books b
+      LEFT JOIN authors a ON b.author_id = a.id
       LEFT JOIN (
         SELECT book_id, COUNT(*) as read_count
-        FROM user_libraries
-        WHERE status = 'completed'
+        FROM user_library
+        WHERE status = 'active'
         GROUP BY book_id
       ) ul ON b.id = ul.book_id
       WHERE b.status = 'published'

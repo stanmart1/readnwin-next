@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 
 export async function GET(request: NextRequest) {
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     let paramIndex = 1;
 
     if (search) {
-      whereConditions.push(`(u.first_name ILIKE $${paramIndex} OR u.last_name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex} OR b.title ILIKE $${paramIndex})`);
+      whereConditions.push(`(u.name ILIKE $${paramIndex} OR u.firstName ILIKE $${paramIndex} OR u.lastName ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex} OR b.title ILIKE $${paramIndex})`);
       queryParams.push(`%${search}%`);
       paramIndex++;
     }
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     // Get total count
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM user_libraries ul
+      FROM user_library ul
       JOIN users u ON ul.user_id = u.id
       JOIN books b ON ul.book_id = b.id
       ${whereClause}
@@ -59,20 +59,22 @@ export async function GET(request: NextRequest) {
       SELECT 
         ul.id,
         ul.user_id,
-        CONCAT(u.first_name, ' ', u.last_name) as user_name,
+        COALESCE(u.name, CONCAT(u.firstName, ' ', u.lastName), u.email) as user_name,
         u.email as user_email,
         ul.book_id,
         b.title as book_title,
-        b.author_name as book_author,
-        ul.assigned_at,
-        ul.progress,
-        ul.last_read,
-        ul.status
-      FROM user_libraries ul
+        COALESCE(a.name, 'Unknown Author') as book_author,
+        ul.added_at as assigned_at,
+        COALESCE(rp.progress_percentage, 0) as progress,
+        rp.last_read_at as last_read,
+        COALESCE(ul.status, 'active') as status
+      FROM user_library ul
       JOIN users u ON ul.user_id = u.id
       JOIN books b ON ul.book_id = b.id
+      LEFT JOIN authors a ON b.author_id = a.id
+      LEFT JOIN reading_progress rp ON ul.user_id = rp.user_id AND ul.book_id = rp.book_id
       ${whereClause}
-      ORDER BY ul.assigned_at DESC
+      ORDER BY ul.added_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
@@ -110,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     // Check if assignment already exists
     const existingQuery = `
-      SELECT id FROM user_libraries 
+      SELECT id FROM user_library 
       WHERE user_id = $1 AND book_id = $2
     `;
     const existingResult = await query(existingQuery, [user_id, book_id]);
@@ -121,8 +123,8 @@ export async function POST(request: NextRequest) {
 
     // Create new assignment
     const insertQuery = `
-      INSERT INTO user_libraries (user_id, book_id, assigned_at, progress, status)
-      VALUES ($1, $2, NOW(), 0, 'active')
+      INSERT INTO user_library (user_id, book_id, added_at, status)
+      VALUES ($1, $2, NOW(), 'active')
       RETURNING id
     `;
     const result = await query(insertQuery, [user_id, book_id]);

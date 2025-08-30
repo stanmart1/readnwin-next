@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { rbacService } from '@/utils/rbac-service';
-import { ecommerceService } from '@/utils/ecommerce-service';
+import { ecommerceService } from '@/utils/ecommerce-service-new';
 import { query } from '@/utils/database';
 
 export async function GET(
@@ -100,28 +100,23 @@ export async function POST(
       return NextResponse.json({ error: 'Book not found' }, { status: 404 });
     }
 
-    // Add book to user's library
-    const success = await ecommerceService.addToLibrary(userId, bookId);
-
-    if (success) {
-      // Log the admin action
-      await query(`
-        INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, admin_user_id)
-        VALUES ($1, 'library_add', 'user_library', $2, $3, $4)
-      `, [userId, bookId, JSON.stringify({ 
-        bookTitle: bookResult.rows[0].title,
-        reason: reason || 'Admin assignment',
-        assignedBy: session.user.id 
-      }), session.user.id]);
+    // Add book to user's library using sync service
+    try {
+      const { LibrarySyncService } = await import('@/utils/library-sync-service');
+      await LibrarySyncService.assignBookToUser(userId, bookId, parseInt(session.user.id), reason);
 
       return NextResponse.json({ 
         success: true, 
         message: 'Book added to user library successfully' 
       });
-    } else {
-      return NextResponse.json({ 
-        error: 'Book already exists in user library' 
-      }, { status: 409 });
+    } catch (libraryError) {
+      // Check if it's a duplicate entry error
+      if (libraryError instanceof Error && libraryError.message.includes('duplicate')) {
+        return NextResponse.json({ 
+          error: 'Book already exists in user library' 
+        }, { status: 409 });
+      }
+      throw libraryError;
     }
 
   } catch (error) {
@@ -170,30 +165,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'Book not found' }, { status: 404 });
     }
 
-    // Remove book from user's library
-    const result = await query(`
-      DELETE FROM user_library 
-      WHERE user_id = $1 AND book_id = $2
-    `, [userId, parseInt(bookId)]);
-
-    if (result.rowCount > 0) {
-      // Log the admin action
-      await query(`
-        INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, admin_user_id)
-        VALUES ($1, 'library_remove', 'user_library', $2, $3, $4)
-      `, [userId, parseInt(bookId), JSON.stringify({ 
-        bookTitle: bookResult.rows[0].title,
-        removedBy: session.user.id 
-      }), session.user.id]);
+    // Remove book from user's library using sync service
+    try {
+      const { LibrarySyncService } = await import('@/utils/library-sync-service');
+      await LibrarySyncService.removeBookFromUser(userId, parseInt(bookId), parseInt(session.user.id));
 
       return NextResponse.json({ 
         success: true, 
         message: 'Book removed from user library successfully' 
       });
-    } else {
-      return NextResponse.json({ 
-        error: 'Book not found in user library' 
-      }, { status: 404 });
+    } catch (removalError) {
+      if (removalError instanceof Error && removalError.message.includes('not found')) {
+        return NextResponse.json({ 
+          error: 'Book not found in user library' 
+        }, { status: 404 });
+      }
+      throw removalError;
     }
 
   } catch (error) {

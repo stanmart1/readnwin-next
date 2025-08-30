@@ -75,6 +75,9 @@ export async function POST(request: NextRequest) {
       ? join('/app/storage/assets/payment-proofs')
       : join(process.cwd(), 'storage', 'assets', 'payment-proofs');
     
+    console.log(`🔧 Environment: ${process.env.NODE_ENV}`);
+    console.log(`📁 Upload directory: ${uploadsDir}`);
+    
     console.log(`📁 Ensuring payment-proofs directory exists: ${uploadsDir}`);
     
     try {
@@ -143,8 +146,26 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error uploading payment proof:', error);
+    
+    // Provide more specific error messages
+    let errorMessage = 'Internal server error';
+    if (error instanceof Error) {
+      if (error.message.includes('ENOENT')) {
+        errorMessage = 'Storage directory not accessible';
+      } else if (error.message.includes('EACCES')) {
+        errorMessage = 'Permission denied to write file';
+      } else if (error.message.includes('ENOSPC')) {
+        errorMessage = 'Insufficient storage space';
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.stack : String(error) : undefined
+      },
       { status: 500 }
     );
   }

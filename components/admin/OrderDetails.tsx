@@ -108,7 +108,7 @@ export default function OrderDetails({
           const filename = proof.file_path.split('/').pop();
           if (filename) {
             try {
-              const fileResponse = await fetch(`/api/payment-proofs/${filename}`, { method: 'HEAD' });
+              const fileResponse = await fetch(`/api/images/payment-proofs/${filename}`, { method: 'HEAD' });
               availabilityMap[proof.id] = fileResponse.ok;
             } catch (error) {
               console.error(`Error checking file availability for ${filename}:`, error);
@@ -269,7 +269,7 @@ export default function OrderDetails({
     }
     
     // Use the API endpoint to serve the image
-    const imageUrl = `/api/payment-proofs/${filename}`;
+    const imageUrl = `/api/images/payment-proofs/${filename}`;
     console.log(`🔍 Generated imageUrl: "${imageUrl}"`);
     
     // Test if the image exists before opening the modal

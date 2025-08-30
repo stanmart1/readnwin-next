@@ -140,7 +140,7 @@ export default function BooksPage() {
     setBooks([]);
   };
 
-  const formats = ['all', 'ebook', 'physical', 'audiobook'];
+  const formats = ['all', 'ebook', 'physical', 'hybrid'];
   const priceRanges = ['all', 'under-10', '10-20', '20-30', 'over-30'];
   const ratings = ['all', '4-plus', '3-plus', '2-plus'];
   const sortOptions = ['featured', 'price-low', 'price-high', 'rating', 'newest', 'bestsellers'];
@@ -236,7 +236,11 @@ export default function BooksPage() {
               >
                 {formats.map(format => (
                   <option key={format} value={format}>
-                    {format === 'all' ? 'All Formats' : format.charAt(0).toUpperCase() + format.slice(1)}
+                    {format === 'all' ? 'All Formats' : 
+                     format === 'ebook' ? 'Ebook' :
+                     format === 'physical' ? 'Physical' :
+                     format === 'hybrid' ? 'Hybrid' :
+                     format.charAt(0).toUpperCase() + format.slice(1)}
                   </option>
                 ))}
               </select>

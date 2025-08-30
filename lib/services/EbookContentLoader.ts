@@ -48,58 +48,13 @@ export class EbookContentLoader {
   }
 
   private static async loadEpubBook(bookId: string, fileInfo: FileInfo) {
-    const baseUrl = `/api/ebooks/${bookId}`;
-    
-    try {
-      // Parse EPUB structure from naked files
-      const { manifest, chapters } = await this.parseNakedEpubStructure(baseUrl);
-      
-      return {
-        id: bookId,
-        title: fileInfo.bookMetadata.title,
-        format: 'epub',
-        contentUrl: baseUrl,
-        metadata: {
-          wordCount: fileInfo.bookMetadata.wordCount,
-          estimatedReadingTime: fileInfo.bookMetadata.estimatedReadingTime,
-          pages: fileInfo.bookMetadata.pages
-        },
-        chapters: chapters.map((chapter, index) => ({
-          id: chapter.id,
-          chapter_number: index + 1,
-          chapter_title: chapter.title || `Chapter ${index + 1}`,
-          content_html: chapter.content,
-          reading_time_minutes: Math.ceil(this.estimateReadingTime(chapter.content))
-        })),
-        loadContent: async () => chapters
-      };
-    } catch (error) {
-      console.error('EPUB parsing failed:', error);
-      // Fallback to single chapter
-      return {
-        id: bookId,
-        title: fileInfo.bookMetadata.title,
-        format: 'epub',
-        contentUrl: baseUrl,
-        metadata: {
-          wordCount: fileInfo.bookMetadata.wordCount,
-          estimatedReadingTime: fileInfo.bookMetadata.estimatedReadingTime,
-          pages: fileInfo.bookMetadata.pages
-        },
-        chapters: [{
-          id: '1',
-          chapter_number: 1,
-          chapter_title: fileInfo.bookMetadata.title,
-          content_html: '<p>EPUB content loading failed. Please contact support.</p>',
-          reading_time_minutes: Math.ceil(fileInfo.bookMetadata.estimatedReadingTime / 60)
-        }],
-        loadContent: async () => []
-      };
-    }
+    // For now, fallback to HTML content for EPUB files
+    // This can be enhanced later to parse actual EPUB structure
+    return await this.loadHtmlBook(bookId, fileInfo);
   }
 
   private static async loadHtmlBook(bookId: string, fileInfo: FileInfo) {
-    const contentUrl = `/api/ebooks/${bookId}/${fileInfo.filename}`;
+    const contentUrl = `/api/books/${bookId}/content`;
     
     try {
       const response = await fetch(contentUrl);
@@ -121,7 +76,7 @@ export class EbookContentLoader {
           chapter_number: 1,
           chapter_title: fileInfo.bookMetadata.title,
           content_html: htmlContent,
-          reading_time_minutes: Math.ceil(fileInfo.bookMetadata.estimatedReadingTime / 60)
+          reading_time_minutes: Math.ceil((fileInfo.bookMetadata.estimatedReadingTime || 5) / 60)
         }],
         loadContent: async () => htmlContent
       };

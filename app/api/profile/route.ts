@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { query } from '@/utils/database';
+import { secureQuery } from '@/utils/secure-database';
+import { validateInput, sanitizeInput, requireAuth } from '@/utils/security-middleware';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAuth(request);
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
     }
+    
+    const userId = parseInt(auth.user.id);
 
     // Fetch user profile data
-    const profileResult = await query(`
+    const profileResult = await secureQuery(`
       SELECT 
         u.id,
         u.email,
@@ -30,7 +32,7 @@ export async function GET() {
       FROM users u
       LEFT JOIN student_info si ON u.id = si.user_id
       WHERE u.id = $1
-    `, [session.user.id]);
+    `, [userId]);
 
     if (profileResult.rows.length === 0) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });

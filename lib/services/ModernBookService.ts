@@ -634,8 +634,8 @@ export class ModernBookService {
       `, [...params, limit, offset]);
 
       const books = booksResult.rows.map(book => {
-        // Convert cover_image_url to use consistent API route
-        if (book.cover_image_url) {
+        // Convert cover_image_url to use consistent API route only if not already an API URL
+        if (book.cover_image_url && !book.cover_image_url.startsWith('/api/images/covers/')) {
           const filename = book.cover_image_url.split('/').pop();
           book.cover_image_url = `/api/images/covers/${filename}`;
         }
@@ -804,7 +804,18 @@ export class ModernBookService {
           filesToDelete.push(asset.asset_path);
         }
 
-        // Delete database records (cascading will handle related tables)
+        // Delete from all related tables in correct order to avoid foreign key violations
+        await client.query('DELETE FROM order_items WHERE book_id = $1', [bookId]);
+        await client.query('DELETE FROM cart_items WHERE book_id = $1', [bookId]);
+        await client.query('DELETE FROM user_library WHERE book_id = $1', [bookId]);
+        await client.query('DELETE FROM reading_progress WHERE book_id = $1', [bookId]);
+        await client.query('DELETE FROM book_reviews WHERE book_id = $1', [bookId]);
+        await client.query('DELETE FROM book_chapters WHERE book_id = $1', [bookId]);
+        await client.query('DELETE FROM book_assets WHERE book_id = $1', [bookId]);
+        await client.query('DELETE FROM book_content_structure WHERE book_id = $1', [bookId]);
+        await client.query('DELETE FROM book_formats WHERE book_id = $1', [bookId]);
+        
+        // Finally delete the book itself
         await client.query('DELETE FROM books WHERE id = $1', [bookId]);
 
         // Delete files from persistent volume

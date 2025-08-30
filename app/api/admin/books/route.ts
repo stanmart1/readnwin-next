@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { withPermission } from '@/utils/api-protection';
 import { query } from '@/utils/database';
+import { secureQuery } from '@/utils/secure-database';
+import { validateInput, sanitizeInput, requireAuth } from '@/utils/security-middleware';
 import { createHash } from 'crypto';
 import { sanitizeForLog, sanitizeHtml, sanitizeInt } from '@/utils/security';
 import { handleApiError } from '@/utils/error-handler';
@@ -84,11 +86,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate required fields
-    if (!title || !author_id || !category_id || !price) {
-      console.log('❌ Stage 3 FAILED: Missing required fields');
+    // Input validation
+    const validation = validateInput({
+      title, author_id, category_id, price, isbn, description, language, pages, publication_date, publisher
+    }, {
+      title: { required: true, type: 'string', maxLength: 255 },
+      author_id: { required: true, type: 'string', pattern: /^\d+$/ },
+      category_id: { required: true, type: 'string', pattern: /^\d+$/ },
+      price: { required: true, type: 'string', pattern: /^\d+(\.\d{1,2})?$/ },
+      isbn: { type: 'string', maxLength: 20 },
+      description: { type: 'string', maxLength: 5000 },
+      language: { type: 'string', maxLength: 10 },
+      pages: { type: 'string', pattern: /^\d+$/ },
+      publisher: { type: 'string', maxLength: 255 }
+    });
+
+    if (!validation.isValid) {
+      console.log('❌ Stage 3 FAILED: Validation errors:', validation.errors);
       return NextResponse.json(
-        { error: 'Missing required fields: title, author, category, and price are required' },
+        { error: 'Validation failed', details: validation.errors },
         { status: 400 }
       );
     }
@@ -157,6 +173,17 @@ export async function POST(request: NextRequest) {
 
       bookId = bookResult.rows[0].id;
       console.log(`✅ Stage 5 PASSED: Book record created with ID ${bookId}`);
+      
+      // Initialize storage for ebooks
+      if (book_type === 'ebook') {
+        try {
+          const { BookStorage } = await import('@/utils/book-storage');
+          await BookStorage.createDefaultContent(bookId, sanitizeInput(title));
+          console.log(`✅ Default content created for book ${bookId}`);
+        } catch (storageError) {
+          console.warn('⚠️ Failed to create default content:', storageError);
+        }
+      }
     } catch (dbError) {
       console.log('❌ Stage 5 FAILED: Database error:', sanitizeForLog(dbError));
       return NextResponse.json(
@@ -595,21 +622,18 @@ export async function DELETE(request: NextRequest) {
           // Continue with book deletion even if file deletion fails
         }
 
-        // Delete book record
+        // Delete book record using ModernBookService for proper cascade deletion
         console.log(`🗑️ Deleting book record ${bookId} from database...`);
-        const result = await query(`
-          DELETE FROM books 
-          WHERE id = $1
-          RETURNING id
-        `, [bookId]);
+        const ModernBookService = (await import('@/lib/services/ModernBookService')).default;
+        const deleteResult = await ModernBookService.deleteBook(bookId);
 
-        if (result.rows.length > 0) {
+        if (deleteResult.success) {
           deletedCount++;
           console.log(`✅ Successfully deleted book ${sanitizeForLog(bookId)}`);
         } else {
-          console.log(`❌ Book ${bookId} not found in database`);
+          console.log(`❌ Failed to delete book ${bookId}: ${deleteResult.error}`);
           failedIds.push(bookId);
-          errors.push(`Book ${sanitizeHtml(String(bookId))} not found`);
+          errors.push(`Book ${sanitizeHtml(String(bookId))}: ${sanitizeHtml(deleteResult.error || 'Unknown error')}`);
         }
       } catch (error) {
         console.error(`❌ Error deleting book ${sanitizeForLog(bookId)}:`, sanitizeForLog(error));

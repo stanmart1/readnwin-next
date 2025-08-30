@@ -26,15 +26,16 @@ export async function GET(
     // Sanitize filename to prevent path traversal
     const sanitizedFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '');
     
-    // Try multiple possible paths for cover images
+    // Try multiple possible paths for cover images (check main covers directory first)
     const possiblePaths = [
-      // New storage structure
-      process.env.NODE_ENV === 'production'
-        ? join('/app/storage/covers/original', sanitizedFilename)
-        : join(process.cwd(), 'storage', 'covers', 'original', sanitizedFilename),
+      // Main covers directory (where files actually are)
       process.env.NODE_ENV === 'production'
         ? join('/app/storage/covers', sanitizedFilename)
         : join(process.cwd(), 'storage', 'covers', sanitizedFilename),
+      // Original subdirectory
+      process.env.NODE_ENV === 'production'
+        ? join('/app/storage/covers/original', sanitizedFilename)
+        : join(process.cwd(), 'storage', 'covers', 'original', sanitizedFilename),
       // Legacy paths
       join(process.cwd(), 'public', 'uploads', 'covers', sanitizedFilename),
       join(process.cwd(), 'uploads', 'covers', sanitizedFilename)

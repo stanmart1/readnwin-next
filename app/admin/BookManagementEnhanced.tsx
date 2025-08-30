@@ -187,7 +187,8 @@ export default function BookManagementEnhanced() {
     if (success) {
       setShowDeleteConfirm(false);
       setBookToDelete(null);
-      toast.success('Book deleted successfully!');
+      // Clear from selected books if it was selected
+      setSelectedBooks(prev => prev.filter(id => id !== bookToDelete));
     }
     setDeleteLoading(false);
   };
@@ -497,6 +498,8 @@ export default function BookManagementEnhanced() {
             setUserSearchQuery('');
           }}
           className="max-w-sm xs:max-w-md sm:max-w-lg w-full mx-2 xs:mx-3 sm:mx-4"
+          showCloseIcon={true}
+          closeOnOutsideClick={true}
         >
           <div className="p-3 xs:p-4 sm:p-6">
             <div className="flex items-start xs:items-center gap-2 xs:gap-3 mb-3 xs:mb-4">
@@ -800,15 +803,26 @@ export default function BookManagementEnhanced() {
         </Modal>
 
         {/* Book Assignment Modal */}
-        {showBookAssignModal && selectedBookForAction && (
-          <BulkLibraryManagement
-            preSelectedBook={selectedBookForAction}
-            onClose={() => {
-              setShowBookAssignModal(false);
-              setSelectedBookForAction(null);
-            }}
-          />
-        )}
+        <Modal
+          isOpen={showBookAssignModal && selectedBookForAction !== null}
+          onClose={() => {
+            setShowBookAssignModal(false);
+            setSelectedBookForAction(null);
+          }}
+          className="max-w-4xl w-full mx-4"
+          showCloseIcon={true}
+          closeOnOutsideClick={true}
+        >
+          {selectedBookForAction && (
+            <BulkLibraryManagement
+              preSelectedBook={selectedBookForAction}
+              onClose={() => {
+                setShowBookAssignModal(false);
+                setSelectedBookForAction(null);
+              }}
+            />
+          )}
+        </Modal>
 
         {/* Batch Update Modal */}
         <Modal 

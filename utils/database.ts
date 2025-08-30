@@ -1,21 +1,30 @@
 import { Pool } from 'pg';
+import { validateEnvironment } from './env-validator';
 
-// Database connection configuration - Using postgres database
+// Validate environment variables at startup
+const envValidation = validateEnvironment();
+if (!envValidation.isValid) {
+  console.error('Environment validation failed:', envValidation.errors);
+  process.exit(1);
+}
+
+// Database connection configuration with security enhancements
 const pool = new Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
   database: process.env.DB_NAME || 'postgres',
   password: process.env.DB_PASSWORD,
   port: parseInt(process.env.DB_PORT || '5432'),
-  ssl: false,
-  // Reduced connection pool to prevent exhaustion
-  max: 5, // Reduced max connections
-  min: 1, // Reduced min connections
-  connectionTimeoutMillis: 10000, // Reduced timeout
-  idleTimeoutMillis: 30000, // Reduced idle timeout
-  maxUses: 1000, // Reduced max uses
-  statement_timeout: 10000, // Reduced statement timeout
-  keepAlive: false // Disabled keepalive to reduce connection overhead
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 5,
+  min: 1,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  maxUses: 1000,
+  statement_timeout: 10000,
+  keepAlive: false,
+  application_name: 'readnwin_app',
+  query_timeout: 30000
 });
 
 // Set timezone for all connections to Nigeria (UTC+1)
@@ -25,8 +34,16 @@ pool.on('connect', (client) => {
 
 // Handle pool errors without crashing
 pool.on('error', (err) => {
-  console.error('Database pool error:', err.message);
+  const sanitizedError = err.message.replace(/password|secret|key/gi, '[REDACTED]');
+  console.error('Database pool error:', sanitizedError);
   // Don't exit process, just log the error
+});
+
+// Log successful connection in development
+pool.on('connect', (client) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Database client connected');
+  }
 });
 
 // Handle process cleanup
@@ -44,14 +61,25 @@ process.on('SIGTERM', async () => {
 
 export const query = async (text: string, params?: any[]) => {
   const start = Date.now();
-  let client;
+  
+  // Validate query length to prevent DoS
+  if (text.length > 10000) {
+    throw new Error('Query too long');
+  }
+  
+  // Block dangerous operations in production
+  if (process.env.NODE_ENV === 'production') {
+    const dangerousPatterns = /\b(DROP|TRUNCATE|ALTER|CREATE|GRANT|REVOKE)\b/i;
+    if (dangerousPatterns.test(text)) {
+      console.error('Dangerous query blocked:', text.substring(0, 100));
+      throw new Error('Operation not permitted');
+    }
+  }
   
   try {
-    // Use pool.query instead of getting a client manually
     const res = await pool.query(text, params);
     const duration = Date.now() - start;
     
-    // Only log slow queries to reduce noise
     if (duration > 2000) {
       console.warn(`⚠️ Slow query (${duration}ms):`, text.substring(0, 50) + '...');
     }
@@ -59,8 +87,8 @@ export const query = async (text: string, params?: any[]) => {
     return res;
   } catch (error) {
     const duration = Date.now() - start;
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Database error:', { error: errorMessage, duration });
+    const sanitizedError = error instanceof Error ? error.message.replace(/password|secret|key/gi, '[REDACTED]') : 'Unknown error';
+    console.error('Database error:', { error: sanitizedError, duration, query: text.substring(0, 100) });
     throw error;
   }
 };

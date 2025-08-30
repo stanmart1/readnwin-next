@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/utils/database';
+import { secureQuery } from '@/utils/secure-database';
+import { requireAuth, sanitizeInput } from '@/utils/security-middleware';
 
 // Simple in-memory cache for analytics data
 let analyticsCache: any = null;
@@ -8,6 +9,12 @@ const CACHE_DURATION = 60000; // 1 minute cache
 
 export async function GET(request: NextRequest) {
   try {
+    // Authentication check
+    const auth = await requireAuth(request, ['admin', 'super_admin']);
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
+
     // Check cache first
     const now = Date.now();
     if (analyticsCache && (now - cacheTimestamp) < CACHE_DURATION) {
@@ -15,7 +22,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const period = searchParams.get('period') || 'month';
+    const period = sanitizeInput(searchParams.get('period') || 'month');
+    
+    // Validate period parameter
+    if (!['day', 'week', 'month', 'year'].includes(period)) {
+      return NextResponse.json({ error: 'Invalid period parameter' }, { status: 400 });
+    }
     
     // Use faster, simpler queries with shorter timeout
     let userCount = 0;
@@ -28,7 +40,7 @@ export async function GET(request: NextRequest) {
       console.log('🔍 Fetching basic stats from database...');
       
       const basicStatsResult = await Promise.race([
-        query(`
+        secureQuery(`
           SELECT 
             (SELECT COUNT(*) FROM users) as user_count,
             (SELECT COUNT(*) FROM books) as book_count,
@@ -50,7 +62,7 @@ export async function GET(request: NextRequest) {
       
       // Try individual queries to identify which table is missing
       try {
-        const userResult = await query('SELECT COUNT(*) as count FROM users');
+        const userResult = await secureQuery('SELECT COUNT(*) as count FROM users');
         userCount = parseInt(userResult.rows[0].count) || 0;
         console.log('✅ Users table accessible, count:', userCount);
       } catch (userError) {
@@ -58,7 +70,7 @@ export async function GET(request: NextRequest) {
       }
       
       try {
-        const bookResult = await query('SELECT COUNT(*) as count FROM books');
+        const bookResult = await secureQuery('SELECT COUNT(*) as count FROM books');
         bookCount = parseInt(bookResult.rows[0].count) || 0;
         console.log('✅ Books table accessible, count:', bookCount);
       } catch (bookError) {
@@ -66,7 +78,7 @@ export async function GET(request: NextRequest) {
       }
       
       try {
-        const orderResult = await query('SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL \'30 days\'');
+        const orderResult = await secureQuery('SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL \'30 days\'');
         orderCount = parseInt(orderResult.rows[0].count) || 0;
         revenue = parseFloat(orderResult.rows[0].revenue) || 0;
         console.log('✅ Orders table accessible, count:', orderCount, 'revenue:', revenue);

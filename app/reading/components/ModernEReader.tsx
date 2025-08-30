@@ -80,7 +80,46 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
 
   const loadEbook = useCallback(async (bookId: string, userId: string) => {
     try {
-      const bookData = await EbookContentLoader.loadBook(bookId, userId);
+      // Use the same API as regular EReader
+      const response = await fetch(`/api/books/${bookId}/content`);
+      if (!response.ok) {
+        throw new Error(`Failed to load book: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      // Convert to format expected by ModernEReader store
+      const bookData = {
+        id: bookId,
+        title: data.title,
+        author: data.author,
+        format: data.originalFormat || 'html',
+        contentUrl: `/api/books/${bookId}/content`,
+        metadata: {
+          wordCount: data.wordCount,
+          estimatedReadingTime: Math.ceil(data.wordCount / 200), // 200 words per minute
+          pages: Math.ceil(data.wordCount / 250) // 250 words per page
+        },
+        chapters: data.chapters && data.chapters.length > 0 ? 
+          data.chapters.map((ch: any, index: number) => ({
+            id: ch.id || `chapter-${index + 1}`,
+            chapter_number: ch.order || index + 1,
+            chapter_title: ch.title || `Chapter ${index + 1}`,
+            content_html: data.content, // For now, use full content
+            reading_time_minutes: Math.ceil(data.wordCount / (200 * data.chapters.length))
+          })) : 
+          [{
+            id: 'chapter-1',
+            chapter_number: 1,
+            chapter_title: data.title,
+            content_html: data.content,
+            reading_time_minutes: Math.ceil(data.wordCount / 200)
+          }]
+      };
+      
       loadBook(bookId, userId, bookData);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to load book');

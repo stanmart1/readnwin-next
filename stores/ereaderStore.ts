@@ -47,7 +47,7 @@ const defaultSettings: ReaderSettings = {
 const defaultDrawerState: DrawerState = {
   leftDrawer: {
     isOpen: false,
-    activeTab: "notes",
+    activeTab: "chapters",
   },
   rightDrawer: {
     isOpen: false,
@@ -79,21 +79,32 @@ export const useEReaderStore = create<EReaderState>()(
           // Load book from API
           const response = await fetch(`/api/books/${bookId}/content`);
           if (!response.ok) {
-            throw new Error("Failed to load book");
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `HTTP ${response.status}: Failed to load book`);
           }
 
           const data = await response.json();
+          
+          // Handle error responses
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
           const book: Book = {
             id: bookId,
             title: data.title,
             author: data.author,
             content: data.content,
-            contentType: data.contentType,
+            contentType: data.contentType || data.originalFormat || 'html',
             wordCount: data.wordCount,
             filePath: data.filePath,
             coverImage: data.coverImage,
             createdAt: new Date(data.createdAt),
             updatedAt: new Date(data.updatedAt),
+            // Enhanced structure data
+            structure: data.structure,
+            chapters: data.chapters || [],
+            originalFormat: data.originalFormat
           };
 
           // Load user data for this book (progress, highlights, notes)
@@ -106,13 +117,13 @@ export const useEReaderStore = create<EReaderState>()(
               ]);
 
             const progressData = progressResponse.ok
-              ? await progressResponse.json()
+              ? await (progressResponse.json().catch(() => null))
               : null;
             const highlightsData = highlightsResponse.ok
-              ? await highlightsResponse.json()
+              ? await (highlightsResponse.json().catch(() => []))
               : [];
             const notesData = notesResponse.ok
-              ? await notesResponse.json()
+              ? await (notesResponse.json().catch(() => []))
               : [];
 
             set({
@@ -157,8 +168,9 @@ export const useEReaderStore = create<EReaderState>()(
             });
           }
         } catch (error) {
+          console.error('Error loading book:', error);
           set({
-            error: error instanceof Error ? error.message : "Unknown error",
+            error: error instanceof Error ? error.message : "Failed to load book content",
             isLoading: false,
           });
         }
@@ -294,7 +306,7 @@ export const useEReaderStore = create<EReaderState>()(
         }));
       },
 
-      setDrawerTab: (drawer: "left", tab: "notes" | "highlights") => {
+      setDrawerTab: (drawer: "left", tab: "chapters" | "notes" | "highlights") => {
         if (drawer !== "left") return;
         set((state) => ({
           drawerState: {

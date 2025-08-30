@@ -615,12 +615,9 @@ export class EcommerceService {
         SELECT 
           ul.id, ul.user_id, ul.book_id, ul.order_id, ul.purchase_date, 
           ul.download_count, ul.last_downloaded_at, ul.is_favorite,
-          b.title, b.cover_image_url, b.format, b.ebook_file_url,
-          a.name as author_name, c.name as category_name
+          b.title, b.cover_image_url, b.format, b.ebook_file_url
         FROM user_library ul
         JOIN books b ON ul.book_id = b.id
-        LEFT JOIN authors a ON b.author_id = a.id
-        LEFT JOIN categories c ON b.category_id = c.id
         WHERE ul.user_id = $1
         ORDER BY ul.purchase_date DESC
       `, [userId]);
@@ -637,8 +634,8 @@ export class EcommerceService {
         book: {
           id: row.book_id,
           title: row.title,
-          author_name: row.author_name,
-          category_name: row.category_name,
+          author_name: 'Unknown Author',
+          category_name: 'Uncategorized',
           cover_image_url: row.cover_image_url,
           format: row.format,
           ebook_file_url: row.ebook_file_url

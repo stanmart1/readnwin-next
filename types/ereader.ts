@@ -11,6 +11,22 @@ export interface Book {
   coverImage?: string;
   createdAt: Date;
   updatedAt: Date;
+  // Enhanced structure data
+  structure?: {
+    type: 'epub' | 'html' | 'markdown';
+    chapters: Chapter[];
+  };
+  chapters?: Chapter[];
+  originalFormat?: string;
+}
+
+export interface Chapter {
+  id: string;
+  title: string;
+  order: number;
+  content?: string;
+  startPosition?: number;
+  endPosition?: number;
 }
 
 export interface ReadingProgress {
@@ -113,7 +129,7 @@ export interface ReadingSession {
 export interface DrawerState {
   leftDrawer: {
     isOpen: boolean;
-    activeTab: "notes" | "highlights";
+    activeTab: "chapters" | "notes" | "highlights";
   };
   rightDrawer: {
     isOpen: boolean;
@@ -157,7 +173,7 @@ export interface EReaderState {
   removeNote: (noteId: string) => void;
   updateSettings: (settings: Partial<ReaderSettings>) => void;
   toggleDrawer: (drawer: "left" | "right", isOpen?: boolean) => void;
-  setDrawerTab: (drawer: "left", tab: "notes" | "highlights") => void;
+  setDrawerTab: (drawer: "left", tab: "chapters" | "notes" | "highlights") => void;
   setDrawerSection: (drawer: "right", section: string) => void;
   startTextToSpeech: () => void;
   stopTextToSpeech: () => void;

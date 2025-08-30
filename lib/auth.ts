@@ -42,6 +42,12 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
+          // Check account status
+          if (user.status !== 'active') {
+            console.warn('Login attempt for inactive user:', user.email);
+            return null;
+          }
+
           // Update last login (non-blocking for better performance)
           query(
             'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1',
@@ -72,7 +78,23 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 24 * 60 * 60, // 24 hours
+    updateAge: 60 * 60, // 1 hour
+  },
+  jwt: {
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        domain: process.env.NODE_ENV === 'production' ? '.readnwin.com' : undefined
+      }
+    }
   },
   callbacks: {
     async jwt({ token, user }) {

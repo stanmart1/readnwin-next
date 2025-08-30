@@ -2,19 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { ecommerceService } from '@/utils/ecommerce-service-new';
+import { validateInput, sanitizeInput, requireAuth, validateId } from '@/utils/security-middleware';
+import { handleApiError } from '@/utils/error-handler';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const auth = await requireAuth(request);
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
     }
 
-    const userId = parseInt(session.user.id);
+    const userId = parseInt(auth.user.id);
     const cartItems = await ecommerceService.getCartItems(userId);
     const analytics = await ecommerceService.getCartAnalytics(userId);
 
@@ -25,41 +23,37 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching cart:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const auth = await requireAuth(request);
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
     }
 
     const body = await request.json();
     const { book_id, quantity = 1, guest_cart_items } = body;
 
-    // Enhanced validation
-    if (!book_id) {
-      return NextResponse.json(
-        { error: 'Book ID is required' },
-        { status: 400 }
-      );
+    // Input validation
+    const validation = validateInput(body, {
+      book_id: { required: true, type: 'number' },
+      quantity: { type: 'number' }
+    });
+
+    if (!validation.isValid) {
+      return NextResponse.json({ error: 'Validation failed', details: validation.errors }, { status: 400 });
+    }
+
+    const validBookId = validateId(book_id.toString());
+    if (!validBookId) {
+      return NextResponse.json({ error: 'Invalid book ID' }, { status: 400 });
     }
 
     if (quantity < 1 || quantity > 99) {
-      return NextResponse.json(
-        { error: 'Quantity must be between 1 and 99' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Quantity must be between 1 and 99' }, { status: 400 });
     }
 
     // Check if book exists and has stock
@@ -94,8 +88,8 @@ export async function POST(request: NextRequest) {
     }
 
     const cartItem = await ecommerceService.addToCart(
-      parseInt(session.user.id),
-      book_id,
+      parseInt(auth.user.id),
+      validBookId,
       quantity
     );
 
@@ -106,23 +100,15 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error adding to cart:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const auth = await requireAuth(request);
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: 401 });
     }
 
     const body = await request.json();
@@ -162,9 +148,14 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    const validBookId = validateId(book_id.toString());
+    if (!validBookId) {
+      return NextResponse.json({ error: 'Invalid book ID' }, { status: 400 });
+    }
+
     const cartItem = await ecommerceService.updateCartItemQuantity(
-      parseInt(session.user.id),
-      book_id,
+      parseInt(auth.user.id),
+      validBookId,
       quantity
     );
 
@@ -175,11 +166,7 @@ export async function PUT(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error updating cart:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 

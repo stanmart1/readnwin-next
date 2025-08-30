@@ -14,6 +14,8 @@ import {
   Trash2,
   Calendar,
   Tag,
+  List,
+  ChevronRight,
 } from "lucide-react";
 
 export default function LeftDrawer() {
@@ -38,6 +40,13 @@ export default function LeftDrawer() {
 
   const isOpen = drawerState.leftDrawer.isOpen;
   const activeTab = drawerState.leftDrawer.activeTab;
+  
+  // Set default tab based on book structure
+  React.useEffect(() => {
+    if (currentBook?.chapters && currentBook.chapters.length > 0 && activeTab === "notes") {
+      setDrawerTab("left", "chapters" as any);
+    }
+  }, [currentBook?.chapters, activeTab, setDrawerTab]);
 
   // Filter notes and highlights based on search and filter
   const filteredNotes = notes
@@ -169,36 +178,92 @@ export default function LeftDrawer() {
 
             {/* Tabs */}
             <div className="flex border-b border-gray-200 dark:border-gray-700">
+              {currentBook?.chapters && currentBook.chapters.length > 0 && (
+                <button
+                  onClick={() => setDrawerTab("left", "chapters" as any)}
+                  className={`flex-1 py-3 px-2 text-sm font-medium border-b-2 ${
+                    activeTab === "chapters"
+                      ? "border-blue-600 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  <div className="flex items-center justify-center space-x-1">
+                    <List className="w-4 h-4" />
+                    <span>Chapters</span>
+                  </div>
+                </button>
+              )}
               <button
                 onClick={() => setDrawerTab("left", "notes")}
-                className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 ${
+                className={`flex-1 py-3 px-2 text-sm font-medium border-b-2 ${
                   activeTab === "notes"
                     ? "border-blue-600 text-blue-600"
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
-                <div className="flex items-center justify-center space-x-2">
+                <div className="flex items-center justify-center space-x-1">
                   <StickyNote className="w-4 h-4" />
-                  <span>Notes ({filteredNotes.length})</span>
+                  <span>Notes</span>
                 </div>
               </button>
               <button
                 onClick={() => setDrawerTab("left", "highlights")}
-                className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 ${
+                className={`flex-1 py-3 px-2 text-sm font-medium border-b-2 ${
                   activeTab === "highlights"
                     ? "border-blue-600 text-blue-600"
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
-                <div className="flex items-center justify-center space-x-2">
+                <div className="flex items-center justify-center space-x-1">
                   <Bookmark className="w-4 h-4" />
-                  <span>Highlights ({filteredHighlights.length})</span>
+                  <span>Highlights</span>
                 </div>
               </button>
             </div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto">
+              {activeTab === "chapters" && currentBook?.chapters && (
+                <div className="p-4 space-y-2">
+                  <div className="mb-4">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                      Table of Contents
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {currentBook.chapters.length} chapters • {currentBook.originalFormat?.toUpperCase()}
+                    </p>
+                  </div>
+                  {currentBook.chapters.map((chapter, index) => (
+                    <button
+                      key={chapter.id}
+                      onClick={() => {
+                        // Scroll to chapter
+                        const chapterElement = document.querySelector(`[data-chapter-id="${chapter.id}"]`);
+                        if (chapterElement) {
+                          chapterElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          toggleDrawer("left", false);
+                        }
+                      }}
+                      className="w-full text-left p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded">
+                              {index + 1}
+                            </span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                              {chapter.title}
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              
               {activeTab === "notes" && (
                 <div className="p-4 space-y-4">
                   {filteredNotes.length === 0 ? (

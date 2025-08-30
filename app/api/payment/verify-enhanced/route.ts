@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { FlutterwaveService } from '@/utils/flutterwave-service';
 import { ecommerceService } from '@/utils/ecommerce-service-new';
-import { query } from '@/utils/database';
+import { secureQuery } from '@/utils/secure-database';
+import { validateInput, sanitizeInput, validateId } from '@/utils/security-middleware';
 import { sendEmail, getOrderConfirmationEmailTemplate } from '@/utils/email';
 
 export async function GET(request: NextRequest) {
@@ -11,9 +12,21 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const searchParams = url.searchParams;
     
-    const status = searchParams.get('status');
-    const tx_ref = searchParams.get('tx_ref');
-    const transaction_id = searchParams.get('transaction_id');
+    const status = sanitizeInput(searchParams.get('status') || '');
+    const tx_ref = sanitizeInput(searchParams.get('tx_ref') || '');
+    const transaction_id = sanitizeInput(searchParams.get('transaction_id') || '');
+    
+    // Validate required parameters
+    const validation = validateInput({ status, tx_ref, transaction_id }, {
+      status: { required: true, type: 'string', pattern: /^(successful|cancelled|failed)$/ },
+      tx_ref: { required: true, type: 'string', maxLength: 100 },
+      transaction_id: { required: true, type: 'string', maxLength: 100 }
+    });
+    
+    if (!validation.isValid) {
+      console.log('❌ Invalid parameters:', validation.errors);
+      return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/payment/failed?error=invalid_params`);
+    }
 
     console.log('🔍 Payment verification request:', { status, tx_ref, transaction_id });
 
@@ -35,7 +48,7 @@ export async function GET(request: NextRequest) {
       console.log('❌ Payment was cancelled by user');
       
       // Find the order by transaction reference
-      const orderResult = await query(`
+      const orderResult = await secureQuery(`
         SELECT id, order_number FROM orders 
         WHERE order_number = $1 AND user_id = $2
       `, [tx_ref, userId]);
@@ -44,7 +57,7 @@ export async function GET(request: NextRequest) {
         const order = orderResult.rows[0];
         
         // Update order status to cancelled
-        await query(`
+        await secureQuery(`
           UPDATE orders 
           SET status = 'cancelled', payment_status = 'failed', updated_at = NOW()
           WHERE id = $1
@@ -61,7 +74,7 @@ export async function GET(request: NextRequest) {
 
       try {
         // Get Flutterwave gateway configuration
-        const gatewayResult = await query(`
+        const gatewayResult = await secureQuery(`
           SELECT * FROM payment_gateways 
           WHERE gateway_id = 'flutterwave' AND enabled = true
         `);
@@ -79,7 +92,7 @@ export async function GET(request: NextRequest) {
 
         if (verification.status === 'successful') {
           // Find the order
-          const orderResult = await query(`
+          const orderResult = await secureQuery(`
             SELECT o.*, 
                    COUNT(CASE WHEN b.format IN ('ebook', 'both') THEN 1 END) as ebook_count,
                    COUNT(CASE WHEN b.format IN ('physical', 'both') THEN 1 END) as physical_count
@@ -104,14 +117,14 @@ export async function GET(request: NextRequest) {
           }
 
           // Update order status to paid
-          await query(`
+          await secureQuery(`
             UPDATE orders 
             SET status = 'confirmed', payment_status = 'paid', updated_at = NOW()
             WHERE id = $1
           `, [order.id]);
 
           // Update payment transaction record
-          await query(`
+          await secureQuery(`
             UPDATE payment_transactions 
             SET status = 'successful', updated_at = NOW()
             WHERE transaction_id = $1

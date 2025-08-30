@@ -124,15 +124,21 @@ export function useBookManagement() {
 
   const deleteBooks = useCallback(async (bookIds: number[]) => {
     try {
+      // Optimistically remove books from UI immediately
+      setBooks(prevBooks => prevBooks.filter(book => !bookIds.includes(book.id)));
+      
       const params = new URLSearchParams({ ids: bookIds.join(',') });
       const response = await fetch(`/api/admin/books?${params}`, { method: 'DELETE' });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        // Revert optimistic update on error
+        await loadBooks();
         throw new Error(errorData.error || 'Failed to delete books');
       }
       
       const result = await response.json();
+      // Refresh the list to ensure consistency
       await loadBooks();
       toast.success(`Successfully deleted ${result.deleted_count || bookIds.length} books`);
       return true;

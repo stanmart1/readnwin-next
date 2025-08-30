@@ -360,6 +360,7 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
             <button
               onClick={() => toggleDrawer("left")}
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              title="Table of Contents"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -368,7 +369,10 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
                 {currentBook.title}
               </h1>
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {currentBook.author}
+                {currentBook.author} • {currentBook.originalFormat?.toUpperCase() || 'HTML'}
+                {currentBook.chapters && currentBook.chapters.length > 0 && (
+                  <span> • {currentBook.chapters.length} chapters</span>
+                )}
               </p>
             </div>
           </div>
@@ -435,6 +439,8 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
             onMouseUp={handleTextSelection}
             onTouchEnd={handleTextSelection}
             dangerouslySetInnerHTML={{ __html: SecurityUtils.sanitizeHTML(currentBook.content) }}
+            data-book-format={currentBook.originalFormat}
+            data-has-chapters={currentBook.chapters && currentBook.chapters.length > 0}
           />
         </div>
       </div>

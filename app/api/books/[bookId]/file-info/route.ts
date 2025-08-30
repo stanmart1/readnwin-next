@@ -43,7 +43,40 @@ export async function GET(
     `, [bookId]);
 
     if (result.rows.length === 0) {
-      return NextResponse.json({ error: 'Book file not found' }, { status: 404 });
+      // Fallback: try to get book info from books table directly
+      const bookResult = await query(`
+        SELECT 
+          title,
+          word_count,
+          estimated_reading_time,
+          pages,
+          file_format,
+          ebook_file_url
+        FROM books 
+        WHERE id = $1
+      `, [bookId]);
+      
+      if (bookResult.rows.length === 0) {
+        return NextResponse.json({ error: 'Book not found' }, { status: 404 });
+      }
+      
+      const book = bookResult.rows[0];
+      
+      // Return fallback data
+      return NextResponse.json({
+        success: true,
+        filename: `book_${bookId}.html`,
+        originalFilename: `${book.title}.html`,
+        fileSize: 0,
+        mimeType: 'text/html',
+        fileFormat: book.file_format || 'html',
+        bookMetadata: {
+          title: book.title,
+          wordCount: book.word_count || 0,
+          estimatedReadingTime: book.estimated_reading_time || 0,
+          pages: book.pages || 0
+        }
+      });
     }
 
     const fileInfo = result.rows[0];

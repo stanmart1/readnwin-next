@@ -24,13 +24,13 @@ export async function GET(request: NextRequest) {
     let paramIndex = 1;
 
     if (search) {
-      whereConditions.push(`(u.name ILIKE $${paramIndex} OR u.firstName ILIKE $${paramIndex} OR u.lastName ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex} OR b.title ILIKE $${paramIndex})`);
+      whereConditions.push(`(u.first_name ILIKE $${paramIndex} OR u.last_name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex} OR b.title ILIKE $${paramIndex})`);
       queryParams.push(`%${search}%`);
       paramIndex++;
     }
 
     if (status) {
-      whereConditions.push(`ul.status = $${paramIndex}`);
+      whereConditions.push(`ul.access_type = $${paramIndex}`);
       queryParams.push(status);
       paramIndex++;
     }
@@ -59,22 +59,21 @@ export async function GET(request: NextRequest) {
       SELECT 
         ul.id,
         ul.user_id,
-        COALESCE(u.name, CONCAT(u.firstName, ' ', u.lastName), u.email) as user_name,
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.email) as user_name,
         u.email as user_email,
         ul.book_id,
         b.title as book_title,
         COALESCE(a.name, 'Unknown Author') as book_author,
-        ul.added_at as assigned_at,
-        COALESCE(rp.progress_percentage, 0) as progress,
-        rp.last_read_at as last_read,
-        COALESCE(ul.status, 'active') as status
+        ul.acquired_at as assigned_at,
+        COALESCE(ul.reading_progress, 0) as progress,
+        ul.last_read_at as last_read,
+        COALESCE(ul.access_type, 'purchased') as status
       FROM user_library ul
       JOIN users u ON ul.user_id = u.id
       JOIN books b ON ul.book_id = b.id
       LEFT JOIN authors a ON b.author_id = a.id
-      LEFT JOIN reading_progress rp ON ul.user_id = rp.user_id AND ul.book_id = rp.book_id
       ${whereClause}
-      ORDER BY ul.added_at DESC
+      ORDER BY ul.acquired_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
@@ -123,8 +122,8 @@ export async function POST(request: NextRequest) {
 
     // Create new assignment
     const insertQuery = `
-      INSERT INTO user_library (user_id, book_id, added_at, status)
-      VALUES ($1, $2, NOW(), 'active')
+      INSERT INTO user_library (user_id, book_id, acquired_at, access_type)
+      VALUES ($1, $2, NOW(), 'assigned')
       RETURNING id
     `;
     const result = await query(insertQuery, [user_id, book_id]);

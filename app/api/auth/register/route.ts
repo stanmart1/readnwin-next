@@ -3,47 +3,60 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { rbacService } from '@/utils/rbac-service';
 import { sendEmailVerification, sendWelcomeEmail } from '@/utils/email';
-import { query } from '@/utils/database';
+import { secureQuery } from '@/utils/secure-database';
+import { validateInput, sanitizeInput } from '@/utils/security-middleware';
+import { authRateLimiter } from '@/utils/rate-limiter';
+import { handleApiError } from '@/utils/error-handler';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+    const rateLimitResult = authRateLimiter.isAllowed(ip);
+    
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: 'Too many registration attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': '900' } }
+      );
+    }
+
     const body = await request.json();
     const { first_name, last_name, email, username, password } = body;
 
-    // Validate required fields
-    if (!first_name || !last_name || !email || !username || !password) {
+    // Input validation
+    const validation = validateInput(body, {
+      first_name: { required: true, type: 'string', maxLength: 50, pattern: /^[a-zA-Z\s]+$/ },
+      last_name: { required: true, type: 'string', maxLength: 50, pattern: /^[a-zA-Z\s]+$/ },
+      email: { required: true, type: 'string', maxLength: 255, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ },
+      username: { required: true, type: 'string', maxLength: 30, pattern: /^[a-zA-Z0-9_]+$/ },
+      password: { required: true, type: 'string', maxLength: 128 }
+    });
+
+    if (!validation.isValid) {
       return NextResponse.json(
-        { error: 'All fields are required' },
+        { error: 'Validation failed', details: validation.errors },
         { status: 400 }
       );
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Additional password strength validation
+    if (password.length < 8 || !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
       return NextResponse.json(
-        { error: 'Please enter a valid email address' },
+        { error: 'Password must be at least 8 characters with uppercase, lowercase, and number' },
         { status: 400 }
       );
     }
 
-    // Validate password strength
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: 'Password must be at least 8 characters long' },
-        { status: 400 }
-      );
-    }
-
-    // Validate username
-    if (username.length < 3) {
-      return NextResponse.json(
-        { error: 'Username must be at least 3 characters long' },
-        { status: 400 }
-      );
-    }
+    // Sanitize inputs
+    const sanitizedData = {
+      first_name: sanitizeInput(first_name),
+      last_name: sanitizeInput(last_name),
+      email: sanitizeInput(email.toLowerCase()),
+      username: sanitizeInput(username.toLowerCase())
+    };
 
     // Check if user already exists
     const existingUser = await rbacService.getUserByEmail(email);
@@ -55,7 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if double opt-in is enabled
-    const doubleOptInResult = await query(`
+    const doubleOptInResult = await secureQuery(`
       SELECT setting_value FROM system_settings 
       WHERE setting_key = 'registration_double_opt_in'
     `);
@@ -77,12 +90,12 @@ export async function POST(request: NextRequest) {
       initialStatus = 'pending';
     }
 
-    // Create user
+    // Create user with sanitized data
     const user = await rbacService.createUser({
-      first_name,
-      last_name,
-      email,
-      username,
+      first_name: sanitizedData.first_name,
+      last_name: sanitizedData.last_name,
+      email: sanitizedData.email,
+      username: sanitizedData.username,
       password_hash: passwordHash,
       status: initialStatus,
       email_verified: !doubleOptInEnabled,
@@ -159,10 +172,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 } 

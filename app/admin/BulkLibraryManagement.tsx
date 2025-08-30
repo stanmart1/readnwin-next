@@ -186,39 +186,28 @@ export default function BulkLibraryManagement({ onClose, preSelectedBook }: Bulk
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-center">
-            <i className="ri-loader-4-line animate-spin text-2xl text-blue-600"></i>
-            <span className="ml-2">Loading data...</span>
-          </div>
+      <div className="p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-center">
+          <i className="ri-loader-4-line animate-spin text-2xl text-blue-600"></i>
+          <span className="ml-2">Loading data...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-7xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="p-6 max-w-7xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {preSelectedBook ? `Assign "${preSelectedBook.title}" to Users` : 'Bulk Library Management'}
-            </h2>
-            <p className="text-gray-600">
-              {preSelectedBook 
-                ? `Assign this ebook to multiple users at once` 
-                : 'Assign ebooks to multiple users at once'
-              }
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 cursor-pointer"
-          >
-            <i className="ri-close-line text-xl"></i>
-          </button>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">
+            {preSelectedBook ? `Assign "${preSelectedBook.title}" to Users` : 'Bulk Library Management'}
+          </h2>
+          <p className="text-gray-600">
+            {preSelectedBook 
+              ? `Assign this ebook to multiple users at once` 
+              : 'Assign ebooks to multiple users at once'
+            }
+          </p>
         </div>
 
         {/* Message Display */}
@@ -451,6 +440,5 @@ export default function BulkLibraryManagement({ onClose, preSelectedBook }: Bulk
           </div>
         )}
       </div>
-    </div>
-  );
+    );
 } 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { rbacService } from '@/utils/rbac-service';
+import { validateInput, sanitizeInput, requireAuth } from '@/utils/security-middleware';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,21 +30,21 @@ export async function GET(request: NextRequest) {
       }, { status: 403 });
     }
 
-    // Get query parameters
+    // Get and validate query parameters
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const search = searchParams.get('search') || '';
-    const status = searchParams.get('status') || '';
-    const role = searchParams.get('role') || '';
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '10')));
+    const search = sanitizeInput(searchParams.get('search') || '');
+    const status = sanitizeInput(searchParams.get('status') || '');
+    const role = sanitizeInput(searchParams.get('role') || '');
 
     console.log('🔍 Users API - Query params:', { page, limit, search, status, role });
 
-    // Build filters
+    // Build validated filters
     const filters: any = {};
-    if (search) filters.search = search;
-    if (status) filters.status = status;
-    if (role) filters.role = role;
+    if (search && search.length >= 2) filters.search = search;
+    if (status && ['active', 'inactive', 'suspended'].includes(status)) filters.status = status;
+    if (role && ['admin', 'super_admin', 'user'].includes(role)) filters.role = role;
 
     console.log('🔍 Users API - Calling rbacService.getUsers');
     
@@ -122,29 +123,46 @@ export async function POST(request: NextRequest) {
       }, { status: 403 });
     }
 
-    // Get request body
+    // Get and validate request body
     const body = await request.json();
     const { email, username, password, first_name, last_name, role_id } = body;
 
-    // Validate required fields
-    if (!email || !username || !password || !first_name || !last_name) {
+    // Input validation
+    const validation = validateInput(body, {
+      email: { required: true, type: 'string', pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ },
+      username: { required: true, type: 'string', maxLength: 50, pattern: /^[a-zA-Z0-9_]+$/ },
+      password: { required: true, type: 'string', maxLength: 100 },
+      first_name: { required: true, type: 'string', maxLength: 50 },
+      last_name: { required: true, type: 'string', maxLength: 50 }
+    });
+
+    if (!validation.isValid) {
       return NextResponse.json({
         success: false,
-        error: 'Missing required fields'
+        error: 'Validation failed',
+        details: validation.errors
       }, { status: 400 });
     }
+
+    // Sanitize inputs
+    const sanitizedData = {
+      email: sanitizeInput(email),
+      username: sanitizeInput(username),
+      first_name: sanitizeInput(first_name),
+      last_name: sanitizeInput(last_name)
+    };
 
     // Hash password
     const bcrypt = require('bcryptjs');
     const password_hash = await bcrypt.hash(password, 12);
 
-    // Create user
+    // Create user with sanitized data
     const user = await rbacService.createUser({
-      email,
-      username,
+      email: sanitizedData.email,
+      username: sanitizedData.username,
       password_hash,
-      first_name,
-      last_name,
+      first_name: sanitizedData.first_name,
+      last_name: sanitizedData.last_name,
       status: 'active',
       email_verified: false
     });

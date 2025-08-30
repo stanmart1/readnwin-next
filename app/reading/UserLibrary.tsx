@@ -151,6 +151,13 @@ export default function UserLibrary() {
   };
 
   const handleBookClick = async (book: Book) => {
+    // Check if it's a physical book
+    if (book.format === 'physical') {
+      // Navigate to book detail page for reviews
+      router.push(`/book/${book.id}?tab=reviews`);
+      return;
+    }
+
     if (book.ebook_file_url) {
       // Track reading activity if not already started
       if (book.status === "unread" || !book.progress || book.progress === 0) {
@@ -344,10 +351,16 @@ export default function UserLibrary() {
               )}
 
               {/* Action Button */}
-              <button className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm whitespace-nowrap">
-                {book.progress && book.progress > 0
-                  ? "Continue Reading"
-                  : "Read Book"}
+              <button className={`w-full py-2 px-4 rounded-lg transition-colors text-sm whitespace-nowrap ${
+                book.format === 'physical'
+                  ? 'bg-amber-600 text-white hover:bg-amber-700'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}>
+                {book.format === 'physical'
+                  ? "Leave Review"
+                  : (book.progress && book.progress > 0
+                      ? "Continue Reading"
+                      : "Read Book")}
               </button>
             </div>
           </div>

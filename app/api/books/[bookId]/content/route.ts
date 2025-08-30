@@ -47,6 +47,14 @@ export async function GET(
 
     const book = bookResult.rows[0];
 
+    // Check if it's a physical book - prevent digital reading
+    if (book.book_type === 'physical' || book.format === 'physical') {
+      return NextResponse.json(
+        { success: false, error: 'Physical books cannot be read digitally. Please leave a review instead.' },
+        { status: 403 }
+      );
+    }
+
     // Verify secure book access
     const accessResult = await SecureBookAccess.verifyBookAccess(session.user.id, bookId);
     if (!accessResult.hasAccess) {

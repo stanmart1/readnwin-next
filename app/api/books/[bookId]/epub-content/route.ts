@@ -22,15 +22,9 @@ export async function GET(
       return NextResponse.json({ error: 'Resource path required' }, { status: 400 });
     }
 
-    // Verify user has access to this book
-    const hasAccess = await verifyUserBookAccess(session.user.id, bookId);
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Access denied to this book' }, { status: 403 });
-    }
-
-    // Get book file information
+    // Get book information first to check type
     const bookResult = await query(`
-      SELECT ebook_file_url, storage_path FROM books 
+      SELECT ebook_file_url, storage_path, book_type, format FROM books 
       WHERE id = $1 AND status = 'published'
     `, [bookId]);
 
@@ -39,6 +33,17 @@ export async function GET(
     }
 
     const book = bookResult.rows[0];
+
+    // Check if it's a physical book - prevent digital reading
+    if (book.book_type === 'physical' || book.format === 'physical') {
+      return NextResponse.json({ error: 'Physical books cannot be read digitally' }, { status: 403 });
+    }
+
+    // Verify user has access to this book
+    const hasAccess = await verifyUserBookAccess(session.user.id, bookId);
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Access denied to this book' }, { status: 403 });
+    }
     
     // Construct secure file path
     const baseStoragePath = book.storage_path || `/storage/books/${bookId}`;

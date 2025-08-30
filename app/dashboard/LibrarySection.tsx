@@ -280,11 +280,14 @@ export default function LibrarySection() {
                       </span>
                     </Link>
                   ) : (
-                    <button className="w-full inline-flex items-center justify-center px-2 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 text-white text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl shadow-sm">
-                      <i className="ri-book-line mr-1 sm:mr-2 text-sm"></i>
-                      <span className="hidden sm:inline">Physical Book</span>
-                      <span className="sm:hidden">Physical</span>
-                    </button>
+                    <Link
+                      href={`/book/${book.id}?tab=reviews`}
+                      className="w-full inline-flex items-center justify-center px-2 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 text-white text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl hover:from-amber-700 hover:to-amber-800 shadow-sm hover:shadow-md transition-all"
+                    >
+                      <i className="ri-star-line mr-1 sm:mr-2 text-sm"></i>
+                      <span className="hidden sm:inline">Leave Review</span>
+                      <span className="sm:hidden">Review</span>
+                    </Link>
                   )}
                 </div>
               </div>
@@ -348,13 +351,16 @@ export default function LibrarySection() {
                             </span>
                           </Link>
                         ) : (
-                          <button className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-700 text-white text-xs sm:text-sm font-medium rounded-lg shadow-sm">
-                            <i className="ri-book-line mr-1 sm:mr-2"></i>
-                            <span className="hidden sm:inline">Physical</span>
+                          <Link
+                            href={`/book/${book.id}?tab=reviews`}
+                            className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-700 text-white text-xs sm:text-sm font-medium rounded-lg hover:from-amber-700 hover:to-amber-800 shadow-sm hover:shadow-md transition-all"
+                          >
+                            <i className="ri-star-line mr-1 sm:mr-2"></i>
+                            <span className="hidden sm:inline">Review</span>
                             <span className="sm:hidden">
-                              <i className="ri-book-line"></i>
+                              <i className="ri-star-line"></i>
                             </span>
-                          </button>
+                          </Link>
                         )}
                       </div>
                     </div>

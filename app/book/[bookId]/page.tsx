@@ -3,9 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import { formatNumber } from '@/utils/dateUtils';
 import { useCart } from '@/contexts/CartContextNew';
+import ReviewForm from '@/components/ReviewForm';
 
 
 interface BookDetails {
@@ -35,15 +37,37 @@ interface BookDetails {
 }
 
 export default function BookDetailsPage({ params }: { params: { bookId: string } }) {
-  const [selectedTab, setSelectedTab] = useState('overview');
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'overview';
+  const [selectedTab, setSelectedTab] = useState(initialTab);
   const [quantity, setQuantity] = useState(1);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [book, setBook] = useState<BookDetails | null>(null);
   const [relatedBooks, setRelatedBooks] = useState<BookDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const { data: session } = useSession();
   const { addToCart } = useCart();
+
+  // Load reviews for the book
+  const loadReviews = useCallback(async () => {
+    if (!book) return;
+    
+    try {
+      setReviewsLoading(true);
+      const response = await fetch(`/api/reviews?bookId=${book.id}&limit=10`);
+      if (response.ok) {
+        const data = await response.json();
+        setReviews(data.reviews || []);
+      }
+    } catch (error) {
+      console.error('Error loading reviews:', error);
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, [book]);
 
   // Load book data from API
   const loadBookData = useCallback(async () => {
@@ -85,6 +109,20 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
   useEffect(() => {
     loadBookData();
   }, [loadBookData]);
+
+  useEffect(() => {
+    if (book && selectedTab === 'reviews') {
+      loadReviews();
+    }
+  }, [book, selectedTab, loadReviews]);
+
+  // Update tab when URL parameter changes
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && tab !== selectedTab) {
+      setSelectedTab(tab);
+    }
+  }, [searchParams, selectedTab]);
 
   const handleWishlist = () => {
     if (!session) {
@@ -375,18 +413,60 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
               <div>
                 <h3 className="text-3xl font-bold text-gray-900 mb-6">Customer Reviews</h3>
                 <div className="space-y-8">
-                  {book.review_count && book.review_count > 0 ? (
+                  {/* Review Form */}
+                  <ReviewForm 
+                    bookId={book.id} 
+                    onReviewSubmitted={() => {
+                      loadReviews();
+                      // Optionally reload book data to update review count
+                      loadBookData();
+                    }}
+                  />
+
+                  {/* Reviews List */}
+                  {reviewsLoading ? (
                     <div className="text-center py-8">
-                      <div className="flex items-center justify-center space-x-3 mb-4">
-                        <div className="flex space-x-1">
-                          {renderStars(book.rating || 0)}
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="mt-4 text-gray-600">Loading reviews...</p>
+                    </div>
+                  ) : reviews.length > 0 ? (
+                    <div className="space-y-6">
+                      <h4 className="text-xl font-semibold text-gray-900">All Reviews ({reviews.length})</h4>
+                      {reviews.map((review: any) => (
+                        <div key={review.id} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+                                <span className="text-white font-semibold text-sm">
+                                  {review.first_name?.charAt(0)}{review.last_name?.charAt(0)}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">
+                                  {review.first_name} {review.last_name}
+                                </p>
+                                <div className="flex items-center space-x-2">
+                                  <div className="flex space-x-1">
+                                    {renderStars(review.rating)}
+                                  </div>
+                                  {review.is_verified_purchase && (
+                                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">
+                                      Verified Purchase
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <span className="text-sm text-gray-500">
+                              {new Date(review.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {review.title && (
+                            <h5 className="font-semibold text-gray-900 mb-2">{review.title}</h5>
+                          )}
+                          <p className="text-gray-700 leading-relaxed">{review.review_text}</p>
                         </div>
-                        <span className="text-xl font-bold text-gray-900">{book.rating || 0}</span>
-                        <span className="text-gray-500">({book.review_count} reviews)</span>
-                      </div>
-                      <p className="text-gray-600 text-lg">
-                        Reviews are loaded from the database. Real customer reviews will appear here.
-                      </p>
+                      ))}
                     </div>
                   ) : (
                     <div className="text-center py-8">
@@ -397,11 +477,6 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                       <p className="text-gray-600 text-lg">
                         Be the first to review this book! Share your thoughts and help other readers.
                       </p>
-                      {session && (
-                        <button className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
-                          Write a Review
-                        </button>
-                      )}
                     </div>
                   )}
                 </div>

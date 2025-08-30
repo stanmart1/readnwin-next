@@ -75,6 +75,15 @@ export async function POST(request: NextRequest) {
     const inventory_enabled = formData.get('inventory_enabled') as string;
     const low_stock_threshold = formData.get('low_stock_threshold') as string;
 
+    // Validate book_type
+    if (!['ebook', 'physical', 'hybrid'].includes(book_type)) {
+      console.log('❌ Stage 3 FAILED: Invalid book type');
+      return NextResponse.json(
+        { error: 'Invalid book type. Must be: ebook, physical, or hybrid' },
+        { status: 400 }
+      );
+    }
+
     // Validate required fields
     if (!title || !author_id || !category_id || !price) {
       console.log('❌ Stage 3 FAILED: Missing required fields');

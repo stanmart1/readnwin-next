@@ -9,14 +9,13 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
-    // Check if this is a public request for featured books
-    const isFeaturedRequest = searchParams.get('is_featured') === 'true';
-    const isBestsellersRequest = searchParams.get('is_bestseller') === 'true';
-    const isNewReleasesRequest = searchParams.get('is_new_release') === 'true';
-    const isPublicRequest = isFeaturedRequest || isBestsellersRequest || isNewReleasesRequest;
+    // Check if this is an admin request (requires authentication)
+    const isAdminRequest = searchParams.get('admin') === 'true' || 
+                          searchParams.get('status') === 'draft' ||
+                          searchParams.get('status') === 'archived';
     
-    // For non-public requests, require authentication
-    if (!isPublicRequest) {
+    // Only require authentication for admin requests
+    if (isAdminRequest) {
       const session = await getServerSession(authOptions);
       if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -29,11 +28,11 @@ export async function GET(request: NextRequest) {
       category_id: searchParams.get('category_id') ? parseInt(searchParams.get('category_id')!) : undefined,
       author_id: searchParams.get('author_id') ? parseInt(searchParams.get('author_id')!) : undefined,
       book_type: searchParams.get('book_type') || undefined,
-      status: isPublicRequest ? 'published' : (searchParams.get('status') || undefined),
+      status: isAdminRequest ? (searchParams.get('status') || undefined) : 'published',
       is_featured: searchParams.get('is_featured') === 'true' ? true : undefined,
       is_bestseller: searchParams.get('is_bestseller') === 'true' ? true : undefined,
       is_new_release: searchParams.get('is_new_release') === 'true' ? true : undefined,
-      visibility: isPublicRequest ? 'public' : undefined,
+      visibility: isAdminRequest ? undefined : 'public',
       page: parseInt(searchParams.get('page') || '1'),
       limit: parseInt(searchParams.get('limit') || '20'),
     };

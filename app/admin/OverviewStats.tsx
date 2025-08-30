@@ -68,6 +68,8 @@ export default function OverviewStats() {
       setLoading(true);
       setError('');
       
+      console.log('📊 Fetching analytics data...');
+      
       // Use AbortController for better timeout handling
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -86,6 +88,7 @@ export default function OverviewStats() {
       }
       
       const data = await response.json();
+      console.log('📊 Analytics response:', data);
 
       if (data.success && data.analytics) {
         const analytics = data.analytics;
@@ -95,6 +98,13 @@ export default function OverviewStats() {
         const totalBooks = analytics.totalBooks || 0;
         const totalRevenue = analytics.total_revenue || 0;
         const totalOrders = analytics.total_orders || 0;
+        
+        console.log('📊 Extracted stats:', { totalUsers, totalBooks, totalRevenue, totalOrders });
+        
+        // Check if all stats are zero (potential database issue)
+        if (totalUsers === 0 && totalBooks === 0 && totalRevenue === 0 && totalOrders === 0) {
+          console.warn('⚠️ All stats are zero - possible database connectivity issue');
+        }
         
         setStats([
           {
@@ -270,14 +280,32 @@ export default function OverviewStats() {
             <h2 className="text-2xl font-bold text-gray-900">Analytics Overview</h2>
             <p className="text-gray-600 mt-1">Real-time insights and performance metrics</p>
           </div>
-          <button 
-            onClick={() => fetchAnalytics(0)}
-            disabled={loading}
-            className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-          >
-            <i className={`ri-refresh-line mr-2 ${loading ? 'animate-spin' : ''}`}></i>
-            Refresh Data
-          </button>
+          <div className="flex space-x-3">
+            <button 
+              onClick={async () => {
+                try {
+                  const response = await fetch('/api/admin/db-health');
+                  const data = await response.json();
+                  console.log('Database health:', data);
+                  alert(`Database Status: ${data.success ? 'Connected' : 'Failed'}\n${JSON.stringify(data, null, 2)}`);
+                } catch (e) {
+                  alert('Failed to check database health');
+                }
+              }}
+              className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-105 flex items-center"
+            >
+              <i className="ri-database-2-line mr-2"></i>
+              Check DB
+            </button>
+            <button 
+              onClick={() => fetchAnalytics(0)}
+              disabled={loading}
+              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              <i className={`ri-refresh-line mr-2 ${loading ? 'animate-spin' : ''}`}></i>
+              Refresh Data
+            </button>
+          </div>
         </div>
       </div>
 

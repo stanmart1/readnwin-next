@@ -23,8 +23,10 @@ export async function GET(request: NextRequest) {
     let orderCount = 0;
     let revenue = 0;
     
-    // Get basic stats with optimized single query and shorter timeout
+    // Get basic stats with improved error handling
     try {
+      console.log('🔍 Fetching basic stats from database...');
+      
       const basicStatsResult = await Promise.race([
         query(`
           SELECT 
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest) {
             (SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL '30 days') as order_count,
             (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL '30 days') as revenue
         `),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Query timeout after 1.5s')), 1500))
       ]);
       
       const stats = basicStatsResult.rows[0];
@@ -41,8 +43,36 @@ export async function GET(request: NextRequest) {
       bookCount = parseInt(stats.book_count) || 0;
       orderCount = parseInt(stats.order_count) || 0;
       revenue = parseFloat(stats.revenue) || 0;
+      
+      console.log('✅ Stats fetched successfully:', { userCount, bookCount, orderCount, revenue });
     } catch (e) {
-      console.log('Basic stats query failed, using defaults');
+      console.error('❌ Basic stats query failed:', e instanceof Error ? e.message : e);
+      
+      // Try individual queries to identify which table is missing
+      try {
+        const userResult = await query('SELECT COUNT(*) as count FROM users');
+        userCount = parseInt(userResult.rows[0].count) || 0;
+        console.log('✅ Users table accessible, count:', userCount);
+      } catch (userError) {
+        console.error('❌ Users table error:', userError instanceof Error ? userError.message : userError);
+      }
+      
+      try {
+        const bookResult = await query('SELECT COUNT(*) as count FROM books');
+        bookCount = parseInt(bookResult.rows[0].count) || 0;
+        console.log('✅ Books table accessible, count:', bookCount);
+      } catch (bookError) {
+        console.error('❌ Books table error:', bookError instanceof Error ? bookError.message : bookError);
+      }
+      
+      try {
+        const orderResult = await query('SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL \'30 days\'');
+        orderCount = parseInt(orderResult.rows[0].count) || 0;
+        revenue = parseFloat(orderResult.rows[0].revenue) || 0;
+        console.log('✅ Orders table accessible, count:', orderCount, 'revenue:', revenue);
+      } catch (orderError) {
+        console.error('❌ Orders table error:', orderError instanceof Error ? orderError.message : orderError);
+      }
     }
 
     // Simplified daily activity with default data for faster loading

@@ -384,7 +384,12 @@ export class ModernBookService {
   /**
    * Store EPUB content in database
    */
-  private static async storeEpubContent(bookId: string, epubData: any): Promise<void> {
+  private static async storeEpubContent(bookId: string, epubData: {
+    tableOfContents: unknown[];
+    chapters: Array<{ order: number; title: string; content: string; wordCount: number }>;
+    metadata: Record<string, unknown>;
+    assets: Array<{ isImage?: boolean; isCss?: boolean; isFont?: boolean; href: string; data: Buffer; mediaType: string }>;
+  }): Promise<void> {
     await transaction(async (client) => {
       // Store content structure
       const structureResult = await client.query(`
@@ -440,7 +445,12 @@ export class ModernBookService {
   /**
    * Store HTML content in database
    */
-  private static async storeHtmlContent(bookId: string, htmlData: any): Promise<void> {
+  private static async storeHtmlContent(bookId: string, htmlData: {
+    tableOfContents: unknown[];
+    chapters: Array<{ order: number; title: string; content: string; wordCount: number }>;
+    metadata: Record<string, unknown>;
+    assets: Array<{ type: string; storedPath: string; originalPath: string; data?: Buffer; mimeType: string }>;
+  }): Promise<void> {
     await transaction(async (client) => {
       // Store content structure
       const structureResult = await client.query(`
@@ -551,7 +561,7 @@ export class ModernBookService {
       const offset = (page - 1) * limit;
 
       let whereClause = 'WHERE 1=1';
-      const params: any[] = [];
+      const params: unknown[] = [];
       let paramIndex = 1;
 
       // Build where clause
@@ -695,7 +705,7 @@ export class ModernBookService {
       return await transaction(async (client) => {
         // Build update query
         const updateFields: string[] = [];
-        const updateValues: any[] = [];
+        const updateValues: unknown[] = [];
         let paramIndex = 1;
 
         const allowedFields = [

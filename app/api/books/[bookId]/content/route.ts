@@ -85,39 +85,59 @@ export async function GET(
     // Handle EPUB files - convert to HTML for display
     if (book.file_format === 'epub' && book.stored_filename) {
       try {
-        const epubBuffer = await BookStorage.getBookFile(bookId.toString(), book.stored_filename);
-        if (epubBuffer) {
-          // For now, create readable HTML content from EPUB
-          content = `
-            <div class="epub-content">
-              <h1>${book.title}</h1>
-              <p><strong>Format:</strong> EPUB (${Math.round(epubBuffer.length / 1024)}KB)</p>
-              <div class="chapter" data-chapter-id="chapter-1">
-                <h2 class="chapter-title">Chapter 1</h2>
-                <p>Call me Ishmael. Some years ago—never mind how long precisely—having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world.</p>
-                <p>It is a way I have of driving off the spleen and regulating the circulation. Whenever I find myself growing grim about the mouth; whenever it is a damp, drizzly November in my soul...</p>
-              </div>
-              <div class="chapter" data-chapter-id="chapter-2">
-                <h2 class="chapter-title">Chapter 2 - The Carpet-Bag</h2>
-                <p>I stuffed a shirt or two into my old carpet-bag, tucked it under my arm, and started for Cape Horn and the Pacific.</p>
-              </div>
-              <p><em>EPUB content extracted and converted to HTML for reading. Full EPUB parsing will be enhanced in future updates.</em></p>
-            </div>`;
+        // First try to get processed HTML content
+        const processedContent = await BookStorage.getBookFile(bookId.toString(), 'content.html');
+        if (processedContent) {
+          content = processedContent.toString('utf-8');
           contentType = 'epub';
           
-          // Add sample chapters for navigation
-          chapters = [
-            { id: 'chapter-1', title: 'Chapter 1', order: 1 },
-            { id: 'chapter-2', title: 'Chapter 2 - The Carpet-Bag', order: 2 }
-          ];
-          structure = {
-            type: 'epub',
-            chapters: chapters
-          };
+          // Try to get structure
+          const bookStructure = await BookStorage.getBookStructure(bookId.toString());
+          if (bookStructure) {
+            structure = bookStructure;
+            chapters = bookStructure.chapters || [];
+          }
+        } else {
+          // If no processed content, try to process the EPUB now
+          const epubBuffer = await BookStorage.getBookFile(bookId.toString(), book.stored_filename);
+          if (epubBuffer) {
+            console.log('Processing EPUB on-the-fly for book', bookId);
+            const processResult = await BookStorage.processEpubFile(bookId.toString(), book.stored_filename, epubBuffer);
+            
+            if (processResult.success) {
+              // Get the newly processed content
+              const newContent = await BookStorage.getBookFile(bookId.toString(), 'content.html');
+              if (newContent) {
+                content = newContent.toString('utf-8');
+                contentType = 'epub';
+                
+                const bookStructure = await BookStorage.getBookStructure(bookId.toString());
+                if (bookStructure) {
+                  structure = bookStructure;
+                  chapters = bookStructure.chapters || [];
+                }
+              }
+            } else {
+              // Fallback content if processing fails
+              content = `
+                <div class="epub-content">
+                  <h1>${book.title}</h1>
+                  <p><strong>Format:</strong> EPUB (${Math.round(epubBuffer.length / 1024)}KB)</p>
+                  <div class="chapter" data-chapter-id="chapter-1">
+                    <h2 class="chapter-title">Chapter 1</h2>
+                    <p>This EPUB book is being processed. The content will be available shortly.</p>
+                    <p>Please refresh the page in a few moments to see the full content.</p>
+                  </div>
+                </div>`;
+              contentType = 'epub';
+              chapters = [{ id: 'chapter-1', title: 'Chapter 1', order: 1 }];
+              structure = { type: 'epub', chapters: chapters };
+            }
+          }
         }
       } catch (error) {
         console.error('EPUB processing error:', error);
-        content = `<h1>${book.title}</h1><p>EPUB file found but could not be processed. Please try re-uploading.</p>`;
+        content = `<h1>${book.title}</h1><p>EPUB file found but could not be processed. Error: ${error.message}</p>`;
       }
     } else {
 

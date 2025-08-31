@@ -8,6 +8,7 @@ import { validateInput, sanitizeInput, requireAuth } from '@/utils/security-midd
 import { createHash } from 'crypto';
 import { sanitizeForLog, sanitizeHtml, sanitizeInt } from '@/utils/security';
 import { handleApiError } from '@/utils/error-handler';
+import path from 'path';
 
 // Lazy load file upload service only when needed
 let fileUploadService: any = null;
@@ -259,6 +260,59 @@ export async function POST(request: NextRequest) {
           ebookFileResult.fileSize,
           ebookFileResult.fileHash
         ]);
+
+        // Create book_files entry for e-reader compatibility
+        const fileFormat = ebookFileResult.mimeType === 'application/epub+zip' ? 'epub' : 'html';
+        await query(`
+          INSERT INTO book_files (book_id, file_type, original_filename, stored_filename, file_path, file_size, mime_type, file_format, processing_status, file_hash)
+          VALUES ($1, 'ebook', $2, $3, $4, $5, $6, $7, 'completed', $8)
+          ON CONFLICT (book_id, file_type) DO UPDATE SET
+            stored_filename = EXCLUDED.stored_filename,
+            file_path = EXCLUDED.file_path,
+            file_size = EXCLUDED.file_size,
+            file_format = EXCLUDED.file_format,
+            processing_status = EXCLUDED.processing_status,
+            file_hash = EXCLUDED.file_hash
+        `, [
+          bookId,
+          ebook_file.name,
+          path.basename(ebookFileResult.filePath),
+          ebookFileResult.filePath,
+          ebookFileResult.fileSize,
+          ebookFileResult.mimeType,
+          fileFormat,
+          ebookFileResult.fileHash
+        ]);
+
+        // Process EPUB file if it's an EPUB
+        if (fileFormat === 'epub') {
+          try {
+            const { BookStorage } = await import('@/utils/book-storage');
+            const buffer = Buffer.from(await ebook_file.arrayBuffer());
+            const processResult = await BookStorage.processEpubFile(bookId.toString(), ebook_file.name, buffer);
+            
+            if (processResult.success && processResult.metadata) {
+              // Update book with EPUB metadata
+              await query(`
+                UPDATE books SET 
+                  word_count = $2,
+                  estimated_reading_time = $3,
+                  chapters = $4,
+                  content_metadata = $5
+                WHERE id = $1
+              `, [
+                bookId,
+                processResult.metadata.wordCount || 0,
+                Math.ceil((processResult.metadata.wordCount || 0) / 200),
+                JSON.stringify(processResult.metadata.chapters || []),
+                JSON.stringify(processResult.metadata)
+              ]);
+            }
+          } catch (epubError) {
+            console.warn('EPUB processing failed:', epubError);
+            // Don't fail the upload, just log the warning
+          }
+        }
 
         console.log('✅ Stage 7 PASSED: E-book file uploaded successfully');
       } catch (ebookError) {

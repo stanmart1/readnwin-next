@@ -104,7 +104,7 @@ export class HtmlProcessingService {
       }
 
       // Use index.html if available, otherwise use first HTML file
-      let mainHtmlFile = htmlFiles.find(name => 
+      const mainHtmlFile = htmlFiles.find(name => 
         name.toLowerCase().includes('index') || 
         name.toLowerCase().includes('main')
       ) || htmlFiles[0];

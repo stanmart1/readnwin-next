@@ -60,15 +60,19 @@ export class BookStorage {
     await fs.writeFile(path.join(bookDir, 'content.html'), htmlContent);
     
     // Update book_files table
+    const crypto = await import('crypto');
+    const fileHash = crypto.createHash('sha256').update(htmlContent).digest('hex');
+    
     await secureQuery(`
-      INSERT INTO book_files (book_id, file_type, original_filename, stored_filename, file_path, file_size, mime_type, file_format, processing_status)
-      VALUES ($1, 'ebook', $2, 'content.html', $3, $4, 'text/html', 'html', 'completed')
+      INSERT INTO book_files (book_id, file_type, original_filename, stored_filename, file_path, file_size, mime_type, file_format, processing_status, file_hash)
+      VALUES ($1, 'ebook', $2, 'content.html', $3, $4, 'text/html', 'html', 'completed', $5)
       ON CONFLICT (book_id, file_type) DO UPDATE SET
         stored_filename = EXCLUDED.stored_filename,
         file_path = EXCLUDED.file_path,
         file_size = EXCLUDED.file_size,
-        processing_status = EXCLUDED.processing_status
-    `, [bookId, `${title}.html`, path.join(bookDir, 'content.html'), Buffer.byteLength(htmlContent)]);
+        processing_status = EXCLUDED.processing_status,
+        file_hash = EXCLUDED.file_hash
+    `, [bookId, `${title}.html`, path.join(bookDir, 'content.html'), Buffer.byteLength(htmlContent), fileHash]);
   }
 
   static async processEpubFile(bookId: string, filename: string, buffer: Buffer): Promise<{ success: boolean; error?: string; metadata?: any }> {

@@ -9,25 +9,25 @@ export default function HeroSection() {
     {
       id: '1',
       title: 'Bestseller',
-      image: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1474154022i/3735293.jpg',
+      image: 'https://picsum.photos/seed/book1/400/600',
       position: 'top-left'
     },
     {
       id: '2',
       title: 'New Release',
-      image: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1602190253i/55539565.jpg',
+      image: 'https://picsum.photos/seed/book2/400/600',
       position: 'bottom-left'
     },
     {
       id: '3',
       title: "Editor's Pick",
-      image: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1535115320i/40121378.jpg',
+      image: 'https://picsum.photos/seed/book3/400/600',
       position: 'top-right'
     },
     {
       id: '4',
       title: 'Must Read',
-      image: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1654371463i/18144590.jpg',
+      image: 'https://picsum.photos/seed/book4/400/600',
       position: 'bottom-right'
     }
   ];

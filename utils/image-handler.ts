@@ -21,9 +21,10 @@ export class ImageHandler {
 
   private static getImagePaths(filename: string, subfolder?: string): string[] {
     const basePaths = [
+      process.cwd(),
       process.cwd() + '/public',
       process.cwd() + '/uploads',
-      process.cwd() + '/storage/assets'
+      process.cwd() + '/storage'
     ];
 
     const paths: string[] = [];
@@ -31,9 +32,11 @@ export class ImageHandler {
     for (const basePath of basePaths) {
       if (subfolder) {
         paths.push(join(basePath, 'uploads', subfolder, filename));
+        paths.push(join(basePath, 'public', 'uploads', subfolder, filename));
         paths.push(join(basePath, subfolder, filename));
       }
       paths.push(join(basePath, 'uploads', filename));
+      paths.push(join(basePath, 'public', 'uploads', filename));
       paths.push(join(basePath, filename));
     }
 
@@ -58,16 +61,9 @@ export class ImageHandler {
 
       if (!filePath) {
         console.log(`Image not found: ${filename} in subfolder: ${subfolder}`);
-        console.log('Searched paths:', possiblePaths);
         
-        // Return a proper 404 response
-        return new NextResponse('Image not found', {
-          status: 404,
-          headers: {
-            'Content-Type': 'text/plain',
-            'Cache-Control': 'no-cache'
-          }
-        });
+        // Return placeholder image instead of 404
+        return this.servePlaceholderImage();
       }
 
       const imageBuffer = await readFile(filePath);
@@ -86,13 +82,25 @@ export class ImageHandler {
 
     } catch (error) {
       console.error('Error serving image:', error);
-      return new NextResponse('Internal Server Error', {
-        status: 500,
-        headers: {
-          'Content-Type': 'text/plain'
-        }
-      });
+      return this.servePlaceholderImage();
     }
+  }
+
+  private static servePlaceholderImage(): NextResponse {
+    // 1x1 transparent PNG
+    const placeholderPng = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77mgAAAABJRU5ErkJggg==',
+      'base64'
+    );
+    
+    return new NextResponse(placeholderPng, {
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=3600',
+        'Access-Control-Allow-Origin': '*'
+      }
+    });
+  }
   }
 
   static async checkImageExists(filename: string, subfolder?: string): Promise<boolean> {

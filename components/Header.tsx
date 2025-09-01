@@ -83,14 +83,17 @@ export default function Header() {
           {/* Right side - Cart, User */}
           <div className="flex items-center space-x-4">
             {/* Cart */}
-            <Link href="/cart-new" className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors duration-200">
+            <button 
+              onClick={() => router.push('/cart-new')}
+              className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors duration-200"
+            >
               <i className="ri-shopping-cart-line text-xl"></i>
               {(session ? getTotalItems() : getGuestTotalItems()) > 0 && (
                 <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                   {(session ? getTotalItems() : getGuestTotalItems()) > 99 ? '99+' : (session ? getTotalItems() : getGuestTotalItems())}
                 </span>
               )}
-            </Link>
+            </button>
 
             {/* User Menu */}
             {session ? (

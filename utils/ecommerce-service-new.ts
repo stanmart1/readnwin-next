@@ -10,65 +10,30 @@ export class EcommerceService {
   // Database initialization
   async ensureCartTableExists(): Promise<void> {
     try {
-      // Create cart_items table if it doesn't exist
       await query(`
-        CREATE TABLE IF NOT EXISTS cart_items (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL,
-          book_id INTEGER NOT NULL,
-          quantity INTEGER NOT NULL DEFAULT 1,
-          format VARCHAR(20) DEFAULT 'ebook',
-          added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT unique_user_book UNIQUE(user_id, book_id)
-        )
+        DO $$ 
+        BEGIN
+          CREATE TABLE IF NOT EXISTS cart_items (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            book_id INTEGER NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 1,
+            format VARCHAR(20) DEFAULT 'ebook',
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT unique_user_book UNIQUE(user_id, book_id)
+          );
+          
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'books' AND column_name = 'format') THEN
+            ALTER TABLE books ADD COLUMN format VARCHAR(20) DEFAULT 'ebook';
+          END IF;
+          
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'books' AND column_name = 'stock_quantity') THEN
+            ALTER TABLE books ADD COLUMN stock_quantity INTEGER DEFAULT 0;
+          END IF;
+        END $$;
       `);
-
-      // Add missing columns to cart_items
-      const cartColumns = await query(`
-        SELECT column_name FROM information_schema.columns 
-        WHERE table_name = 'cart_items'
-      `);
-      
-      const existingColumns = cartColumns.rows.map(row => row.column_name);
-      
-      if (!existingColumns.includes('format')) {
-        await query('ALTER TABLE cart_items ADD COLUMN format VARCHAR(20) DEFAULT \'ebook\'');
-      }
-      
-      if (!existingColumns.includes('added_at')) {
-        await query('ALTER TABLE cart_items ADD COLUMN added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
-      }
-      
-      if (!existingColumns.includes('updated_at')) {
-        await query('ALTER TABLE cart_items ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
-      }
-
-      // Ensure books table has required columns
-      const bookColumns = await query(`
-        SELECT column_name FROM information_schema.columns 
-        WHERE table_name = 'books'
-      `);
-      
-      const existingBookColumns = bookColumns.rows.map(row => row.column_name);
-      
-      if (!existingBookColumns.includes('format')) {
-        await query('ALTER TABLE books ADD COLUMN format VARCHAR(20) DEFAULT \'ebook\'');
-      }
-      
-      if (!existingBookColumns.includes('stock_quantity')) {
-        await query('ALTER TABLE books ADD COLUMN stock_quantity INTEGER DEFAULT 0');
-      }
-      
-      if (!existingBookColumns.includes('original_price')) {
-        await query('ALTER TABLE books ADD COLUMN original_price DECIMAL(10,2)');
-      }
-
-      // Update NULL values
-      await query('UPDATE cart_items SET format = \'ebook\' WHERE format IS NULL');
-      await query('UPDATE books SET format = \'ebook\' WHERE format IS NULL');
-      
     } catch (error) {
       console.error('Error ensuring cart table exists:', error);
       throw error;

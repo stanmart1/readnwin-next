@@ -6,7 +6,7 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.flutterwave.com https://js.stripe.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://checkout.flutterwave.com https://js.stripe.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
       "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
       "img-src 'self' data: https: blob:",

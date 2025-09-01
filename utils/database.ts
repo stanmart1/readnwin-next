@@ -76,20 +76,33 @@ export const query = async (text: string, params?: any[]) => {
     }
   }
   
-  try {
-    const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-    
-    if (duration > 2000) {
-      console.warn(`⚠️ Slow query (${duration}ms):`, text.substring(0, 50) + '...');
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await pool.query(text, params);
+      const duration = Date.now() - start;
+      
+      if (duration > 2000) {
+        console.warn(`⚠️ Slow query (${duration}ms):`, text.substring(0, 50) + '...');
+      }
+      
+      return res;
+    } catch (error) {
+      const isLastAttempt = attempt === 3;
+      const isConnectionError = error instanceof Error && 
+        (error.message.includes('connect') || error.message.includes('ECONNREFUSED') || 
+         error.message.includes('timeout'));
+      
+      if (isConnectionError && !isLastAttempt) {
+        console.warn(`Database connection attempt ${attempt} failed, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        continue;
+      }
+      
+      const duration = Date.now() - start;
+      const sanitizedError = error instanceof Error ? error.message.replace(/password|secret|key/gi, '[REDACTED]') : 'Unknown error';
+      console.error('Database error:', { error: sanitizedError, duration, query: text.substring(0, 100) });
+      throw error;
     }
-    
-    return res;
-  } catch (error) {
-    const duration = Date.now() - start;
-    const sanitizedError = error instanceof Error ? error.message.replace(/password|secret|key/gi, '[REDACTED]') : 'Unknown error';
-    console.error('Database error:', { error: sanitizedError, duration, query: text.substring(0, 100) });
-    throw error;
   }
 };
 

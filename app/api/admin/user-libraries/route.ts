@@ -103,21 +103,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { user_id, book_id } = await request.json();
+    const { user_id, book_id, format } = await request.json();
 
     if (!user_id || !book_id) {
       return NextResponse.json({ error: 'User ID and Book ID are required' }, { status: 400 });
     }
 
-    // Check if assignment already exists
+    // Check if assignment already exists for this format
+    const formatCondition = format ? 'AND format = $3' : '';
     const existingQuery = `
-      SELECT id FROM user_library 
-      WHERE user_id = $1 AND book_id = $2
+      SELECT id, format FROM user_library 
+      WHERE user_id = $1 AND book_id = $2 ${formatCondition}
     `;
-    const existingResult = await query(existingQuery, [user_id, book_id]);
+    const queryParams = format ? [user_id, book_id, format] : [user_id, book_id];
+    const existingResult = await query(existingQuery, queryParams);
 
     if (existingResult.rows.length > 0) {
-      return NextResponse.json({ error: 'Book already assigned to this user' }, { status: 400 });
+      const existingFormat = existingResult.rows[0].format || 'unknown';
+      return NextResponse.json({ 
+        error: `${format || existingFormat} format already assigned to this user` 
+      }, { status: 400 });
     }
 
     // Get book details to determine type
@@ -130,22 +135,21 @@ export async function POST(request: NextRequest) {
     
     const book = bookResult.rows[0];
 
-    // Create new assignment (works for both ebook and physical books)
+    // Create new assignment with format specification
+    const assignedFormat = format || book.format;
     const insertQuery = `
-      INSERT INTO user_library (user_id, book_id, purchase_date, access_type)
-      VALUES ($1, $2, CURRENT_TIMESTAMP, 'assigned')
-      ON CONFLICT (user_id, book_id) DO UPDATE SET
-        access_type = 'assigned',
-        purchase_date = CURRENT_TIMESTAMP
+      INSERT INTO user_library (user_id, book_id, purchase_date, access_type, format)
+      VALUES ($1, $2, CURRENT_TIMESTAMP, 'assigned', $3)
       RETURNING id
     `;
-    const result = await query(insertQuery, [user_id, book_id]);
+    const result = await query(insertQuery, [user_id, book_id, assignedFormat]);
 
-    const bookType = book.format === 'physical' ? 'Physical book' : 'Ebook';
+    const bookType = assignedFormat === 'physical' ? 'Physical book' : 'Ebook';
     return NextResponse.json({ 
       message: `${bookType} "${book.title}" assigned successfully`,
       id: result.rows[0].id,
-      book_type: book.format
+      book_type: assignedFormat,
+      format: assignedFormat
     });
 
   } catch (error) {

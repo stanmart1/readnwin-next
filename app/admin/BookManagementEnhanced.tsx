@@ -86,6 +86,7 @@ export default function BookManagementEnhanced() {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [assignLoading, setAssignLoading] = useState(false);
+  const [selectedFormat, setSelectedFormat] = useState<'both' | 'ebook' | 'physical'>('both');
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -102,6 +103,13 @@ export default function BookManagementEnhanced() {
   useEffect(() => {
     loadAuthorsAndCategories();
   }, []);
+  
+  // Load users when assign modal opens
+  useEffect(() => {
+    if (showAssignModal) {
+      loadUsers();
+    }
+  }, [showAssignModal]);
 
   // Reload data when modal closes
   const handleModalClose = () => {
@@ -146,26 +154,59 @@ export default function BookManagementEnhanced() {
     
     setAssignLoading(true);
     try {
-      const response = await fetch('/api/admin/user-libraries', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: selectedUser.id,
-          book_id: selectedBookForAction.id
-        }),
-      });
-
-      if (response.ok) {
-        const bookType = selectedBookForAction.format === 'physical' ? 'Physical Book' : 'Ebook';
-        toast.success(`${bookType} "${selectedBookForAction.title}" assigned to ${selectedUser.name} successfully!`);
+      const assignments = [];
+      
+      // Determine which formats to assign based on selection
+      if (selectedFormat === 'both' || selectedFormat === 'ebook') {
+        assignments.push({ format: 'ebook', book_id: selectedBookForAction.id });
+      }
+      if (selectedFormat === 'both' || selectedFormat === 'physical') {
+        assignments.push({ format: 'physical', book_id: selectedBookForAction.id });
+      }
+      
+      const results = [];
+      for (const assignment of assignments) {
+        const response = await fetch('/api/admin/user-libraries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: selectedUser.id,
+            book_id: assignment.book_id,
+            format: assignment.format
+          }),
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          results.push({ success: true, format: assignment.format, message: result.message });
+        } else {
+          const error = await response.json();
+          results.push({ success: false, format: assignment.format, error: error.error });
+        }
+      }
+      
+      // Show results
+      const successful = results.filter(r => r.success);
+      const failed = results.filter(r => !r.success);
+      
+      if (successful.length > 0) {
+        const formats = successful.map(r => r.format).join(' and ');
+        toast.success(`${formats} "${selectedBookForAction.title}" assigned to ${selectedUser.name} successfully!`);
+      }
+      
+      if (failed.length > 0) {
+        failed.forEach(f => {
+          toast.error(`Failed to assign ${f.format}: ${f.error}`);
+        });
+      }
+      
+      if (successful.length > 0) {
         setShowAssignModal(false);
         setSelectedUser(null);
         setUserSearchQuery('');
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Failed to assign book');
+        setSelectedFormat('both');
       }
     } catch (error) {
       console.error('Error assigning book:', error);
@@ -510,10 +551,62 @@ export default function BookManagementEnhanced() {
             </div>
             {selectedBookForAction && (
               <div className="mb-3 xs:mb-4 p-2 xs:p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs xs:text-sm font-medium text-gray-900 leading-tight break-words">{selectedBookForAction.title}</p>
-                <p className="text-xs text-gray-600 break-words">by {selectedBookForAction.author_name}</p>
+                <div className="flex items-center gap-2 xs:gap-3 mb-2">
+                  <img
+                    src={selectedBookForAction.cover_image_url || '/placeholder-book.jpg'}
+                    alt={selectedBookForAction.title}
+                    className="w-10 xs:w-12 h-12 xs:h-15 object-cover rounded"
+                  />
+                  <div className="flex-1">
+                    <p className="text-xs xs:text-sm font-medium text-gray-900 leading-tight break-words">{selectedBookForAction.title}</p>
+                    <p className="text-xs text-gray-600 break-words">by {selectedBookForAction.author_name}</p>
+                    <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${
+                      selectedBookForAction.format === 'physical' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {selectedBookForAction.format === 'physical' ? 'Physical Book' : 'Ebook'}
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
+            <div className="mb-3 xs:mb-4">
+              <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Assignment Format</label>
+              <div className="flex gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedFormat('both')}
+                  className={`flex-1 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium rounded-lg border transition-colors ${
+                    selectedFormat === 'both'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Both Formats
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFormat('ebook')}
+                  className={`flex-1 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium rounded-lg border transition-colors ${
+                    selectedFormat === 'ebook'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Ebook Only
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFormat('physical')}
+                  className={`flex-1 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium rounded-lg border transition-colors ${
+                    selectedFormat === 'physical'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Physical Only
+                </button>
+              </div>
+            </div>
             <div className="mb-3 xs:mb-4">
               <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Search and Select User</label>
               <input
@@ -554,6 +647,7 @@ export default function BookManagementEnhanced() {
                   setShowAssignModal(false);
                   setSelectedUser(null);
                   setUserSearchQuery('');
+                  setSelectedFormat('both');
                 }}
                 className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs xs:text-sm font-medium"
               >
@@ -569,7 +663,7 @@ export default function BookManagementEnhanced() {
                 ) : (
                   <i className="ri-user-add-line text-sm xs:text-base"></i>
                 )}
-                <span className="truncate">{assignLoading ? 'Assigning...' : 'Assign Book'}</span>
+                <span className="truncate">{assignLoading ? 'Assigning...' : `Assign ${selectedFormat === 'both' ? 'Both Formats' : selectedFormat === 'ebook' ? 'Ebook' : 'Physical Book'}`}</span>
               </button>
             </div>
           </div>

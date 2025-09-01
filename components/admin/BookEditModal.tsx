@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import Modal from '@/components/ui/Modal';
 
@@ -53,20 +53,41 @@ export default function BookEditModal({
   const [loading, setLoading] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [formData, setFormData] = useState({
-    title: book?.title || '',
-    author_name: book?.author_name || '',
-    description: book?.description || '',
-    price: book?.price || 0,
-    stock_quantity: book?.stock_quantity || 0,
-    status: book?.status || 'draft',
-    is_featured: book?.is_featured || false,
-    isbn: book?.isbn || '',
-    pages: book?.pages || 0,
-    language: book?.language || 'English',
-    publisher: book?.publisher || '',
-    publication_date: book?.publication_date || '',
-    cover_image_url: book?.cover_image_url || ''
+    title: '',
+    author_name: '',
+    description: '',
+    price: 0,
+    stock_quantity: 0,
+    status: 'draft',
+    is_featured: false,
+    isbn: '',
+    pages: 0,
+    language: 'English',
+    publisher: '',
+    publication_date: '',
+    cover_image_url: ''
   });
+  
+  // Update form data when book changes
+  useEffect(() => {
+    if (book) {
+      setFormData({
+        title: book.title || '',
+        author_name: book.author_name || '',
+        description: book.description || '',
+        price: book.price || 0,
+        stock_quantity: book.stock_quantity || 0,
+        status: book.status || 'draft',
+        is_featured: book.is_featured || false,
+        isbn: book.isbn || '',
+        pages: book.pages || 0,
+        language: book.language || 'English',
+        publisher: book.publisher || '',
+        publication_date: book.publication_date || '',
+        cover_image_url: book.cover_image_url || ''
+      });
+    }
+  }, [book]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 

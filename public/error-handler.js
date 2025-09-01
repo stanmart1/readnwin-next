@@ -15,7 +15,13 @@
     /Refused to load.*violates.*Content Security Policy/i,
     /Failed to load about section image/i,
     /using fallback/i,
-    /_next\/image.*400/i
+    /_next\/image.*400/i,
+    /\/uploads\/works\/.*404/i,
+    /1755361316689_nwj1qoidkh/i,
+    /1755366437045_aa12papdg4d/i,
+    /1755383089021_4jrjnman35w/i,
+    /Refused to connect.*Content Security Policy/i,
+    /Fetch API cannot load.*Content Security Policy/i
   ];
   
   // Override console.error

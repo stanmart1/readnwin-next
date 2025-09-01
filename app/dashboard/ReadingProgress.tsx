@@ -119,7 +119,7 @@ export default function ReadingProgress() {
               </div>
 
               <Link
-                href={`/reading/${book.id}`}
+                href={`/dashboard?tab=library`}
                 className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 whitespace-nowrap"
               >
                 Continue

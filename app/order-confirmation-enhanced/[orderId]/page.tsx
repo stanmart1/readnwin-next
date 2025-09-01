@@ -480,7 +480,7 @@ export default function EnhancedOrderConfirmationPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {orderAnalysis.hasEbooks && (
               <Link
-                href="/reading"
+                href="/dashboard?tab=library"
                 className="flex items-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
               >
                 <BookOpen className="w-8 h-8 text-blue-600 mr-3" />
@@ -591,7 +591,7 @@ function EbooksTab({ orderItems, libraryItems }: {
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">Your eBooks</h3>
         <Link
-          href="/reading"
+          href="/dashboard?tab=library"
           className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center"
         >
           View All in Library

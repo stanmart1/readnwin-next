@@ -9,25 +9,25 @@ export default function HeroSection() {
     {
       id: '1',
       title: 'Bestseller',
-      image: getBookCoverImage('1', 'The Great Gatsby'),
+      image: 'https://covers.openlibrary.org/b/id/8225261-L.jpg',
       position: 'top-left'
     },
     {
       id: '2',
       title: 'New Release',
-      image: getBookCoverImage('2', 'The Midnight Library'),
+      image: 'https://covers.openlibrary.org/b/id/12593080-L.jpg',
       position: 'bottom-left'
     },
     {
       id: '3',
       title: "Editor's Pick",
-      image: getBookCoverImage('3', 'Atomic Habits'),
+      image: 'https://covers.openlibrary.org/b/id/10909258-L.jpg',
       position: 'top-right'
     },
     {
       id: '4',
       title: 'Must Read',
-      image: getBookCoverImage('4', 'The Alchemist'),
+      image: 'https://covers.openlibrary.org/b/id/240726-L.jpg',
       position: 'bottom-right'
     }
   ];

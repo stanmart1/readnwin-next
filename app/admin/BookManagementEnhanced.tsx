@@ -8,6 +8,7 @@ import { useLoadingState, useSkeletonLoading } from '@/hooks/useLoadingState';
 import { LoadingSpinner, CardSkeleton } from '@/components/ui/LoadingSpinner';
 import Modal from '@/components/ui/Modal';
 import ModernBookUploadModal from '@/components/ModernBookUploadModal';
+import BookEditModal from '@/components/admin/BookEditModal';
 import LibraryManagement from './LibraryManagement';
 import BookAnalytics from './BookAnalytics';
 import CategoriesManagement from './CategoriesManagement';
@@ -638,89 +639,17 @@ export default function BookManagementEnhanced() {
         </Modal>
 
         {/* Edit Book Modal */}
-        <Modal 
-          isOpen={showEditModal} 
+        <BookEditModal
+          isOpen={showEditModal}
           onClose={() => setShowEditModal(false)}
-          className="max-w-sm xs:max-w-md sm:max-w-lg md:max-w-2xl w-full mx-2 xs:mx-3 sm:mx-4"
-        >
-          <div className="p-3 xs:p-4 sm:p-6">
-            <div className="flex items-start xs:items-center gap-2 xs:gap-3 mb-4 xs:mb-5 sm:mb-6">
-              <div className="flex-shrink-0 w-8 xs:w-10 h-8 xs:h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <i className="ri-edit-line text-green-600 text-sm xs:text-base"></i>
-              </div>
-              <h3 className="text-sm xs:text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">Edit Book</h3>
-            </div>
-            {selectedBookForAction && (
-              <div className="space-y-3 xs:space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 xs:gap-4">
-                  <div>
-                    <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Title</label>
-                    <input
-                      type="text"
-                      defaultValue={selectedBookForAction.title}
-                      className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Author</label>
-                    <input
-                      type="text"
-                      defaultValue={selectedBookForAction.author_name}
-                      className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 xs:gap-4">
-                  <div>
-                    <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Price</label>
-                    <input
-                      type="number"
-                      defaultValue={selectedBookForAction.price}
-                      className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Stock</label>
-                    <input
-                      type="number"
-                      defaultValue={selectedBookForAction.stock_quantity}
-                      className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Status</label>
-                  <select
-                    defaultValue={selectedBookForAction.status}
-                    className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  >
-                    <option value="published">Published</option>
-                    <option value="draft">Draft</option>
-                    <option value="archived">Archived</option>
-                  </select>
-                </div>
-              </div>
-            )}
-            <div className="flex flex-col xs:flex-row justify-end gap-2 xs:gap-3 mt-4 xs:mt-5 sm:mt-6">
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs xs:text-sm font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  toast.success('Book updated successfully!');
-                  setShowEditModal(false);
-                }}
-                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs xs:text-sm font-medium flex items-center justify-center gap-1 xs:gap-2"
-              >
-                <i className="ri-save-line text-sm xs:text-base"></i>
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </Modal>
+          book={selectedBookForAction}
+          categories={categories}
+          authors={authors}
+          onSuccess={() => {
+            // Refresh the books list
+            window.location.reload();
+          }}
+        />
 
         {/* Book Details Modal */}
         <Modal 

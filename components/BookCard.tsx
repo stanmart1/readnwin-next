@@ -167,7 +167,7 @@ export default function BookCard({
     sessionStorage.setItem('selectedBook', JSON.stringify(eReaderBook));
     
     // Navigate to the ereader page
-    window.location.href = '/reading';
+    window.location.href = '/dashboard?tab=library';
   };
 
   const renderStars = (rating: number) => {

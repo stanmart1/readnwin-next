@@ -3,124 +3,61 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { path: string[] } }
 ) {
   try {
-    // Handle both array and string path formats
-    const pathArray = Array.isArray(params.path) ? params.path : [params.path];
-    console.log('📁 Uploads API called with path:', pathArray);
-    
-    // In production Docker, files are in different locations
-    const isProduction = process.env.NODE_ENV === 'production';
-    const isCoverImage = pathArray[0] === 'covers';
-    
-    let possiblePaths: string[];
-    
-    if (isProduction) {
-      // Production Docker paths - prioritize persistent storage
-      possiblePaths = [
-        join('/app/storage/uploads', ...pathArray),
-        join('/app/storage/public/uploads', ...pathArray),
-        join('/app/storage', ...pathArray),
-        join('/app/public/uploads', ...pathArray),
-        join('/app/uploads', ...pathArray),
-        join('/app/.next/standalone/public/uploads', ...pathArray),
-        join(process.cwd(), 'public/uploads', ...pathArray)
-      ];
-    } else {
-      // Development paths
-      possiblePaths = [
-        join(process.cwd(), 'public/uploads', ...pathArray),
-        join(process.cwd(), 'uploads', ...pathArray)
-      ];
-    }
-    
-    console.log(`📁 Searching for file in paths:`, possiblePaths);
-    
-    // Find the first existing file
-    let filePath = possiblePaths.find(path => {
-      const exists = existsSync(path);
-      console.log(`📁 Checking ${path}: ${exists ? '✅ EXISTS' : '❌ NOT FOUND'}`);
-      return exists;
-    });
+    const filePath = params.path.join('/');
     
     if (!filePath) {
-      console.log('❌ File not found at any location:', {
-        requested: pathArray,
-        isCoverImage,
-        tried: possiblePaths,
-        cwd: process.cwd(),
-        nodeEnv: process.env.NODE_ENV,
-        dockerEnv: process.env.DOCKER_ENV,
-        platform: process.platform
-      });
-      
-      // Return detailed error for debugging in production
-      return NextResponse.json(
-        { 
-          error: 'File not found',
-          debug: {
-            requested: pathArray.join('/'),
-            environment: process.env.NODE_ENV,
-            searchedPaths: possiblePaths,
-            cwd: process.cwd()
-          }
-        },
-        { status: 404 }
-      );
+      return new NextResponse('File path is required', { status: 400 });
     }
-    
-    console.log('✅ File found at:', filePath);
 
-    // Read the file
-    const fileBuffer = await readFile(filePath);
+    // Check multiple possible locations
+    const possiblePaths = [
+      join(process.cwd(), 'public', 'uploads', filePath),
+      join(process.cwd(), 'uploads', filePath),
+      join(process.cwd(), 'storage', 'assets', filePath)
+    ];
+
+    let fullPath = null;
+    for (const path of possiblePaths) {
+      if (existsSync(path)) {
+        fullPath = path;
+        break;
+      }
+    }
+
+    if (!fullPath) {
+      return new NextResponse('File not found', { status: 404 });
+    }
+
+    const fileBuffer = await readFile(fullPath);
+    const ext = filePath.split('.').pop()?.toLowerCase();
     
-    // Determine content type based on file extension
-    const extension = filePath.split('.').pop()?.toLowerCase();
     let contentType = 'application/octet-stream';
-    
-    switch (extension) {
+    switch (ext) {
+      case 'png': contentType = 'image/png'; break;
       case 'jpg':
-      case 'jpeg':
-        contentType = 'image/jpeg';
-        break;
-      case 'png':
-        contentType = 'image/png';
-        break;
-      case 'gif':
-        contentType = 'image/gif';
-        break;
-      case 'webp':
-        contentType = 'image/webp';
-        break;
-      case 'pdf':
-        contentType = 'application/pdf';
-        break;
-      case 'epub':
-        contentType = 'application/epub+zip';
-        break;
-      case 'mobi':
-        contentType = 'application/x-mobipocket-ebook';
-        break;
-      default:
-        contentType = 'application/octet-stream';
+      case 'jpeg': contentType = 'image/jpeg'; break;
+      case 'gif': contentType = 'image/gif'; break;
+      case 'webp': contentType = 'image/webp'; break;
+      case 'svg': contentType = 'image/svg+xml'; break;
+      case 'pdf': contentType = 'application/pdf'; break;
     }
 
-    // Return the file with appropriate headers
-    return new NextResponse(new Uint8Array(fileBuffer), {
+    return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable', // Cache for 1 year
-        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=86400',
+        'Content-Length': fileBuffer.length.toString(),
       },
     });
   } catch (error) {
-    console.error('Error serving uploaded file:', error);
-    return NextResponse.json(
-      { error: 'Failed to serve file' },
-      { status: 500 }
-    );
+    console.error('Error serving upload file:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
-} 
+}

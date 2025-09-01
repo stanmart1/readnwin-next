@@ -9,7 +9,7 @@ export default function QuickActions() {
       title: 'Continue Reading',
       description: 'Pick up where you left off',
       icon: 'ri-book-open-line',
-      href: '/reading',
+      href: '/dashboard?tab=library',
       color: 'bg-blue-500 hover:bg-blue-600'
     },
     {
@@ -23,7 +23,7 @@ export default function QuickActions() {
       title: 'My Library',
       description: 'View your collection',
       icon: 'ri-book-line',
-      href: '/reading',
+      href: '/dashboard?tab=library',
       color: 'bg-green-500 hover:bg-green-600'
     },
     {

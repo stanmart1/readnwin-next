@@ -301,7 +301,7 @@ export default function LibrarySection() {
                   {/* Action Button */}
                   {book.book_type === 'ebook' ? (
                     <Link
-                      href={`/reading/${book.id}`}
+                      href={`/dashboard?tab=library`}
                       className="w-full inline-flex items-center justify-center px-2 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all"
                     >
                       <i className={`${book.progress_percentage > 0 ? 'ri-play-line' : 'ri-book-open-line'} mr-1 sm:mr-2 text-sm`}></i>
@@ -372,7 +372,7 @@ export default function LibrarySection() {
                       <div className="flex-shrink-0 ml-4">
                         {book.book_type === 'ebook' ? (
                           <Link
-                            href={`/reading/${book.id}`}
+                            href={`/dashboard?tab=library`}
                             className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all"
                           >
                             <i className={`${book.progress_percentage > 0 ? 'ri-play-line' : 'ri-book-open-line'} mr-1 sm:mr-2`}></i>

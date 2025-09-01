@@ -74,13 +74,26 @@ interface CheckoutStep {
   required: boolean;
 }
 
+interface CartItem {
+  id: number;
+  title: string;
+  price: number;
+  quantity: number;
+  book_type: 'physical' | 'ebook' | 'hybrid';
+}
+
+interface OrderData {
+  orderId?: string;
+  formData: CheckoutFormData;
+  total: number;
+}
+
 interface CheckoutFlowProps {
-  cartItems: any[];
+  cartItems: CartItem[];
   isEbookOnly: () => boolean;
   isPhysicalOnly: () => boolean;
   isMixedCart: () => boolean;
-  analytics: any;
-  onComplete: (orderData: any) => void;
+  onComplete: (orderData: OrderData) => void;
   onBack: () => void;
 }
 
@@ -89,7 +102,6 @@ export default function CheckoutFlow({
   isEbookOnly,
   isPhysicalOnly,
   isMixedCart,
-  analytics,
   onComplete,
   onBack
 }: CheckoutFlowProps) {
@@ -294,7 +306,7 @@ export default function CheckoutFlow({
     }
   };
 
-  const updateFormData = (section: keyof CheckoutFormData, data: any) => {
+  const updateFormData = (section: keyof CheckoutFormData, data: Partial<CheckoutFormData[keyof CheckoutFormData]>) => {
     try {
       setFormData(prev => ({
         ...prev,

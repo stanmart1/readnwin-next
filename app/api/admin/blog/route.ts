@@ -14,8 +14,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Check permission
+    const userId = (session.user as any)?.id;
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
+    }
+    
     const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
+      parseInt(userId),
       'content.manage'
     );
     
@@ -42,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     // Log audit event
     await rbacService.logAuditEvent(
-      parseInt(session.user.id),
+      parseInt(userId),
       'blog_posts.list',
       'blog_posts',
       undefined,
@@ -75,8 +80,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Check permission
+    const userId = (session.user as any)?.id;
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
+    }
+    
     const hasPermission = await rbacService.hasPermission(
-      parseInt(session.user.id),
+      parseInt(userId),
       'content.manage'
     );
     
@@ -106,8 +116,8 @@ export async function POST(request: NextRequest) {
 
     const post = await blogService.createPost({
       ...postData,
-      author_id: parseInt(session.user.id),
-      author_name: postData.author_name || session.user.name || 'Admin',
+      author_id: parseInt(userId),
+      author_name: postData.author_name || (session.user as any).name || 'Admin',
       status: postData.status || 'draft',
       featured: postData.featured || false,
       category: postData.category || 'general',
@@ -116,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     // Log audit event
     await rbacService.logAuditEvent(
-      parseInt(session.user.id),
+      parseInt(userId),
       'blog_posts.create',
       'blog_posts',
       post.id,

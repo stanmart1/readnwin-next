@@ -80,7 +80,6 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
 
   const loadEbook = useCallback(async (bookId: string, userId: string) => {
     try {
-      // Use the same API as regular EReader
       const response = await fetch(`/api/books/${bookId}/content`);
       if (!response.ok) {
         throw new Error(`Failed to load book: ${response.status} ${response.statusText}`);
@@ -91,32 +90,56 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
         throw new Error(data.error);
       }
       
-      // Convert to format expected by ModernEReader store
+      // Handle structure-preserved EPUB books
+      if (data.preservedFormat && data.contentType === 'epub' && data.structure) {
+        const bookData = {
+          id: bookId,
+          title: data.title,
+          author: data.author,
+          format: 'epub',
+          contentUrl: `/api/books/${bookId}/content`,
+          structure: data.structure,
+          preservedFormat: true,
+          metadata: {
+            wordCount: 0, // Will be calculated from chapters
+            estimatedReadingTime: 0,
+            pages: 0
+          },
+          chapters: await loadEpubChapters(bookId, data.structure)
+        };
+        
+        loadBook(bookId, userId, bookData);
+        return;
+      }
+      
+      // Handle structure-preserved HTML or regular books
       const bookData = {
         id: bookId,
         title: data.title,
         author: data.author,
-        format: data.originalFormat || 'html',
+        format: data.contentType || 'html',
         contentUrl: `/api/books/${bookId}/content`,
+        structure: data.structure,
+        preservedFormat: data.preservedFormat || false,
         metadata: {
-          wordCount: data.wordCount,
-          estimatedReadingTime: Math.ceil(data.wordCount / 200), // 200 words per minute
-          pages: Math.ceil(data.wordCount / 250) // 250 words per page
+          wordCount: data.wordCount || 0,
+          estimatedReadingTime: Math.ceil((data.wordCount || 0) / 200),
+          pages: Math.ceil((data.wordCount || 0) / 250)
         },
         chapters: data.chapters && data.chapters.length > 0 ? 
-          data.chapters.map((ch: any, index: number) => ({
+          data.chapters.map((ch: { id?: string; order?: number; title?: string }, index: number) => ({
             id: ch.id || `chapter-${index + 1}`,
             chapter_number: ch.order || index + 1,
             chapter_title: ch.title || `Chapter ${index + 1}`,
-            content_html: data.content, // For now, use full content
-            reading_time_minutes: Math.ceil(data.wordCount / (200 * data.chapters.length))
+            content_html: data.content,
+            reading_time_minutes: Math.ceil((data.wordCount || 0) / (200 * data.chapters.length))
           })) : 
           [{
             id: 'chapter-1',
             chapter_number: 1,
             chapter_title: data.title,
             content_html: data.content,
-            reading_time_minutes: Math.ceil(data.wordCount / 200)
+            reading_time_minutes: Math.ceil((data.wordCount || 0) / 200)
           }]
       };
       
@@ -125,6 +148,58 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
       setError(error instanceof Error ? error.message : 'Failed to load book');
     }
   }, [loadBook, setError]);
+  
+  // Load EPUB chapters from preserved structure
+  const loadEpubChapters = useCallback(async (bookId: string, structure: { spine?: string[]; manifest?: Record<string, { href: string; mediaType: string }> }) => {
+    try {
+      const chapters = [];
+      const spine = structure.spine || [];
+      const manifest = structure.manifest || {};
+      
+      for (let i = 0; i < spine.length; i++) {
+        const spineItem = spine[i];
+        const manifestItem = manifest[spineItem];
+        
+        if (manifestItem && manifestItem.mediaType === 'application/xhtml+xml') {
+          // Load chapter content from extracted EPUB
+          const chapterResponse = await fetch(`/api/ebooks/${bookId}/${manifestItem.href}`);
+          if (chapterResponse.ok) {
+            const chapterContent = await chapterResponse.text();
+            
+            // Extract title from content
+            const titleMatch = chapterContent.match(/<title>([^<]+)<\/title>/i) || 
+                              chapterContent.match(/<h[1-6][^>]*>([^<]+)<\/h[1-6]>/i);
+            const title = titleMatch?.[1] || `Chapter ${i + 1}`;
+            
+            chapters.push({
+              id: spineItem,
+              chapter_number: i + 1,
+              chapter_title: title.trim(),
+              content_html: chapterContent,
+              reading_time_minutes: Math.ceil(chapterContent.replace(/<[^>]*>/g, '').split(/\s+/).length / 200)
+            });
+          }
+        }
+      }
+      
+      return chapters.length > 0 ? chapters : [{
+        id: 'chapter-1',
+        chapter_number: 1,
+        chapter_title: 'Content',
+        content_html: '<p>EPUB structure preserved but content could not be loaded.</p>',
+        reading_time_minutes: 1
+      }];
+    } catch (error) {
+      console.error('Failed to load EPUB chapters:', error);
+      return [{
+        id: 'chapter-1',
+        chapter_number: 1,
+        chapter_title: 'Error',
+        content_html: '<p>Failed to load EPUB content.</p>',
+        reading_time_minutes: 1
+      }];
+    }
+  }, []);
 
   // Load book on mount
   useEffect(() => {
@@ -350,7 +425,7 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
               onClick={() => {
                 clearError();
                 if (session?.user?.id) {
-                  loadEbook(bookId, session.user.id);
+                  loadEbook(bookId, session.user.id).catch(console.error);
                 }
               }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -558,7 +633,7 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
             }}
             onMouseUp={handleTextSelection}
             onTouchEnd={handleTextSelection}
-            dangerouslySetInnerHTML={{ __html: SecurityUtils.sanitizeHTML(currentChapter.content_html) }}
+            dangerouslySetInnerHTML={{ __html: SecurityUtils.sanitizeHtml(currentChapter.content_html) }}
           />
 
           {/* Chapter Navigation */}

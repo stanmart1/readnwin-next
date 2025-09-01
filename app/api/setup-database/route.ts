@@ -67,7 +67,7 @@ export async function POST() {
         results.push({ table: tableName, success: true });
       } catch (error) {
         const tableName = createQuery.match(/CREATE TABLE IF NOT EXISTS (\w+)/)?.[1];
-        results.push({ table: tableName, success: false, error: error.message });
+        results.push({ table: tableName, success: false, error: error instanceof Error ? error.message : 'Unknown error' });
       }
     }
 
@@ -80,7 +80,7 @@ export async function POST() {
   } catch (error) {
     return NextResponse.json({ 
       error: 'Failed to create tables',
-      details: error.message 
+      details: error instanceof Error ? error.message : 'Unknown error' 
     }, { status: 500 });
   }
 }

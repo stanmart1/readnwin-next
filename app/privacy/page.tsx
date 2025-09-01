@@ -36,7 +36,7 @@ export default function PrivacyPage() {
             <section className="mb-16">
               <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-8">1. Introduction</h2>
               <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                At ReadnWin ("we," "our," or "us"), we are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our reading platform and services.
+                At ReadnWin (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;), we are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our reading platform and services.
               </p>
               <p className="text-lg text-gray-700 leading-relaxed">
                 By using our Service, you consent to the collection and use of your information as described in this Privacy Policy.

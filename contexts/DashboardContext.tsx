@@ -3,13 +3,58 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 
+interface UserStats {
+  totalBooks: number;
+  completedBooks: number;
+  totalReadingTime: number;
+  totalPagesRead: number;
+  readingSessions: number;
+  averageRating: number;
+}
+
+interface ReadingProgress {
+  currentBooks: Array<{ id: number; title: string; progress: number }>;
+  recentActivity: Array<{ date: string; pages: number }>;
+}
+
+interface LibraryItem {
+  id: number;
+  title: string;
+  author: string;
+  progress: number;
+  lastRead?: string;
+}
+
+interface Notification {
+  id: number;
+  message: string;
+  type: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+interface Activity {
+  id: number;
+  action: string;
+  details: string;
+  timestamp: string;
+}
+
+interface Goal {
+  id: number;
+  title: string;
+  target: number;
+  current: number;
+  deadline?: string;
+}
+
 interface DashboardState {
-  userStats: any;
-  readingProgress: any;
-  libraryItems: any[];
-  notifications: any[];
-  activities: any[];
-  goals: any[];
+  userStats: UserStats | null;
+  readingProgress: ReadingProgress | null;
+  libraryItems: LibraryItem[];
+  notifications: Notification[];
+  activities: Activity[];
+  goals: Goal[];
   loading: boolean;
   error: string | null;
   lastUpdated: Date | null;
@@ -18,14 +63,14 @@ interface DashboardState {
 type DashboardAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'SET_USER_STATS'; payload: any }
-  | { type: 'SET_READING_PROGRESS'; payload: any }
-  | { type: 'SET_LIBRARY_ITEMS'; payload: any[] }
-  | { type: 'SET_NOTIFICATIONS'; payload: any[] }
-  | { type: 'SET_ACTIVITIES'; payload: any[] }
-  | { type: 'SET_GOALS'; payload: any[] }
-  | { type: 'UPDATE_LIBRARY_ITEM'; payload: { id: number; updates: any } }
-  | { type: 'ADD_NOTIFICATION'; payload: any }
+  | { type: 'SET_USER_STATS'; payload: UserStats }
+  | { type: 'SET_READING_PROGRESS'; payload: ReadingProgress }
+  | { type: 'SET_LIBRARY_ITEMS'; payload: LibraryItem[] }
+  | { type: 'SET_NOTIFICATIONS'; payload: Notification[] }
+  | { type: 'SET_ACTIVITIES'; payload: Activity[] }
+  | { type: 'SET_GOALS'; payload: Goal[] }
+  | { type: 'UPDATE_LIBRARY_ITEM'; payload: { id: number; updates: Partial<LibraryItem> } }
+  | { type: 'ADD_NOTIFICATION'; payload: Notification }
   | { type: 'MARK_NOTIFICATION_READ'; payload: number }
   | { type: 'REFRESH_DATA' };
 

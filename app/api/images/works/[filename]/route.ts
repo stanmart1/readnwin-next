@@ -21,7 +21,7 @@ export async function GET(
     const imageBuffer = readFileSync(worksPath);
     const contentType = getContentType(sanitizedFilename);
     
-    return new NextResponse(imageBuffer, {
+    return new NextResponse(new Uint8Array(imageBuffer), {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=86400'

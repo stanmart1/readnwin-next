@@ -64,7 +64,7 @@ export async function GET(
     const fileBuffer = readFileSync(filePath);
     const contentType = getContentType(sanitizedPath);
     
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'private, max-age=3600',

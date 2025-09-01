@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 interface Book {
   id: number;
@@ -96,13 +97,12 @@ export default function BookTable({
                 </td>
                 <td className="px-3 py-4">
                   <div className="w-10 h-14 bg-gray-100 rounded overflow-hidden relative">
-                    <img
+                    <Image
                       src={book.cover_image_url || '/placeholder-book.jpg'}
                       alt={book.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = '/placeholder-book.jpg';
-                      }}
+                      fill
+                      className="object-cover"
+                      sizes="40px"
                     />
                     {book.is_featured && (
                       <div className="absolute -top-1 -right-1">
@@ -237,13 +237,12 @@ export default function BookTable({
               {/* Cover Image */}
               <div className="flex-shrink-0">
                 <div className="w-12 xs:w-14 h-15 xs:h-17 bg-gray-100 rounded overflow-hidden relative">
-                  <img
+                  <Image
                     src={book.cover_image_url || '/placeholder-book.jpg'}
                     alt={book.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.src = '/placeholder-book.jpg';
-                    }}
+                    fill
+                    className="object-cover"
+                    sizes="56px"
                   />
                   {book.is_featured && (
                     <div className="absolute -top-1 -right-1">

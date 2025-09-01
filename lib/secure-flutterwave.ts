@@ -16,7 +16,7 @@ interface FlutterwaveConfig {
     description?: string;
     logo?: string;
   };
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 interface FlutterwaveResponse {
@@ -37,6 +37,33 @@ interface FlutterwaveResponse {
   payment_type: string;
   created_at: string;
   account_id: number;
+}
+
+interface FlutterwaveCallbackResponse {
+  status: string;
+  tx_ref: string;
+  transaction_id?: string;
+}
+
+interface FlutterwaveInlineConfig {
+  public_key: string;
+  tx_ref: string;
+  amount: number;
+  currency: string;
+  payment_options: string;
+  customer: {
+    email: string;
+    phone_number?: string;
+    name: string;
+  };
+  customizations: {
+    title: string;
+    description: string;
+    logo: string;
+  };
+  meta: Record<string, unknown>;
+  callback: (response: FlutterwaveCallbackResponse) => void;
+  onclose: () => void;
 }
 
 export class SecureFlutterwave {
@@ -105,8 +132,8 @@ export class SecureFlutterwave {
     }
   }
 
-  validateWebhookSignature(payload: string, signature: string): boolean {
-    const crypto = require('crypto');
+  async validateWebhookSignature(payload: string, signature: string): Promise<boolean> {
+    const crypto = await import('crypto');
     const hash = crypto
       .createHmac('sha256', this.secretKey)
       .update(payload)
@@ -116,7 +143,7 @@ export class SecureFlutterwave {
   }
 
   // Secure inline payment method
-  generateInlineConfig(config: FlutterwaveConfig): any {
+  generateInlineConfig(config: FlutterwaveConfig): FlutterwaveInlineConfig {
     return {
       public_key: this.publicKey,
       tx_ref: config.tx_ref,
@@ -134,7 +161,7 @@ export class SecureFlutterwave {
         logo: config.customizations?.logo || `${process.env.NEXT_PUBLIC_APP_URL}/logo.png`
       },
       meta: config.meta || {},
-      callback: (response: any) => {
+      callback: (response: FlutterwaveCallbackResponse) => {
         console.log('Payment callback:', response);
         if (response.status === 'successful') {
           window.location.href = `/payment/success?tx_ref=${response.tx_ref}`;

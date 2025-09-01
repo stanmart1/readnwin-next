@@ -10,42 +10,7 @@ const SecureQuill = dynamic(() => import('@/components/SecureQuill'), {
   loading: () => <div className="h-32 bg-gray-100 rounded animate-pulse"></div>
 });
 
-// Custom styles for SecureQuill
-const quillStyles = {
-  '.ql-editor': {
-    minHeight: '120px',
-    fontSize: '14px',
-    lineHeight: '1.5',
-  },
-  '.ql-toolbar': {
-    borderTop: '1px solid #d1d5db',
-    borderLeft: '1px solid #d1d5db',
-    borderRight: '1px solid #d1d5db',
-    borderTopLeftRadius: '6px',
-    borderTopRightRadius: '6px',
-    padding: '8px',
-  },
-  '.ql-container': {
-    borderBottom: '1px solid #d1d5db',
-    borderLeft: '1px solid #d1d5db',
-    borderRight: '1px solid #d1d5db',
-    borderBottomLeftRadius: '6px',
-    borderBottomRightRadius: '6px',
-  },
-  // Mobile optimizations
-  '@media (max-width: 640px)': {
-    '.ql-toolbar': {
-      padding: '4px',
-    },
-    '.ql-toolbar .ql-formats': {
-      marginRight: '8px',
-    },
-    '.ql-toolbar button': {
-      width: '28px',
-      height: '28px',
-    }
-  }
-};
+
 
 interface AboutContent {
   hero: {

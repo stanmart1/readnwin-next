@@ -57,11 +57,23 @@ export async function GET(request: NextRequest) {
     }
 
     sessionQuery += ` ORDER BY rs.session_start DESC LIMIT $${queryParams.length + 1}`;
-    queryParams.push(limit);
+    queryParams.push(limit.toString());
 
     const result = await query(sessionQuery, queryParams);
 
-    const sessions = result.rows.map(row => ({
+    const sessions = result.rows.map((row: {
+      id: number;
+      book_id: number;
+      session_start: string;
+      session_end: string | null;
+      duration_seconds: number;
+      pages_read: number;
+      progress_start: string;
+      progress_end: string;
+      created_at: string;
+      book_title: string;
+      author_name: string;
+    }) => ({
       id: row.id,
       bookId: row.book_id,
       sessionStart: row.session_start,

@@ -65,7 +65,7 @@ export interface AuditLog {
   action: string;
   resource_type?: string;
   resource_id?: number;
-  details?: any;
+  details?: Record<string, unknown>;
   ip_address?: string;
   user_agent?: string;
   created_at: Date;
@@ -83,12 +83,12 @@ class RBACService {
     return result.rows[0] || null;
   }
 
-  async getUsers(page: number = 1, limit: number = 10, filters: any = {}, currentUserRole?: string): Promise<{ users: User[], total: number }> {
+  async getUsers(page: number = 1, limit: number = 10, filters: Record<string, unknown> = {}, currentUserRole?: string): Promise<{ users: User[], total: number }> {
     try {
       console.log('🔍 RBAC getUsers - Starting with params:', { page, limit, filters, currentUserRole });
       
       let whereClause = 'WHERE 1=1';
-      const params: any[] = [];
+      const params: unknown[] = [];
       let paramIndex = 1;
 
       if (filters.search) {
@@ -589,7 +589,7 @@ class RBACService {
     action: string,
     resourceType?: string,
     resourceId?: number,
-    details?: any,
+    details?: Record<string, unknown>,
     ipAddress?: string,
     userAgent?: string
   ): Promise<void> {
@@ -605,7 +605,7 @@ class RBACService {
     resourceType?: string;
     startDate?: string;
     endDate?: string;
-  } = {}): Promise<{ logs: AuditLog[]; pagination: any }> {
+  } = {}): Promise<{ logs: AuditLog[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
     const { page = 1, limit = 20, userId, action, resourceType, startDate, endDate } = filters;
     const offset = (page - 1) * limit;
 

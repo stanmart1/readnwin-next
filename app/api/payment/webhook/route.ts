@@ -4,7 +4,11 @@ import { ecommerceService } from '@/utils/ecommerce-service';
 import { OrderStatus } from '@/utils/order-types';
 
 // Helper function to handle payment_intent.succeeded event
-async function handlePaymentSucceeded(paymentIntent: any) {
+async function handlePaymentSucceeded(paymentIntent: {
+  id: string;
+  amount: number;
+  metadata: { order_id?: string; user_id?: string; order_number?: string };
+}) {
   try {
     console.log('Processing payment succeeded for:', paymentIntent.id);
     
@@ -57,7 +61,10 @@ async function handlePaymentSucceeded(paymentIntent: any) {
 }
 
 // Helper function to handle payment_intent.payment_failed event
-async function handlePaymentFailed(paymentIntent: any) {
+async function handlePaymentFailed(paymentIntent: {
+  id: string;
+  metadata: { order_id?: string };
+}) {
   try {
     console.log('Processing payment failed for:', paymentIntent.id);
     
@@ -80,7 +87,10 @@ async function handlePaymentFailed(paymentIntent: any) {
 }
 
 // Helper function to handle payment_intent.canceled event
-async function handlePaymentCanceled(paymentIntent: any) {
+async function handlePaymentCanceled(paymentIntent: {
+  id: string;
+  metadata: { order_id?: string };
+}) {
   try {
     console.log('Processing payment canceled for:', paymentIntent.id);
     
@@ -100,7 +110,10 @@ async function handlePaymentCanceled(paymentIntent: any) {
 }
 
 // Helper function to handle charge.refunded event
-async function handleChargeRefunded(charge: any) {
+async function handleChargeRefunded(charge: {
+  id: string;
+  metadata: { order_id?: string };
+}) {
   try {
     console.log('Processing charge refunded for:', charge.id);
     

@@ -16,16 +16,36 @@ export default function ContactPage() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
+  interface ContactMethod {
+    title: string;
+    description: string;
+    contact: string;
+    action: string;
+    icon: string;
+    isActive: boolean;
+  }
+
+  interface FAQ {
+    question: string;
+    answer: string;
+    isActive: boolean;
+  }
+
+  interface ContactSubject {
+    name: string;
+    isActive: boolean;
+  }
+
   // Dynamic data from API
-  const [contactMethods, setContactMethods] = useState<any[]>([]);
-  const [faqs, setFaqs] = useState<any[]>([]);
+  const [contactMethods, setContactMethods] = useState<ContactMethod[]>([]);
+  const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [officeInfo, setOfficeInfo] = useState({
     address: '',
     hours: '',
     parking: '',
     isActive: false
   });
-  const [contactSubjects, setContactSubjects] = useState<any[]>([]);
+  const [contactSubjects, setContactSubjects] = useState<ContactSubject[]>([]);
 
   // Load contact data from API
   useEffect(() => {
@@ -35,10 +55,10 @@ export default function ContactPage() {
         const result = await response.json();
         
         if (result.success) {
-          setContactMethods(result.data.contactMethods.filter((method: any) => method.isActive));
-          setFaqs(result.data.faqs.filter((faq: any) => faq.isActive));
+          setContactMethods(result.data.contactMethods.filter((method: ContactMethod) => method.isActive));
+          setFaqs(result.data.faqs.filter((faq: FAQ) => faq.isActive));
           setOfficeInfo(result.data.officeInfo);
-          setContactSubjects(result.data.contactSubjects.filter((subject: any) => subject.isActive));
+          setContactSubjects(result.data.contactSubjects.filter((subject: ContactSubject) => subject.isActive));
         }
       } catch (error) {
         console.error('Failed to load contact data:', error);
@@ -215,7 +235,7 @@ export default function ContactPage() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Select a subject</option>
-                    {contactSubjects.map((subject: any, index: number) => (
+                    {contactSubjects.map((subject: ContactSubject, index: number) => (
                       <option key={index} value={subject.name}>
                         {subject.name}
                       </option>

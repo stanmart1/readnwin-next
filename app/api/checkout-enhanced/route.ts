@@ -451,7 +451,7 @@ export async function POST(request: NextRequest) {
         total_amount: totalAmount,
         currency: 'NGN',
         payment_method: formData.payment.gateway,
-        payment_status: formData.payment.gateway === 'bank_transfer' ? 'pending_bank_transfer' : 'pending',
+        payment_status: 'pending' as 'pending' | 'failed' | 'paid' | 'refunded',
         shipping_address: shippingAddress,
         billing_address: billingAddress,
         shipping_method: analytics.isEbookOnly ? 'Digital Download' : formData.shipping_method?.name,

@@ -85,7 +85,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
       fontSize: `${settings.fontSize}px`,
       lineHeight: settings.lineHeight,
       fontFamily: settings.fontFamily,
-      textAlign: settings.textAlign as any,
+      textAlign: settings.textAlign as 'left' | 'center' | 'right' | 'justify',
       maxWidth: `${settings.readingWidth}%`,
       paddingLeft: `${settings.marginHorizontal}px`,
       paddingRight: `${settings.marginHorizontal}px`,
@@ -95,7 +95,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
 
     // Custom components for ReactMarkdown
     const markdownComponents = {
-      h1: ({ children, ...props }: any) => (
+      h1: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement> & { children: React.ReactNode }) => (
         <h1 
           className="text-3xl font-bold mb-6 mt-8 scroll-mt-20" 
           {...props}
@@ -103,7 +103,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </h1>
       ),
-      h2: ({ children, ...props }: any) => (
+      h2: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement> & { children: React.ReactNode }) => (
         <h2 
           className="text-2xl font-semibold mb-4 mt-6 scroll-mt-20" 
           {...props}
@@ -111,7 +111,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </h2>
       ),
-      h3: ({ children, ...props }: any) => (
+      h3: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement> & { children: React.ReactNode }) => (
         <h3 
           className="text-xl font-medium mb-3 mt-5 scroll-mt-20" 
           {...props}
@@ -119,7 +119,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </h3>
       ),
-      h4: ({ children, ...props }: any) => (
+      h4: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement> & { children: React.ReactNode }) => (
         <h4 
           className="text-lg font-medium mb-2 mt-4 scroll-mt-20" 
           {...props}
@@ -127,7 +127,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </h4>
       ),
-      h5: ({ children, ...props }: any) => (
+      h5: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement> & { children: React.ReactNode }) => (
         <h5 
           className="text-base font-medium mb-2 mt-3 scroll-mt-20" 
           {...props}
@@ -135,7 +135,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </h5>
       ),
-      h6: ({ children, ...props }: any) => (
+      h6: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement> & { children: React.ReactNode }) => (
         <h6 
           className="text-sm font-medium mb-2 mt-2 scroll-mt-20" 
           {...props}
@@ -143,7 +143,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </h6>
       ),
-      p: ({ children, ...props }: any) => (
+      p: ({ children, ...props }: React.HTMLAttributes<HTMLParagraphElement> & { children: React.ReactNode }) => (
         <p 
           className="mb-4 leading-relaxed" 
           {...props}
@@ -151,7 +151,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </p>
       ),
-      blockquote: ({ children, ...props }: any) => (
+      blockquote: ({ children, ...props }: React.HTMLAttributes<HTMLQuoteElement> & { children: React.ReactNode }) => (
         <blockquote 
           className="border-l-4 border-blue-500 pl-4 my-4 italic opacity-80" 
           {...props}
@@ -159,7 +159,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </blockquote>
       ),
-      ul: ({ children, ...props }: any) => (
+      ul: ({ children, ...props }: React.HTMLAttributes<HTMLUListElement> & { children: React.ReactNode }) => (
         <ul 
           className="list-disc list-inside mb-4 space-y-1" 
           {...props}
@@ -167,7 +167,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </ul>
       ),
-      ol: ({ children, ...props }: any) => (
+      ol: ({ children, ...props }: React.HTMLAttributes<HTMLOListElement> & { children: React.ReactNode }) => (
         <ol 
           className="list-decimal list-inside mb-4 space-y-1" 
           {...props}
@@ -175,7 +175,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </ol>
       ),
-      li: ({ children, ...props }: any) => (
+      li: ({ children, ...props }: React.HTMLAttributes<HTMLLIElement> & { children: React.ReactNode }) => (
         <li 
           className="ml-4" 
           {...props}
@@ -183,7 +183,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </li>
       ),
-      code: ({ children, ...props }: any) => (
+      code: ({ children, ...props }: React.HTMLAttributes<HTMLElement> & { children: React.ReactNode }) => (
         <code 
           className={`px-1 py-0.5 rounded text-sm font-mono ${
             settings.theme === 'light' 
@@ -197,7 +197,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </code>
       ),
-      pre: ({ children, ...props }: any) => (
+      pre: ({ children, ...props }: React.HTMLAttributes<HTMLPreElement> & { children: React.ReactNode }) => (
         <pre 
           className={`p-4 rounded-lg overflow-x-auto mb-4 ${
             settings.theme === 'light' 
@@ -211,7 +211,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </pre>
       ),
-      img: ({ src, alt, ...props }: any) => (
+      img: ({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => (
         <img 
           src={src} 
           alt={alt} 
@@ -220,7 +220,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {...props}
         />
       ),
-      a: ({ href, children, ...props }: any) => (
+      a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { children: React.ReactNode }) => (
         <a 
           href={href} 
           className="text-blue-600 hover:text-blue-800 underline"
@@ -231,7 +231,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </a>
       ),
-      table: ({ children, ...props }: any) => (
+      table: ({ children, ...props }: React.HTMLAttributes<HTMLTableElement> & { children: React.ReactNode }) => (
         <div className="overflow-x-auto mb-4">
           <table 
             className={`min-w-full border-collapse border ${
@@ -247,7 +247,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           </table>
         </div>
       ),
-      th: ({ children, ...props }: any) => (
+      th: ({ children, ...props }: React.HTMLAttributes<HTMLTableCellElement> & { children: React.ReactNode }) => (
         <th 
           className={`border px-4 py-2 text-left font-semibold ${
             settings.theme === 'light' 
@@ -261,7 +261,7 @@ const ReadingContent = forwardRef<HTMLDivElement, ReadingContentProps>(
           {children}
         </th>
       ),
-      td: ({ children, ...props }: any) => (
+      td: ({ children, ...props }: React.HTMLAttributes<HTMLTableCellElement> & { children: React.ReactNode }) => (
         <td 
           className={`border px-4 py-2 ${
             settings.theme === 'light' 

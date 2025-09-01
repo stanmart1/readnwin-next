@@ -42,8 +42,8 @@ export async function GET(
       'permissions',
       permissionId,
       undefined,
-      request.headers.get('x-forwarded-for') || request.ip,
-      request.headers.get('user-agent')
+      request.headers.get('x-forwarded-for') || request.ip || undefined,
+      request.headers.get('user-agent') || undefined
     );
 
     return NextResponse.json({
@@ -110,8 +110,8 @@ export async function PUT(
       'permissions',
       permissionId,
       { display_name, description, resource, action, scope },
-      request.headers.get('x-forwarded-for') || request.ip,
-      request.headers.get('user-agent')
+      request.headers.get('x-forwarded-for') || request.ip || undefined,
+      request.headers.get('user-agent') || undefined
     );
 
     return NextResponse.json({
@@ -168,8 +168,8 @@ export async function DELETE(
       'permissions',
       permissionId,
       undefined,
-      request.headers.get('x-forwarded-for') || request.ip,
-      request.headers.get('user-agent')
+      request.headers.get('x-forwarded-for') || request.ip || undefined,
+      request.headers.get('user-agent') || undefined
     );
 
     return NextResponse.json({

@@ -284,33 +284,92 @@ export async function POST(request: NextRequest) {
           ebookFileResult.fileHash
         ]);
 
-        // Process EPUB file if it's an EPUB
+        // Preserve EPUB/HTML structure without conversion
         if (fileFormat === 'epub') {
           try {
-            const { BookStorage } = await import('@/utils/book-storage');
+            const { preserveEpubStructure } = await import('@/utils/book-storage');
             const buffer = Buffer.from(await ebook_file.arrayBuffer());
-            const processResult = await BookStorage.processEpubFile(bookId.toString(), ebook_file.name, buffer);
+            const structureResult = await preserveEpubStructure(bookId, buffer, ebook_file.name);
             
-            if (processResult.success && processResult.metadata) {
-              // Update book with EPUB metadata
+            if (structureResult.success) {
+              // Update book_files with structure preservation data
               await query(`
-                UPDATE books SET 
-                  word_count = $2,
-                  estimated_reading_time = $3,
-                  chapters = $4,
-                  content_metadata = $5
-                WHERE id = $1
+                UPDATE book_files SET 
+                  preserve_structure = true,
+                  original_structure = $2,
+                  extraction_path = $3
+                WHERE book_id = $1 AND file_type = 'ebook'
               `, [
                 bookId,
-                processResult.metadata.wordCount || 0,
-                Math.ceil((processResult.metadata.wordCount || 0) / 200),
-                JSON.stringify(processResult.metadata.chapters || []),
-                JSON.stringify(processResult.metadata)
+                JSON.stringify(structureResult.structure || {}),
+                structureResult.extractionPath || null
+              ]);
+              
+              // Insert EPUB structure data
+              await query(`
+                INSERT INTO epub_structure (book_id, file_id, title, creator, language, spine_order, manifest, navigation, opf_path, ncx_path)
+                SELECT $1, bf.id, $2, $3, $4, $5, $6, $7, $8, $9
+                FROM book_files bf WHERE bf.book_id = $1 AND bf.file_type = 'ebook'
+                ON CONFLICT (book_id, file_id) DO UPDATE SET
+                  title = EXCLUDED.title,
+                  creator = EXCLUDED.creator,
+                  spine_order = EXCLUDED.spine_order,
+                  manifest = EXCLUDED.manifest,
+                  navigation = EXCLUDED.navigation
+              `, [
+                bookId,
+                structureResult.metadata?.title || title,
+                structureResult.metadata?.creator || null,
+                structureResult.metadata?.language || 'en',
+                JSON.stringify(structureResult.structure?.spine || []),
+                JSON.stringify(structureResult.structure?.manifest || {}),
+                JSON.stringify({}), // navigation placeholder
+                structureResult.structure?.opfPath || null,
+                null // ncxPath placeholder
               ]);
             }
           } catch (epubError) {
-            console.warn('EPUB processing failed:', epubError);
-            // Don't fail the upload, just log the warning
+            console.warn('EPUB structure preservation failed:', epubError);
+          }
+        } else if (fileFormat === 'html') {
+          try {
+            const { preserveHtmlStructure } = await import('@/utils/book-storage');
+            const buffer = Buffer.from(await ebook_file.arrayBuffer());
+            const structureResult = await preserveHtmlStructure(bookId, buffer, ebook_file.name);
+            
+            if (structureResult.success) {
+              // Update book_files with structure preservation data
+              await query(`
+                UPDATE book_files SET 
+                  preserve_structure = true,
+                  original_structure = $2
+                WHERE book_id = $1 AND file_type = 'ebook'
+              `, [
+                bookId,
+                JSON.stringify(structureResult.structure)
+              ]);
+              
+              // Insert HTML structure data
+              await query(`
+                INSERT INTO html_structure (book_id, file_id, title, author, language, chapter_structure, asset_files)
+                SELECT $1, bf.id, $2, $3, $4, $5, $6
+                FROM book_files bf WHERE bf.book_id = $1 AND bf.file_type = 'ebook'
+                ON CONFLICT (book_id, file_id) DO UPDATE SET
+                  title = EXCLUDED.title,
+                  author = EXCLUDED.author,
+                  chapter_structure = EXCLUDED.chapter_structure,
+                  asset_files = EXCLUDED.asset_files
+              `, [
+                bookId,
+                structureResult.metadata?.title || title,
+                structureResult.metadata?.author || null,
+                'en',
+                JSON.stringify(structureResult.structure?.chapters || {}),
+                JSON.stringify({}) // assets placeholder
+              ]);
+            }
+          } catch (htmlError) {
+            console.warn('HTML structure preservation failed:', htmlError);
           }
         }
 

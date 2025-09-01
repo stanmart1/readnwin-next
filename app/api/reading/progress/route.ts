@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
       SELECT 
         book_id,
         progress_percentage,
-        current_page,
-        total_pages,
+        current_position as current_page,
+        pages_read as total_pages,
         last_read_at,
         completed_at,
         total_reading_time_seconds
@@ -61,13 +61,13 @@ export async function POST(request: NextRequest) {
     // Update or create reading progress
     await query(`
       INSERT INTO reading_progress (
-        user_id, book_id, progress_percentage, current_page, total_pages, 
+        user_id, book_id, progress_percentage, current_position, pages_read, 
         last_read_at, completed_at, total_reading_time_seconds
       ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6, $7)
       ON CONFLICT (user_id, book_id) DO UPDATE SET
         progress_percentage = EXCLUDED.progress_percentage,
-        current_page = EXCLUDED.current_page,
-        total_pages = EXCLUDED.total_pages,
+        current_position = EXCLUDED.current_position,
+        pages_read = EXCLUDED.pages_read,
         last_read_at = EXCLUDED.last_read_at,
         completed_at = EXCLUDED.completed_at,
         total_reading_time_seconds = EXCLUDED.total_reading_time_seconds

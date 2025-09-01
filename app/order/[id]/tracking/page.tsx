@@ -31,8 +31,20 @@ interface Order {
   payment_method?: string;
   payment_status: string;
   payment_transaction_id?: string;
-  shipping_address?: any;
-  billing_address?: any;
+  shipping_address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
+  billing_address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
   shipping_method?: string;
   tracking_number?: string;
   estimated_delivery_date?: string;

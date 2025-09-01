@@ -103,7 +103,7 @@ export default function BlogManagement() {
   const [imageUploading, setImageUploading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState('');
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Quill editor configuration
   const quillModules = {
@@ -117,15 +117,6 @@ export default function BlogManagement() {
       ['clean']
     ],
   };
-
-  const quillFormats = [
-    'header',
-    'bold', 'italic', 'underline', 'strike',
-    'list', 'bullet',
-    'color', 'background',
-    'align',
-    'link', 'image'
-  ];
 
   useEffect(() => {
     fetchPosts();
@@ -653,7 +644,6 @@ export default function BlogManagement() {
             resetForm();
           }}
           quillModules={quillModules}
-          quillFormats={quillFormats}
         />
       )}
 
@@ -691,8 +681,7 @@ function PostModal({
   categories, 
   onSubmit, 
   onClose,
-  quillModules,
-  quillFormats
+  quillModules
 }: {
   title: string;
   formData: any;
@@ -701,7 +690,6 @@ function PostModal({
   onSubmit: () => void;
   onClose: () => void;
   quillModules: any;
-  quillFormats: string[];
 }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

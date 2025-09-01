@@ -44,7 +44,7 @@ export default function ModernHighlightRenderer({
         const walker = document.createTreeWalker(
           content,
           NodeFilter.SHOW_TEXT,
-          null
+          null as any
         );
 
         let currentOffset = 0;

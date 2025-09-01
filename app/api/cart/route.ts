@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       for (const guestItem of guest_cart_items) {
         try {
           await ecommerceService.addToCart(
-            parseInt(session.user.id),
+            parseInt(auth.user.id),
             guestItem.book_id,
             guestItem.quantity
           );

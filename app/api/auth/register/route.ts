@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     // Assign default reader role
     const readerRole = await rbacService.getRoleByName('reader');
     if (readerRole) {
-      await rbacService.assignRoleToUser(user.id, readerRole.id)
+      await rbacService.assignRoleToUser(user.id, readerRole.id);
     }
 
     // Log audit event

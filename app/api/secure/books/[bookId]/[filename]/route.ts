@@ -67,7 +67,7 @@ export async function GET(
     headers.set('Cache-Control', 'private, max-age=3600');
     headers.set('X-Content-Type-Options', 'nosniff');
     
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers
     });

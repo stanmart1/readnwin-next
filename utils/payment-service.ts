@@ -65,6 +65,20 @@ export class PaymentService {
     return paymentIntent;
   }
 
+  async getPaymentIntentStatus(paymentIntentId: string): Promise<any> {
+    // Placeholder implementation
+    return {
+      id: paymentIntentId,
+      status: 'succeeded',
+      amount: 2000,
+      currency: 'usd',
+      created: Math.floor(Date.now() / 1000),
+      receipt_email: null,
+      last_payment_error: null,
+      metadata: {}
+    };
+  }
+
   async createRefund(paymentIntentId: string, amount?: number): Promise<any> {
     // Placeholder implementation
     return {

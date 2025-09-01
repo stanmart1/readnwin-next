@@ -22,12 +22,12 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid book ID' }, { status: 400 });
     }
 
-    // Get book info with file info - using correct column names
+    // Get book info with file info and structure preservation data
     let bookResult;
     try {
       bookResult = await secureQuery(`
         SELECT b.id, b.title, b.description, b.cover_image_url, b.created_at, b.updated_at, b.created_by, b.price, b.visibility,
-               bf.stored_filename, bf.file_format, bf.file_size, bf.original_filename
+               bf.stored_filename, bf.file_format, bf.file_size, bf.original_filename, bf.preserve_structure, bf.extraction_path
         FROM books b
         LEFT JOIN book_files bf ON b.id = bf.book_id AND bf.file_type = 'ebook'
         WHERE b.id = $1
@@ -82,72 +82,92 @@ export async function GET(
     let chapters: any[] = [];
     let structure: any = null;
     
-    // Handle EPUB files - convert to HTML for display
-    if (book.file_format === 'epub' && book.stored_filename) {
+    // Handle structure-preserved books
+    if (book.preserve_structure && book.file_format === 'epub') {
       try {
-        // First try to get processed HTML content
+        // Get EPUB structure from database
+        const epubResult = await secureQuery(`
+          SELECT spine_order, manifest, navigation, title, creator
+          FROM epub_structure WHERE book_id = $1
+        `, [bookId]);
+        
+        if (epubResult.rows.length > 0) {
+          const epubData = epubResult.rows[0];
+          contentType = 'epub';
+          structure = {
+            type: 'epub',
+            spine: epubData.spine_order,
+            manifest: epubData.manifest,
+            navigation: epubData.navigation,
+            basePath: `/api/ebooks/${bookId}/`
+          };
+          
+          // For EPUB, return structure info instead of converted content
+          return NextResponse.json({
+            id: book.id.toString(),
+            title: epubData.title || book.title,
+            author: epubData.creator || 'Unknown Author',
+            description: book.description || '',
+            contentType: 'epub',
+            structure: structure,
+            preservedFormat: true,
+            coverImage: book.cover_image_url,
+            createdAt: book.created_at,
+            updatedAt: book.updated_at
+          });
+        }
+      } catch (error) {
+        console.error('EPUB structure serving error:', error);
+      }
+    } else if (book.preserve_structure && book.file_format === 'html') {
+      try {
+        // Get HTML structure from database
+        const htmlResult = await secureQuery(`
+          SELECT chapter_structure, asset_files, title, author
+          FROM html_structure WHERE book_id = $1
+        `, [bookId]);
+        
+        if (htmlResult.rows.length > 0) {
+          const htmlData = htmlResult.rows[0];
+          
+          // Read original HTML file
+          const htmlContent = await BookStorage.getBookFile(bookId.toString(), book.stored_filename);
+          if (htmlContent) {
+            content = htmlContent.toString('utf-8');
+            contentType = 'html';
+            structure = {
+              type: 'html',
+              chapters: htmlData.chapter_structure,
+              assets: htmlData.asset_files
+            };
+            chapters = htmlData.chapter_structure || [];
+          }
+        }
+      } catch (error) {
+        console.error('HTML structure serving error:', error);
+      }
+    } else if (book.file_format === 'epub' && book.stored_filename) {
+      // Fallback for non-preserved EPUB files
+      try {
         const processedContent = await BookStorage.getBookFile(bookId.toString(), 'content.html');
         if (processedContent) {
           content = processedContent.toString('utf-8');
           contentType = 'epub';
-          
-          // Try to get structure
-          const bookStructure = await BookStorage.getBookStructure(bookId.toString());
-          if (bookStructure) {
-            structure = bookStructure;
-            chapters = bookStructure.chapters || [];
-          }
-        } else {
-          // If no processed content, try to process the EPUB now
-          const epubBuffer = await BookStorage.getBookFile(bookId.toString(), book.stored_filename);
-          if (epubBuffer) {
-            console.log('Processing EPUB on-the-fly for book', bookId);
-            const processResult = await BookStorage.processEpubFile(bookId.toString(), book.stored_filename, epubBuffer);
-            
-            if (processResult.success) {
-              // Get the newly processed content
-              const newContent = await BookStorage.getBookFile(bookId.toString(), 'content.html');
-              if (newContent) {
-                content = newContent.toString('utf-8');
-                contentType = 'epub';
-                
-                const bookStructure = await BookStorage.getBookStructure(bookId.toString());
-                if (bookStructure) {
-                  structure = bookStructure;
-                  chapters = bookStructure.chapters || [];
-                }
-              }
-            } else {
-              // Fallback content if processing fails
-              content = `
-                <div class="epub-content">
-                  <h1>${book.title}</h1>
-                  <p><strong>Format:</strong> EPUB (${Math.round(epubBuffer.length / 1024)}KB)</p>
-                  <div class="chapter" data-chapter-id="chapter-1">
-                    <h2 class="chapter-title">Chapter 1</h2>
-                    <p>This EPUB book is being processed. The content will be available shortly.</p>
-                    <p>Please refresh the page in a few moments to see the full content.</p>
-                  </div>
-                </div>`;
-              contentType = 'epub';
-              chapters = [{ id: 'chapter-1', title: 'Chapter 1', order: 1 }];
-              structure = { type: 'epub', chapters: chapters };
-            }
-          }
         }
       } catch (error) {
-        console.error('EPUB processing error:', error);
-        content = `<h1>${book.title}</h1><p>EPUB file found but could not be processed. Error: ${error.message}</p>`;
+        console.error('EPUB fallback error:', error);
       }
-    } else {
-
-    try {
+    }
+    
+    // Fallback for books without preserved structure
+    if (!content) {
+      try {
         const fileContent = await BookStorage.getBookFile(bookId.toString(), 'content.html');
         
         if (fileContent) {
           content = fileContent.toString('utf-8');
           
-          // Try to extract chapter structure from HTML
+          // Extract chapter structure from HTML
           const chapterMatches = content.match(/<h[1-3][^>]*>([^<]+)<\/h[1-3]>/gi);
           if (chapterMatches && chapterMatches.length > 1) {
             chapters = chapterMatches.map((match, index) => {
@@ -158,13 +178,9 @@ export async function GET(
                 order: index + 1
               };
             });
-            structure = {
-              type: 'html',
-              chapters: chapters
-            };
+            structure = { type: 'html', chapters: chapters };
           }
         } else {
-          // Create default content
           await BookStorage.createDefaultContent(bookId, book.title);
           const defaultContent = await BookStorage.getBookFile(bookId.toString(), 'content.html');
           content = defaultContent ? defaultContent.toString('utf-8') : `<h1>${book.title}</h1><p>Content not available</p>`;

@@ -6,6 +6,42 @@ import { useRouter } from "next/navigation";
 import { formatDate } from "@/utils/dateUtils";
 import { toast } from "react-hot-toast";
 
+interface LibraryItem {
+  book_id?: number;
+  id?: number;
+  book?: {
+    title?: string;
+    author_name?: string;
+    cover_image_url?: string;
+    category_name?: string;
+    format?: string;
+    ebook_file_url?: string;
+  };
+  book_title?: string;
+  title?: string;
+  author_name?: string;
+  author?: string;
+  cover_image?: string;
+  cover?: string;
+  readingProgress?: {
+    progressPercentage?: number;
+    totalPages?: number;
+    currentPage?: number;
+    lastReadAt?: string;
+  };
+  progress_percentage?: number;
+  total_pages?: number;
+  current_page?: number;
+  last_read_at?: string;
+  status?: string;
+  category_name?: string;
+  category?: string;
+  rating?: number;
+  format?: string;
+  ebook_file_url?: string;
+  chapters?: Array<{ title: string; pages: number }>;
+}
+
 interface Book {
   id: string;
   title: string;
@@ -50,7 +86,7 @@ export default function UserLibrary() {
             // Transform the API data to match our Book interface
             // Only include books with valid essential data
             const transformedBooks = data.libraryItems
-              .filter((item: any) => {
+              .filter((item: LibraryItem) => {
                 // Ensure we have essential book data
                 const hasValidTitle = item.book_title || item.title;
                 const hasValidAuthor = item.author_name || item.author;
@@ -58,7 +94,7 @@ export default function UserLibrary() {
 
                 return hasValidTitle && hasValidAuthor && hasValidBookId;
               })
-              .map((item: any) => ({
+              .map((item: LibraryItem) => ({
                 id: item.book_id?.toString() || item.id?.toString(),
                 title: item.book?.title || item.book_title || item.title,
                 author:

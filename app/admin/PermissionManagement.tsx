@@ -158,8 +158,8 @@ export default function PermissionManagement() {
     return matchesResource && matchesScope;
   });
 
-  const uniqueResources = [...new Set(permissions.map(p => p.resource))];
-  const uniqueScopes = [...new Set(permissions.map(p => p.scope))];
+  const uniqueResources = Array.from(new Set(permissions.map(p => p.resource)));
+  const uniqueScopes = Array.from(new Set(permissions.map(p => p.scope)));
 
   if (loading) {
     return (

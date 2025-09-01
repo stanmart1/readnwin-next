@@ -120,10 +120,12 @@ export function NotificationContainer() {
 
   // Expose addNotification globally
   useEffect(() => {
-    (window as any).showNotification = addNotification;
-    return () => {
-      delete (window as any).showNotification;
-    };
+    if (typeof window !== 'undefined') {
+      (window as any).showNotification = addNotification;
+      return () => {
+        delete (window as any).showNotification;
+      };
+    }
   }, []);
 
   return (

@@ -88,32 +88,32 @@ export async function POST(request: NextRequest) {
     const bookData = {
       title: formData.get('title') as string,
       subtitle: formData.get('subtitle') as string || undefined,
-      author_id: sanitizeInt(formData.get('author_id')),
-      category_id: sanitizeInt(formData.get('category_id')),
+      author_id: sanitizeInt(formData.get('author_id') as string),
+      category_id: sanitizeInt(formData.get('category_id') as string),
       isbn: formData.get('isbn') as string || undefined,
       description: formData.get('description') as string || undefined,
       short_description: formData.get('short_description') as string || undefined,
       
       book_type: formData.get('book_type') as 'physical' | 'ebook' | 'hybrid' || 'ebook',
-      primary_format: formData.get('primary_format') as string || undefined,
+      primary_format: formData.get('primary_format') as 'epub' | 'html' | 'pdf' | 'hardcover' | 'paperback' || undefined,
       
-      price: sanitizeInt(formData.get('price')),
-      original_price: formData.get('original_price') ? sanitizeInt(formData.get('original_price')) : undefined,
-      cost_price: formData.get('cost_price') ? sanitizeInt(formData.get('cost_price')) : undefined,
+      price: sanitizeInt(formData.get('price') as string),
+      original_price: formData.get('original_price') ? sanitizeInt(formData.get('original_price') as string) : undefined,
+      cost_price: formData.get('cost_price') ? sanitizeInt(formData.get('cost_price') as string) : undefined,
       currency: formData.get('currency') as string || 'NGN',
       
-      weight_grams: formData.get('weight_grams') ? sanitizeInt(formData.get('weight_grams')) : undefined,
+      weight_grams: formData.get('weight_grams') ? sanitizeInt(formData.get('weight_grams') as string) : undefined,
       dimensions: formData.get('dimensions') ? safeJsonParse(formData.get('dimensions') as string) : undefined,
       shipping_class: formData.get('shipping_class') as string || undefined,
-      stock_quantity: sanitizeInt(formData.get('stock_quantity')),
-      low_stock_threshold: sanitizeInt(formData.get('low_stock_threshold'), 5),
+      stock_quantity: sanitizeInt(formData.get('stock_quantity') as string),
+      low_stock_threshold: sanitizeInt(formData.get('low_stock_threshold') as string, 5),
       inventory_tracking: formData.get('inventory_tracking') === 'true',
       
-      download_limit: sanitizeInt(formData.get('download_limit'), -1),
+      download_limit: sanitizeInt(formData.get('download_limit') as string, -1),
       drm_protected: formData.get('drm_protected') === 'true',
       
       language: formData.get('language') as string || 'en',
-      pages: formData.get('pages') ? sanitizeInt(formData.get('pages')) : undefined,
+      pages: formData.get('pages') ? sanitizeInt(formData.get('pages') as string) : undefined,
       publication_date: formData.get('publication_date') as string || undefined,
       publisher: formData.get('publisher') as string || undefined,
       edition: formData.get('edition') as string || undefined,
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
       ebook_file: formData.get('ebook_file') as File || undefined,
       sample_content: formData.get('sample_content') as File || undefined,
       
-      created_by: sanitizeInt(session.user.id),
+      created_by: sanitizeInt(session.user.id as string),
     };
 
     // Validate required fields

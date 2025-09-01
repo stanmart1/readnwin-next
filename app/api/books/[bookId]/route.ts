@@ -34,8 +34,8 @@ export async function GET(
 
     if (fileResult.rows.length > 0) {
       const fileInfo = fileResult.rows[0];
-      book.file_format = fileInfo.file_format;
-      book.ebook_file_url = fileInfo.ebook_file_url;
+      (book as any).file_format = fileInfo.file_format;
+      (book as any).ebook_file_url = fileInfo.ebook_file_url;
     }
 
     return NextResponse.json({

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { User, Mail, MapPin, CreditCard, Package, Calendar, DollarSign } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { User, Mail, MapPin, CreditCard, Package, Calendar } from 'lucide-react';
 import ImageViewerModal from './ImageViewerModal';
 
 interface OrderItem {
@@ -13,6 +13,23 @@ interface OrderItem {
   quantity: number;
   total_price: number;
   format: string;
+}
+
+interface Address {
+  name: string;
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}
+
+interface PaymentProof {
+  id: number;
+  file_name: string;
+  file_path: string;
+  upload_date: string;
+  status: 'pending' | 'verified' | 'rejected';
 }
 
 interface OrderDetailsProps {
@@ -31,8 +48,8 @@ interface OrderDetailsProps {
     payment_method?: string;
     payment_status: string;
     payment_transaction_id?: string;
-    shipping_address?: any;
-    billing_address?: any;
+    shipping_address?: Address;
+    billing_address?: Address;
     shipping_method?: string;
     tracking_number?: string;
     estimated_delivery_date?: string;
@@ -55,7 +72,7 @@ export default function OrderDetails({
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
-  const [paymentProofs, setPaymentProofs] = useState<any[]>([]);
+  const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>([]);
   const [loadingProofs, setLoadingProofs] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState(false);
@@ -70,13 +87,7 @@ export default function OrderDetails({
   });
   const [fileAvailability, setFileAvailability] = useState<{[key: string]: boolean}>({});
 
-  useEffect(() => {
-    fetchOrderItems();
-    // Always fetch payment proofs to determine if this is a bank transfer order
-    fetchPaymentProofs();
-  }, [order.id]);
-
-  const fetchOrderItems = async () => {
+  const fetchOrderItems = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/orders/${order.id}/items`);
@@ -89,9 +100,9 @@ export default function OrderDetails({
     } finally {
       setLoading(false);
     }
-  };
+  }, [order.id]);
 
-  const fetchPaymentProofs = async () => {
+  const fetchPaymentProofs = useCallback(async () => {
     try {
       setLoadingProofs(true);
       console.log(`🔍 Fetching payment proofs for order ${order.id}...`);
@@ -128,7 +139,15 @@ export default function OrderDetails({
     } finally {
       setLoadingProofs(false);
     }
-  };
+  }, [order.id]);
+
+  useEffect(() => {
+    fetchOrderItems();
+    // Always fetch payment proofs to determine if this is a bank transfer order
+    fetchPaymentProofs();
+  }, [fetchOrderItems, fetchPaymentProofs]);
+
+
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {

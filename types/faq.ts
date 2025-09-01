@@ -192,7 +192,7 @@ export interface FAQError {
   code: string;
   message: string;
   field?: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 // Validation Types

@@ -26,8 +26,8 @@ interface BulkLibraryManagementProps {
   preSelectedBook?: Book;
 }
 
-export default function BulkLibraryManagement({ onClose, preSelectedBook }: BulkLibraryManagementProps) {
-  const { data: session } = useSession();
+export default function BulkLibraryManagement({  preSelectedBook }: BulkLibraryManagementProps) {
+  
   const [users, setUsers] = useState<User[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);

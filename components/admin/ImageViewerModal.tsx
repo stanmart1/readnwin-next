@@ -1,10 +1,47 @@
-import React from 'react';
+import React, { useState } from 'react';
+import Image from 'next/image';
 
 interface ImageViewerModalProps {
   isOpen: boolean;
   onClose: () => void;
   imageUrl: string;
   fileName: string;
+}
+
+function ImageWithFallback({ imageUrl, fileName }: { imageUrl: string; fileName: string }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <div className="text-center text-gray-500 py-8">
+        <div className="mb-4">
+          <i className="ri-image-line text-4xl text-gray-300"></i>
+        </div>
+        <p className="text-sm">Unable to load image</p>
+        <a 
+          href={imageUrl} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-blue-600 hover:text-blue-800 text-sm mt-2 inline-block"
+        >
+          Open in new tab
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative max-w-full max-h-[70vh]">
+      <Image
+        src={imageUrl}
+        alt={fileName}
+        width={800}
+        height={600}
+        className="object-contain"
+        onError={() => setHasError(true)}
+      />
+    </div>
+  );
 }
 
 export default function ImageViewerModal({ isOpen, onClose, imageUrl, fileName }: ImageViewerModalProps) {
@@ -46,27 +83,7 @@ export default function ImageViewerModal({ isOpen, onClose, imageUrl, fileName }
                 </div>
               </div>
             ) : (
-              <img
-                src={imageUrl}
-                alt={fileName}
-                className="max-w-full max-h-full object-contain"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const errorDiv = document.createElement('div');
-                  errorDiv.className = 'text-center text-gray-500 py-8';
-                  errorDiv.innerHTML = `
-                    <div class="mb-4">
-                      <i class="ri-image-line text-4xl text-gray-300"></i>
-                    </div>
-                    <p class="text-sm">Unable to load image</p>
-                    <a href="${imageUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 text-sm mt-2 inline-block">
-                      Open in new tab
-                    </a>
-                  `;
-                  target.parentNode?.appendChild(errorDiv);
-                }}
-              />
+              <ImageWithFallback imageUrl={imageUrl} fileName={fileName} />
             )}
           </div>
         </div>

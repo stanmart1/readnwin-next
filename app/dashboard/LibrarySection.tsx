@@ -228,7 +228,7 @@ export default function LibrarySection() {
           <p className="text-gray-600 mb-6 max-w-sm mx-auto">
             {books.length === 0 
               ? 'Start building your digital library today' 
-              : `You don't have any ${filter} books at the moment`}
+              : `You don&apos;t have any ${filter} books at the moment`}
           </p>
           {books.length === 0 && (
             <Link 

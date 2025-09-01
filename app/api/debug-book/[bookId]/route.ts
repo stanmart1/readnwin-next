@@ -10,7 +10,7 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
     
-    const debug = {
+    const debug: any = {
       bookId: params.bookId,
       hasSession: !!session,
       userId: session?.user?.id || null,

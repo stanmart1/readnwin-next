@@ -26,7 +26,7 @@ interface Permission {
 }
 
 export default function RoleManagement() {
-  const { data: session } = useSession();
+  useSession(); // Session used for authentication context
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);

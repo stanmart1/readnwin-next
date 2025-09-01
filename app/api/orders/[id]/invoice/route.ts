@@ -131,7 +131,7 @@ export async function GET(
     console.log('PDF generated successfully, size:', pdfBuffer.length);
 
     // Return PDF with appropriate headers
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="invoice-${order.order_number || order.id}.pdf"`,

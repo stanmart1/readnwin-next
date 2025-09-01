@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     // Log access for security audit
     await logSecureFileAccess(session.user.id, bookId, filePath, 'success');
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': contentType,
         'Content-Length': fileBuffer.length.toString(),

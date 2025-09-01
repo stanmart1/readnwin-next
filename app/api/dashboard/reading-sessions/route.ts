@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     }
 
     sessionQuery += ` ORDER BY rs.session_start DESC LIMIT $${queryParams.length + 1}`;
-    queryParams.push(limit);
+    queryParams.push(limit.toString());
 
     const result = await query(sessionQuery, queryParams);
 

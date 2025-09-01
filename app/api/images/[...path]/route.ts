@@ -28,7 +28,7 @@ export async function GET(
           case 'svg': contentType = 'image/svg+xml'; break;
         }
 
-        return new NextResponse(imageBuffer, {
+        return new NextResponse(new Uint8Array(imageBuffer), {
           headers: {
             'Content-Type': contentType,
             'Cache-Control': 'public, max-age=86400',
@@ -55,7 +55,7 @@ export async function GET(
       case 'svg': contentType = 'image/svg+xml'; break;
     }
 
-    return new NextResponse(imageBuffer, {
+    return new NextResponse(new Uint8Array(imageBuffer), {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000, immutable',

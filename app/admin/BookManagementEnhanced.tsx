@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import Pagination from '@/components/Pagination';
 import { useLoadingState, useSkeletonLoading } from '@/hooks/useLoadingState';
-import { EnhancedErrorDisplay } from '@/components/ui/EnhancedErrorDisplay';
+
 import { LoadingSpinner, CardSkeleton } from '@/components/ui/LoadingSpinner';
 import Modal from '@/components/ui/Modal';
 import ModernBookUploadModal from '@/components/ModernBookUploadModal';
@@ -70,7 +70,7 @@ export default function BookManagementEnhanced() {
   } = useBookManagement();
   
   // Loading states
-  const { loadingState, startLoading, stopLoading } = useLoadingState();
+  
   const { isLoading: skeletonLoading } = useSkeletonLoading();
   
   // State management
@@ -306,7 +306,6 @@ export default function BookManagementEnhanced() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      
       <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-6 lg:py-8">
         <div className="mb-4 sm:mb-6 md:mb-8">
           <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 leading-tight break-words">

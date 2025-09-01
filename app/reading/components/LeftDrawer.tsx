@@ -44,7 +44,7 @@ export default function LeftDrawer() {
   // Set default tab based on book structure
   React.useEffect(() => {
     if (currentBook?.chapters && currentBook.chapters.length > 0 && activeTab === "notes") {
-      setDrawerTab("left", "chapters" as any);
+      setDrawerTab("left", "chapters");
     }
   }, [currentBook?.chapters, activeTab, setDrawerTab]);
 
@@ -180,7 +180,7 @@ export default function LeftDrawer() {
             <div className="flex border-b border-gray-200 dark:border-gray-700">
               {currentBook?.chapters && currentBook.chapters.length > 0 && (
                 <button
-                  onClick={() => setDrawerTab("left", "chapters" as any)}
+                  onClick={() => setDrawerTab("left", "chapters")}
                   className={`flex-1 py-3 px-2 text-sm font-medium border-b-2 ${
                     activeTab === "chapters"
                       ? "border-blue-600 text-blue-600"

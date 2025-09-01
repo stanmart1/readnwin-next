@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     const user = profileResult.rows[0];
     
     // Fetch reading statistics
-    const statsResult = await query(`
+    const statsResult = await secureQuery(`
       SELECT 
         COUNT(DISTINCT rb.book_id) as total_books_read,
         SUM(rb.pages_read) as total_pages_read,
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         AVG(rb.rating) as average_rating
       FROM reading_progress rb
       WHERE rb.user_id = $1 AND rb.completed = true
-    `, [session.user.id]);
+    `, [userId]);
 
     const stats = statsResult.rows[0] || {
       total_books_read: 0,
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Fetch current reading streak
-    const streakResult = await query(`
+    const streakResult = await secureQuery(`
       SELECT COUNT(*) as current_streak
       FROM (
         SELECT DISTINCT DATE(rp.read_date) as read_date
@@ -69,12 +69,12 @@ export async function GET(request: NextRequest) {
         LIMIT 30
       ) recent_reads
       WHERE read_date >= CURRENT_DATE - INTERVAL '30 days'
-    `, [session.user.id]);
+    `, [userId]);
 
     const currentStreak = streakResult.rows[0]?.current_streak || 0;
 
     // Fetch favorite genres
-    const genresResult = await query(`
+    const genresResult = await secureQuery(`
       SELECT g.name as genre, COUNT(*) as count
       FROM reading_progress rp
       JOIN books b ON rp.book_id = b.id
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       GROUP BY g.name
       ORDER BY count DESC
       LIMIT 5
-    `, [session.user.id]);
+    `, [userId]);
 
     const favoriteGenres = genresResult.rows.map(row => row.genre);
 
@@ -140,7 +140,7 @@ export async function PUT(request: NextRequest) {
     } = body;
 
     // Update basic user information
-    await query(`
+    await secureQuery(`
       UPDATE users 
       SET 
         first_name = $1,
@@ -155,13 +155,13 @@ export async function PUT(request: NextRequest) {
     // Handle student information
     if (isStudent && studentInfo) {
       // Check if student info already exists
-      const existingStudentInfo = await query(`
+      const existingStudentInfo = await secureQuery(`
         SELECT id FROM student_info WHERE user_id = $1
       `, [session.user.id]);
 
       if (existingStudentInfo.rows.length > 0) {
         // Update existing student info
-        await query(`
+        await secureQuery(`
           UPDATE student_info 
           SET 
             school_name = $1,
@@ -179,7 +179,7 @@ export async function PUT(request: NextRequest) {
         ]);
       } else {
         // Insert new student info
-        await query(`
+        await secureQuery(`
           INSERT INTO student_info (
             user_id, school_name, matriculation_number, department, course, created_at, updated_at
           ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
@@ -193,13 +193,13 @@ export async function PUT(request: NextRequest) {
       }
     } else if (!isStudent) {
       // Remove student info if user is no longer a student
-      await query(`
+      await secureQuery(`
         DELETE FROM student_info WHERE user_id = $1
       `, [session.user.id]);
     }
 
     // Fetch updated profile
-    const updatedProfileResult = await query(`
+    const updatedProfileResult = await secureQuery(`
       SELECT 
         u.id,
         u.email,

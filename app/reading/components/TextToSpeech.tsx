@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEReaderStore } from "@/stores/ereaderStore";
-import { SecurityUtils } from "@/utils/security";
+
 import {
   Play,
   Pause,
@@ -43,8 +43,8 @@ export default function TextToSpeech({ className = "" }: TextToSpeechProps) {
   const [sentences, setSentences] = useState<string[]>([]);
 
   const synthRef = useRef<SpeechSynthesis | null>(null);
-  const contentRef = useRef<HTMLDivElement | null>(null);
-  const highlightedElementRef = useRef<HTMLElement | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const highlightedElementRef = useRef<HTMLElement>(null);
 
   // Initialize speech synthesis
   useEffect(() => {
@@ -89,13 +89,13 @@ export default function TextToSpeech({ className = "" }: TextToSpeechProps) {
   }, [isTextToSpeechPlaying, settings.textToSpeech, updateSettings]);
 
   // Extract text content from book content
-  const extractTextFromContent = (content: any): string => {
+  const extractTextFromContent = (content: string | { chapters?: Array<{ content?: string }> }): string => {
     if (typeof content === "string") {
       return content.replace(/<[^>]*>/g, "");
     }
     if (content?.chapters && Array.isArray(content.chapters)) {
       return content.chapters
-        .map((chapter: any) => chapter.content || "")
+        .map((chapter) => chapter.content || "")
         .join(" ")
         .replace(/<[^>]*>/g, "");
     }
@@ -146,7 +146,7 @@ export default function TextToSpeech({ className = "" }: TextToSpeechProps) {
           }
         }
       } catch (error) {
-        console.warn("Error highlighting sentence:", SecurityUtils.sanitizeLogInput(String(error)));
+        console.warn("Error highlighting sentence:", error);
       }
     },
     [sentences, removeHighlight],
@@ -191,7 +191,7 @@ export default function TextToSpeech({ className = "" }: TextToSpeechProps) {
       };
 
       utterance.onerror = (event) => {
-        console.error("Speech synthesis error:", SecurityUtils.sanitizeLogInput(String(event)));
+        console.error("Speech synthesis error:", event);
         setIsLoading(false);
         stopTextToSpeech();
       };
@@ -208,7 +208,7 @@ export default function TextToSpeech({ className = "" }: TextToSpeechProps) {
       setCurrentUtterance(utterance);
       synthRef.current.speak(utterance);
     } catch (error) {
-      console.error("Error starting speech:", SecurityUtils.sanitizeLogInput(String(error)));
+      console.error("Error starting speech:", error);
       setIsLoading(false);
     }
   }, [

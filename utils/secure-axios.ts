@@ -150,19 +150,21 @@ class SecureAxios {
   /**
    * Handle response errors
    */
-  private handleResponseError(error: any): never {
+  private handleResponseError(error: unknown): never {
     // Log security-related errors
-    if (error.message && error.message.includes('Security:')) {
+    if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' && error.message.includes('Security:')) {
       console.error('Security Error:', error.message);
     }
 
     // Handle network errors
-    if (error.code === 'ECONNREFUSED') {
-      throw new Error('Security: Connection refused - possible SSRF attempt');
-    }
+    if (error && typeof error === 'object' && 'code' in error) {
+      if (error.code === 'ECONNREFUSED') {
+        throw new Error('Security: Connection refused - possible SSRF attempt');
+      }
 
-    if (error.code === 'ENOTFOUND') {
-      throw new Error('Security: Host not found - possible DNS rebinding attempt');
+      if (error.code === 'ENOTFOUND') {
+        throw new Error('Security: Host not found - possible DNS rebinding attempt');
+      }
     }
 
     throw error;
@@ -216,35 +218,35 @@ class SecureAxios {
   /**
    * Make a GET request
    */
-  async get<T = any>(url: string, config?: SecureAxiosConfig): Promise<AxiosResponse<T>> {
+  async get<T = unknown>(url: string, config?: SecureAxiosConfig): Promise<AxiosResponse<T>> {
     return this.instance.get(url, config);
   }
 
   /**
    * Make a POST request
    */
-  async post<T = any>(url: string, data?: any, config?: SecureAxiosConfig): Promise<AxiosResponse<T>> {
+  async post<T = unknown>(url: string, data?: unknown, config?: SecureAxiosConfig): Promise<AxiosResponse<T>> {
     return this.instance.post(url, data, config);
   }
 
   /**
    * Make a PUT request
    */
-  async put<T = any>(url: string, data?: any, config?: SecureAxiosConfig): Promise<AxiosResponse<T>> {
+  async put<T = unknown>(url: string, data?: unknown, config?: SecureAxiosConfig): Promise<AxiosResponse<T>> {
     return this.instance.put(url, data, config);
   }
 
   /**
    * Make a DELETE request
    */
-  async delete<T = any>(url: string, config?: SecureAxiosConfig): Promise<AxiosResponse<T>> {
+  async delete<T = unknown>(url: string, config?: SecureAxiosConfig): Promise<AxiosResponse<T>> {
     return this.instance.delete(url, config);
   }
 
   /**
    * Make a PATCH request
    */
-  async patch<T = any>(url: string, data?: any, config?: SecureAxiosConfig): Promise<AxiosResponse<T>> {
+  async patch<T = unknown>(url: string, data?: unknown, config?: SecureAxiosConfig): Promise<AxiosResponse<T>> {
     return this.instance.patch(url, data, config);
   }
 

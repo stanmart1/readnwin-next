@@ -39,7 +39,7 @@ export default function ModernRightDrawer() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black bg-opacity-50 z-40"
-            onClick={toggleRightDrawer}
+            onClick={(e) => { e.stopPropagation(); toggleRightDrawer(); }}
           />
 
           {/* Drawer */}
@@ -56,7 +56,7 @@ export default function ModernRightDrawer() {
                 <h2 className="font-semibold">Reading Settings</h2>
               </div>
               <button
-                onClick={toggleRightDrawer}
+                onClick={(e) => { e.stopPropagation(); toggleRightDrawer(); }}
                 className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 <X className="w-5 h-5" />
@@ -75,7 +75,7 @@ export default function ModernRightDrawer() {
                   {themes.map((theme) => (
                     <button
                       key={theme.value}
-                      onClick={() => updateSettings({ theme: theme.value as any })}
+                      onClick={() => updateSettings({ theme: theme.value as 'light' | 'dark' | 'sepia' | 'high-contrast' })}
                       className={`p-2 text-sm rounded-lg border transition-colors ${
                         settings.theme === theme.value
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900'
@@ -157,7 +157,7 @@ export default function ModernRightDrawer() {
                   ].map((width) => (
                     <button
                       key={width.value}
-                      onClick={() => updateSettings({ readingWidth: width.value as any })}
+                      onClick={() => updateSettings({ readingWidth: width.value as 'narrow' | 'normal' | 'wide' | 'full' })}
                       className={`p-2 text-sm rounded-lg border transition-colors ${
                         settings.readingWidth === width.value
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900'
@@ -198,13 +198,13 @@ export default function ModernRightDrawer() {
                           min={0.5}
                           max={2.0}
                           step={0.1}
-                          value={settings.textToSpeech.rate}
+                          value={settings.textToSpeech.speed}
                           onChange={(e) => updateSettings({
-                            textToSpeech: { ...settings.textToSpeech, rate: parseFloat(e.target.value) }
+                            textToSpeech: { ...settings.textToSpeech, speed: parseFloat(e.target.value) }
                           })}
                           className="w-full"
                         />
-                        <p className="text-xs text-gray-500">{settings.textToSpeech.rate}x</p>
+                        <p className="text-xs text-gray-500">{settings.textToSpeech.speed}x</p>
                       </div>
                       
                       <div>

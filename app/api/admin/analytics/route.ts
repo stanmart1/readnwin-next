@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         new Promise((_, reject) => setTimeout(() => reject(new Error('Query timeout after 1.5s')), 1500))
       ]);
       
-      const stats = basicStatsResult.rows[0];
+      const stats = (basicStatsResult as any).rows[0];
       userCount = parseInt(stats.user_count) || 0;
       bookCount = parseInt(stats.book_count) || 0;
       orderCount = parseInt(stats.order_count) || 0;
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
       }
     ];
     
-    function getTimeAgo(date) {
+    function getTimeAgo(date: any) {
       const now = new Date();
       const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
       

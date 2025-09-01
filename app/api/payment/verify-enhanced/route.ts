@@ -94,8 +94,8 @@ export async function GET(request: NextRequest) {
           // Find the order
           const orderResult = await secureQuery(`
             SELECT o.*, 
-                   COUNT(CASE WHEN b.format IN ('ebook', 'both') THEN 1 END) as ebook_count,
-                   COUNT(CASE WHEN b.format IN ('physical', 'both') THEN 1 END) as physical_count
+                   COUNT(CASE WHEN b.book_type IN ('ebook', 'hybrid') THEN 1 END) as ebook_count,
+                   COUNT(CASE WHEN b.book_type IN ('physical', 'hybrid') THEN 1 END) as physical_count
             FROM orders o
             LEFT JOIN order_items oi ON o.id = oi.order_id
             LEFT JOIN books b ON oi.book_id = b.id
@@ -152,10 +152,11 @@ export async function GET(request: NextRequest) {
 
           // Send confirmation email
           try {
-            const orderItemsResult = await query(`
-              SELECT oi.*, b.title, b.author_name, b.format
+            const orderItemsResult = await secureQuery(`
+              SELECT oi.*, b.title, COALESCE(a.name, 'Unknown Author') as author_name, b.book_type as format
               FROM order_items oi
               JOIN books b ON oi.book_id = b.id
+              LEFT JOIN authors a ON b.author_id = a.id
               WHERE oi.order_id = $1
             `, [order.id]);
 
@@ -171,8 +172,8 @@ export async function GET(request: NextRequest) {
                 format: item.format
               })),
               paymentMethod: 'Flutterwave',
-              isDigital: hasEbooks && parseInt(order.physical_count) === 0,
-              isMixed: hasEbooks && parseInt(order.physical_count) > 0
+              isDigital: parseInt(order.ebook_count) > 0 && parseInt(order.physical_count) === 0,
+              isMixed: parseInt(order.ebook_count) > 0 && parseInt(order.physical_count) > 0
             }, `${order.shipping_address?.first_name || ''} ${order.shipping_address?.last_name || ''}`.trim() || 'Customer');
 
             await sendEmail(
@@ -195,12 +196,12 @@ export async function GET(request: NextRequest) {
           console.log('❌ Payment verification failed');
           
           // Update order status to failed
-          const orderResult = await query(`
+          const orderResult = await secureQuery(`
             SELECT id FROM orders WHERE order_number = $1 AND user_id = $2
           `, [tx_ref, userId]);
 
           if (orderResult.rows.length > 0) {
-            await query(`
+            await secureQuery(`
               UPDATE orders 
               SET status = 'failed', payment_status = 'failed', updated_at = NOW()
               WHERE id = $1

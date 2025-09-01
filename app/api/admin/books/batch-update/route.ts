@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withPermission } from '@/utils/api-protection';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 import { sanitizeInt, sanitizeHtml } from '@/utils/security';
 
@@ -13,8 +14,20 @@ interface BatchUpdateRequest {
   };
 }
 
-export const PUT = withPermission('books.update', async (request: NextRequest, context: any, session: any) => {
+export async function PUT(request: NextRequest) {
   try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin
+    const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body: BatchUpdateRequest = await request.json();
     const { book_ids, status, category_id, price_adjustment } = body;
 
@@ -24,7 +37,7 @@ export const PUT = withPermission('books.update', async (request: NextRequest, c
     }
 
     // Sanitize book IDs
-    const sanitizedBookIds = book_ids.map(id => sanitizeInt(id)).filter(id => id > 0);
+    const sanitizedBookIds = book_ids.map(id => sanitizeInt(id.toString())).filter(id => id > 0);
     if (sanitizedBookIds.length === 0) {
       return NextResponse.json({ error: 'No valid book IDs provided' }, { status: 400 });
     }
@@ -46,7 +59,7 @@ export const PUT = withPermission('books.update', async (request: NextRequest, c
 
     // Validate and add category update
     if (category_id) {
-      const categoryIdNum = sanitizeInt(category_id);
+      const categoryIdNum = sanitizeInt(category_id.toString());
       if (categoryIdNum <= 0) {
         return NextResponse.json({ error: 'Invalid category ID' }, { status: 400 });
       }
@@ -105,4 +118,4 @@ export const PUT = withPermission('books.update', async (request: NextRequest, c
       { status: 500 }
     );
   }
-});
+}

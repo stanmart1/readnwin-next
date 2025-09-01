@@ -26,7 +26,7 @@ export default function ModernLeftDrawer() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black bg-opacity-50 z-40"
-            onClick={toggleLeftDrawer}
+            onClick={(e) => { e.stopPropagation(); toggleLeftDrawer(); }}
           />
 
           {/* Drawer */}
@@ -43,7 +43,7 @@ export default function ModernLeftDrawer() {
                 <h2 className="font-semibold">Table of Contents</h2>
               </div>
               <button
-                onClick={toggleLeftDrawer}
+                onClick={(e) => { e.stopPropagation(); toggleLeftDrawer(); }}
                 className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 <X className="w-5 h-5" />
@@ -58,7 +58,7 @@ export default function ModernLeftDrawer() {
                     <button
                       key={chapter.id}
                       onClick={() => {
-                        goToChapter(chapter.chapter_number);
+                        goToChapter(chapter.id);
                         toggleLeftDrawer();
                       }}
                       className={`w-full text-left p-3 rounded-lg transition-colors ${

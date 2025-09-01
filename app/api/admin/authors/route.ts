@@ -16,7 +16,12 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || '';
 
-    const filters: any = { page, limit };
+    const filters: {
+      page: number;
+      limit: number;
+      search?: string;
+      status?: string;
+    } = { page, limit };
     if (search) filters.search = search;
     if (status) filters.status = status;
 
@@ -63,7 +68,7 @@ export async function POST(request: NextRequest) {
       name: body.name.trim(),
       bio: body.bio || '',
       website_url: body.website || '',
-      status: 'active'
+      status: 'active' as const
     };
 
     const author = await ecommerceService.createAuthor(authorData);

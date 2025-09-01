@@ -857,7 +857,6 @@ export default function UserManagement() {
                 loading={actionLoading[`${user.status === 'active' ? 'suspend' : 'activate'}-${user.id}`]}
                 onClick={() => handleUserAction(user.id, user.status === 'active' ? 'suspend' : 'activate')}
                 className="text-yellow-600 hover:text-yellow-800 flex items-center text-sm whitespace-nowrap"
-                title={user.status === 'active' ? 'Suspend User' : 'Activate User'}
               >
                 <i className={`ri-${user.status === 'active' ? 'pause' : 'play'}-circle-line mr-1`}></i>
                 {user.status === 'active' ? 'Suspend' : 'Activate'}
@@ -866,7 +865,6 @@ export default function UserManagement() {
                 loading={actionLoading[`delete-${user.id}`]}
                 onClick={() => handleUserAction(user.id, 'delete')}
                 className="text-red-600 hover:text-red-800 flex items-center text-sm whitespace-nowrap"
-                title="Delete User"
               >
                 <i className="ri-delete-bin-line mr-1"></i>
                 Delete
@@ -1008,7 +1006,6 @@ export default function UserManagement() {
                         loading={actionLoading[`${user.status === 'active' ? 'suspend' : 'activate'}-${user.id}`]}
                         onClick={() => handleUserAction(user.id, user.status === 'active' ? 'suspend' : 'activate')}
                         className="text-yellow-600 hover:text-yellow-800 cursor-pointer transition-colors duration-200"
-                        title={user.status === 'active' ? 'Suspend User' : 'Activate User'}
                       >
                         <i className={`ri-${user.status === 'active' ? 'pause' : 'play'}-circle-line`}></i>
                       </LoadingButton>
@@ -1016,7 +1013,6 @@ export default function UserManagement() {
                         loading={actionLoading[`delete-${user.id}`]}
                         onClick={() => handleUserAction(user.id, 'delete')}
                         className="text-red-600 hover:text-red-800 cursor-pointer transition-colors duration-200"
-                        title="Delete User"
                       >
                         <i className="ri-delete-bin-line"></i>
                       </LoadingButton>

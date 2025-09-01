@@ -35,7 +35,7 @@ export interface Author {
   bio?: string;
   avatar_url?: string;
   website_url?: string;
-  social_media?: Record<string, any>;
+  social_media?: Record<string, string>;
   is_verified: boolean;
   status: 'active' | 'inactive' | 'pending';
   created_at: string;
@@ -206,7 +206,7 @@ export interface PaymentTransaction {
   amount: number;
   currency: string;
   status: 'pending' | 'success' | 'failed' | 'cancelled';
-  gateway_response?: Record<string, any>;
+  gateway_response?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -321,7 +321,7 @@ export interface FlutterwavePaymentData {
     description?: string;
     logo?: string;
   };
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 export interface PayStackPaymentData {
@@ -331,11 +331,11 @@ export interface PayStackPaymentData {
   currency?: string;
   callback_url?: string;
   channels?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // API Response Types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;

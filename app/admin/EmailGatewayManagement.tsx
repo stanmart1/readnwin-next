@@ -516,7 +516,7 @@ export default function EmailGatewayManagement() {
                 onChange={(e) => {
                   const preset = e.target.value;
                   if (preset) {
-                    const presets = {
+                    const presets: {[key: string]: { host: string; port: number; secure: boolean }} = {
                       gmail: { host: 'smtp.gmail.com', port: 587, secure: false },
                       outlook: { host: 'smtp-mail.outlook.com', port: 587, secure: false },
                       yahoo: { host: 'smtp.mail.yahoo.com', port: 587, secure: false },

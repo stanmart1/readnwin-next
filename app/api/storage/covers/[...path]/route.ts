@@ -37,7 +37,7 @@ export async function GET(
       case 'webp': contentType = 'image/webp'; break;
     }
 
-    return new NextResponse(imageBuffer, {
+    return new NextResponse(new Uint8Array(imageBuffer), {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=86400',

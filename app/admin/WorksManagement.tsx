@@ -251,7 +251,7 @@ export default function WorksManagement() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Works Management</h1>
-            <p className="text-gray-600">Manage the "Some Of Our Works" carousel images</p>
+            <p className="text-gray-600">Manage the &quot;Some Of Our Works&quot; carousel images</p>
           </div>
           <button
             onClick={() => setShowUploadForm(true)}

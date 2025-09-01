@@ -297,18 +297,18 @@ export const validateName = (name: string, fieldName: string = 'Name'): string =
 };
 
 // Form validation hook
-export const useFormValidation = (initialValues: any, validators: any) => {
+export const useFormValidation = (initialValues: Record<string, unknown>, validators: Record<string, (value: unknown) => string>) => {
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [touched, setTouched] = useState<{[key: string]: boolean}>({});
   
-  const validateField = (name: string, value: any): string => {
+  const validateField = (name: string, value: unknown): string => {
     const validator = validators[name];
     return validator ? validator(value) : '';
   };
   
-  const handleChange = (name: string, value: any) => {
-    setValues((prev: any) => ({ ...prev, [name]: value }));
+  const handleChange = (name: string, value: unknown) => {
+    setValues((prev: Record<string, unknown>) => ({ ...prev, [name]: value }));
     
     // Clear error when user starts typing
     if (errors[name]) {
@@ -318,18 +318,18 @@ export const useFormValidation = (initialValues: any, validators: any) => {
     // Validate on blur if field has been touched
     if (touched[name]) {
       const error = validateField(name, value);
-      setErrors((prev: {[key: string]: string}) => ({ ...prev, [name]: error }));
+      setErrors((prev: Record<string, string>) => ({ ...prev, [name]: error }));
     }
   };
   
   const handleBlur = (name: string) => {
-    setTouched(prev => ({ ...prev, [name]: true }));
+    setTouched((prev: Record<string, boolean>) => ({ ...prev, [name]: true }));
     const error = validateField(name, values[name]);
-    setErrors(prev => ({ ...prev, [name]: error }));
+    setErrors((prev: Record<string, string>) => ({ ...prev, [name]: error }));
   };
   
   const validateForm = (): boolean => {
-    const newErrors: {[key: string]: string} = {};
+    const newErrors: Record<string, string> = {};
     let isValid = true;
     
     Object.keys(validators).forEach(field => {

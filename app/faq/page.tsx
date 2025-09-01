@@ -97,8 +97,8 @@ export default function FAQPage() {
               </h3>
               <p className="text-gray-600">
                 {searchQuery 
-                  ? 'Try adjusting your search query.'
-                  : 'No FAQs available at the moment.'
+                  ? "Try adjusting your search query."
+                  : "No FAQs available at the moment."
                 }
               </p>
             </div>
@@ -160,7 +160,7 @@ export default function FAQPage() {
             Still have questions?
           </h3>
           <p className="text-gray-600 mb-4">
-            Can't find what you're looking for? Contact our support team for assistance.
+            Can&apos;t find what you&apos;re looking for? Contact our support team for assistance.
           </p>
           <a
             href="/contact"

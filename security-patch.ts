@@ -41,7 +41,7 @@ export const validateFilePath = (path: string): boolean => {
 };
 
 // 3. SQL Injection Protection (Enhanced)
-export const validateSqlParams = (params: any[]): boolean => {
+export const validateSqlParams = (params: unknown[]): boolean => {
   return params.every(param => {
     if (typeof param === 'string') {
       return !param.includes('--') && 
@@ -124,7 +124,7 @@ export const securityHeaders = {
 };
 
 // 9. Secure Response Helper
-export const secureResponse = (data: any, status: number = 200) => {
+export const secureResponse = (data: unknown, status: number = 200) => {
   return NextResponse.json(data, { 
     status,
     headers: securityHeaders
@@ -132,13 +132,13 @@ export const secureResponse = (data: any, status: number = 200) => {
 };
 
 // 10. Error Handling (Prevent Information Disclosure)
-export const handleSecureError = (error: any, isDevelopment: boolean = false) => {
+export const handleSecureError = (error: unknown, isDevelopment: boolean = false) => {
   console.error('Security Error:', error);
   
   if (isDevelopment) {
     return secureResponse({ 
       error: 'Internal server error',
-      details: error.message 
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, 500);
   }
   
@@ -148,7 +148,7 @@ export const handleSecureError = (error: any, isDevelopment: boolean = false) =>
 };
 
 // 11. Database Query Security Wrapper
-export const secureQuery = async (query: Function, text: string, params: any[] = []) => {
+export const secureQuery = async (query: (text: string, params: unknown[]) => Promise<unknown>, text: string, params: unknown[] = []) => {
   // Validate parameters
   if (!validateSqlParams(params)) {
     throw new Error('Invalid SQL parameters detected');
@@ -164,7 +164,7 @@ export const secureQuery = async (query: Function, text: string, params: any[] =
 };
 
 // 12. Session Security
-export const validateSession = (session: any): boolean => {
+export const validateSession = (session: { user?: { id?: string; status?: string }; expires?: string }): boolean => {
   if (!session?.user?.id) return false;
   
   // Check session expiry
@@ -180,7 +180,7 @@ export const validateSession = (session: any): boolean => {
 
 // 13. API Endpoint Security Wrapper
 export const secureEndpoint = (handler: Function) => {
-  return async (request: NextRequest, context?: any) => {
+  return async (request: NextRequest, context?: unknown) => {
     try {
       // Add security headers
       const response = await handler(request, context);
@@ -214,7 +214,7 @@ export const logSecurityEvent = async (
   userId: number | undefined,
   action: string,
   resource: string,
-  details: any,
+  details: Record<string, unknown>,
   ip?: string,
   userAgent?: string
 ) => {

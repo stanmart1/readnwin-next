@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      categories: result.categories || result,
-      pagination: result.pagination
+      categories: Array.isArray(result) ? result : (result.categories || []),
+      pagination: Array.isArray(result) ? { page: 1, limit: result.length, total: result.length, pages: 1 } : result.pagination
     });
 
   } catch (error) {

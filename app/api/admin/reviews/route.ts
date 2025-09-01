@@ -85,7 +85,7 @@ export async function PATCH(request: NextRequest) {
 
     // Update review status with error handling
     try {
-      const review = await ecommerceService.updateReviewStatus(reviewId, status, adminNotes, session.user.id);
+      const review = await ecommerceService.updateReviewStatus(reviewId, status, adminNotes, parseInt(session.user.id));
 
       return NextResponse.json({
         success: true,
@@ -131,7 +131,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete review
-    const success = await ecommerceService.deleteReview(parseInt(reviewId), session.user.id);
+    const success = await ecommerceService.deleteReview(parseInt(reviewId), parseInt(session.user.id));
 
     return NextResponse.json({
       success,

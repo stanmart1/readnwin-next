@@ -44,9 +44,15 @@ export function safeJsonParse(input: string, defaultValue: any = null): any {
   }
 }
 
+// Export individual functions for direct import
+export const sanitizeLogInput = sanitizeForLog;
+
 export const SecurityUtils = {
   sanitizeForXSS,
   sanitizeHtml,
+  sanitizeHTML: sanitizeHtml, // Alias for compatibility
   sanitizeForLog,
+  sanitizeLogInput: sanitizeForLog, // Alias for compatibility
+  sanitizeDBInput: sanitizeForLog, // Alias for compatibility
   safeJsonParse
 };

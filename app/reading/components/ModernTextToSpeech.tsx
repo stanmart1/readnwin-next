@@ -2,14 +2,14 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useModernEReaderStore } from '@/stores/modernEReaderStore';
-import { SecurityUtils } from '@/utils/security';
+
 
 export default function ModernTextToSpeech() {
   const {
     currentChapter,
     settings,
     uiState,
-    updateTextToSpeechState,
+    // updateTextToSpeechState not available in store
   } = useModernEReaderStore();
 
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -38,14 +38,14 @@ export default function ModernTextToSpeech() {
 
     // Extract text content from HTML
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = SecurityUtils.sanitizeHTML(currentChapter.content_html);
+    tempDiv.innerHTML = currentChapter.content_html;
     const textContent = tempDiv.textContent || tempDiv.innerText || '';
 
     if (!textContent.trim()) return;
 
     // Create speech utterance
     const utterance = new SpeechSynthesisUtterance(textContent);
-    utterance.rate = settings.textToSpeech.rate;
+    utterance.rate = settings.textToSpeech.speed;
     utterance.volume = settings.textToSpeech.volume;
     utterance.pitch = settings.textToSpeech.pitch;
 
@@ -61,28 +61,28 @@ export default function ModernTextToSpeech() {
     // Event handlers
     utterance.onstart = () => {
       isPlayingRef.current = true;
-      updateTextToSpeechState({ isPlaying: true });
+      // updateTextToSpeechState({ isPlaying: true });
     };
 
     utterance.onend = () => {
       isPlayingRef.current = false;
-      updateTextToSpeechState({ isPlaying: false });
+      // updateTextToSpeechState({ isPlaying: false });
       speechRef.current = null;
     };
 
     utterance.onerror = (event) => {
-      console.error('Speech synthesis error:', SecurityUtils.sanitizeLogInput(String(event)));
+      console.error('Speech synthesis error:', event);
       isPlayingRef.current = false;
-      updateTextToSpeechState({ isPlaying: false });
+      // updateTextToSpeechState({ isPlaying: false });
       speechRef.current = null;
     };
 
     utterance.onpause = () => {
-      updateTextToSpeechState({ isPlaying: false });
+      // updateTextToSpeechState({ isPlaying: false });
     };
 
     utterance.onresume = () => {
-      updateTextToSpeechState({ isPlaying: true });
+      // updateTextToSpeechState({ isPlaying: true });
     };
 
     speechRef.current = utterance;
@@ -105,7 +105,7 @@ export default function ModernTextToSpeech() {
     if (speechRef.current) {
       speechSynthesis.cancel();
       isPlayingRef.current = false;
-      updateTextToSpeechState({ isPlaying: false });
+      // updateTextToSpeechState({ isPlaying: false });
       speechRef.current = null;
     }
   };
@@ -114,15 +114,19 @@ export default function ModernTextToSpeech() {
   useEffect(() => {
     // This is a bit of a hack, but we need to expose these methods
     // to the store so they can be called from other components
-    (window as any).__modernEReaderTTS = {
-      start: startSpeech,
-      pause: pauseSpeech,
-      resume: resumeSpeech,
-      stop: stopSpeech,
-    };
+    if (typeof window !== 'undefined') {
+      (window as any).__modernEReaderTTS = {
+        start: startSpeech,
+        pause: pauseSpeech,
+        resume: resumeSpeech,
+        stop: stopSpeech,
+      };
+    }
 
     return () => {
-      delete (window as any).__modernEReaderTTS;
+      if (typeof window !== 'undefined') {
+        delete (window as any).__modernEReaderTTS;
+      }
     };
   }, []);
 

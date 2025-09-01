@@ -256,7 +256,7 @@ export default function RightDrawer() {
                         ].map((theme) => (
                   <button
                             key={theme.id}
-                            onClick={() => handleThemeChange(theme.id as any)}
+                            onClick={() => handleThemeChange(theme.id as 'light' | 'dark' | 'sepia')}
                             className={`p-3 rounded-lg border-2 transition-colors ${
                               settings.theme === theme.id
                                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900'
@@ -282,7 +282,7 @@ export default function RightDrawer() {
                         ].map((width) => (
                   <button
                             key={width.id}
-                            onClick={() => handleReadingWidthChange(width.id as any)}
+                            onClick={() => handleReadingWidthChange(width.id as 'narrow' | 'medium' | 'wide')}
                             className={`w-full p-2 rounded-lg text-left ${
                               settings.readingWidth === width.id
                                 ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'

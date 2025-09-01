@@ -20,7 +20,7 @@ export async function GET(
       const defaultPath = join(process.cwd(), 'public', 'images', 'default-avatar.png');
       if (existsSync(defaultPath)) {
         const defaultBuffer = readFileSync(defaultPath);
-        return new NextResponse(defaultBuffer, {
+        return new NextResponse(new Uint8Array(defaultBuffer), {
           headers: {
             'Content-Type': 'image/png',
             'Cache-Control': 'public, max-age=86400'
@@ -33,7 +33,7 @@ export async function GET(
     const imageBuffer = readFileSync(profilePath);
     const contentType = getContentType(sanitizedFilename);
     
-    return new NextResponse(imageBuffer, {
+    return new NextResponse(new Uint8Array(imageBuffer), {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=3600'

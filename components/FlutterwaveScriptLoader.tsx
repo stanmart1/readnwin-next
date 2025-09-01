@@ -2,10 +2,27 @@
 
 import { useEffect } from 'react';
 
+interface FlutterwaveConfig {
+  disable_forter?: boolean;
+  disable_fingerprint?: boolean;
+  disable_metrics?: boolean;
+  disable_analytics?: boolean;
+  disable_tracking?: boolean;
+  source?: string;
+  integration?: string;
+  [key: string]: unknown;
+}
+
+interface FlutterwaveCheckoutConfig {
+  meta?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 declare global {
   interface Window {
-    FlutterwaveCheckout: any;
-    FlutterwaveConfig?: any;
+    FlutterwaveCheckout: (config: FlutterwaveCheckoutConfig) => unknown;
+    FlutterwaveConfig?: FlutterwaveConfig;
   }
 }
 
@@ -37,7 +54,7 @@ export default function FlutterwaveScriptLoader() {
 
     // Set global Flutterwave configuration to disable problematic services
     if (typeof window !== 'undefined') {
-      (window as any).FlutterwaveConfig = {
+      window.FlutterwaveConfig = {
         disable_forter: true,
         disable_fingerprint: true,
         disable_metrics: true,
@@ -56,10 +73,10 @@ export default function FlutterwaveScriptLoader() {
       console.log('Flutterwave script loaded successfully');
       
       // Configure global Flutterwave settings to prevent internal service errors
-      if (typeof window !== 'undefined' && (window as any).FlutterwaveCheckout) {
+      if (typeof window !== 'undefined' && window.FlutterwaveCheckout) {
         // Override the default FlutterwaveCheckout to add internal service configuration
-        const originalFlutterwaveCheckout = (window as any).FlutterwaveCheckout;
-        (window as any).FlutterwaveCheckout = function(config: any) {
+        const originalFlutterwaveCheckout = window.FlutterwaveCheckout;
+        window.FlutterwaveCheckout = function(config: FlutterwaveCheckoutConfig) {
           // Add comprehensive internal service configuration to prevent 400 errors
           const enhancedConfig = {
             ...config,

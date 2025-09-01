@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
-const RATE_LIMIT_MAP = new Map();
+const RATE_LIMIT_MAP = new Map<string, number[]>();
 
 const rateLimit = (ip: string, limit: number = 100, window: number = 60000) => {
   const now = Date.now();
@@ -12,7 +12,7 @@ const rateLimit = (ip: string, limit: number = 100, window: number = 60000) => {
     RATE_LIMIT_MAP.set(ip, []);
   }
   
-  const requests = RATE_LIMIT_MAP.get(ip).filter((time: number) => time > windowStart);
+  const requests = (RATE_LIMIT_MAP.get(ip) || []).filter((time: number) => time > windowStart);
   
   if (requests.length >= limit) {
     return false;

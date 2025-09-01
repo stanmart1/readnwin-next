@@ -319,7 +319,7 @@ export default function LoginPage() {
                       }}
                       className="mt-2 text-sm text-green-600 hover:text-green-800 underline"
                     >
-                      Click here if you're not redirected automatically
+                      Click here if you&apos;re not redirected automatically
                     </button>
                   </div>
                 </div>
@@ -377,7 +377,7 @@ export default function LoginPage() {
                 href="/register" 
                 className="font-medium text-blue-600 hover:text-blue-800 transition-colors duration-200"
               >
-                Don't have an account?
+                Don&apos;t have an account?
               </Link>
               <div className="flex flex-col items-end space-y-1">
                 <Link 

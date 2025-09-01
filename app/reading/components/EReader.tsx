@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEReaderStore } from "@/stores/ereaderStore";
-import { SecurityUtils } from "@/utils/security";
+
 import { Settings, StickyNote, X, Menu, Highlighter } from "lucide-react";
 import LeftDrawer from "./LeftDrawer";
 import RightDrawer from "./RightDrawer";
@@ -438,7 +438,7 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
             }}
             onMouseUp={handleTextSelection}
             onTouchEnd={handleTextSelection}
-            dangerouslySetInnerHTML={{ __html: SecurityUtils.sanitizeHTML(currentBook.content) }}
+            dangerouslySetInnerHTML={{ __html: currentBook.content }}
             data-book-format={currentBook.originalFormat}
             data-has-chapters={currentBook.chapters && currentBook.chapters.length > 0}
           />
@@ -478,11 +478,11 @@ export default function EReader({ bookId, onClose }: EReaderProps) {
         contentRef={contentRef}
         onHighlightClick={(highlight) => {
           // Navigate to highlight or show details
-          console.log("Highlight clicked:", SecurityUtils.sanitizeLogInput(JSON.stringify(highlight)));
+          console.log("Highlight clicked:", highlight);
         }}
         onHighlightHover={(highlight) => {
           // Show highlight preview or tooltip
-          console.log("Highlight hovered:", SecurityUtils.sanitizeLogInput(JSON.stringify(highlight)));
+          console.log("Highlight hovered:", highlight);
         }}
       />
 

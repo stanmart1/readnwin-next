@@ -1,6 +1,11 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { createHash } from 'crypto';
 import { secureQuery } from './secure-database';
+
+const STORAGE_BASE = process.env.NODE_ENV === 'production' 
+  ? '/app/storage'
+  : path.join(process.cwd(), 'storage');
 
 export class BookStorage {
   private static getStoragePath(): string {
@@ -152,5 +157,175 @@ export class BookStorage {
     } catch {
       return null;
     }
+  }
+}
+
+// Structure preservation functions
+export async function preserveEpubStructure(bookId: number, buffer: Buffer, filename: string) {
+  try {
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(buffer);
+    
+    // Extract to storage directory
+    const extractionPath = path.join(STORAGE_BASE, 'books', bookId.toString(), 'extracted');
+    await fs.mkdir(extractionPath, { recursive: true });
+    
+    // Extract all files
+    for (const [relativePath, file] of Object.entries(zip.files)) {
+      if (!file.dir) {
+        const content = await file.async('nodebuffer');
+        const filePath = path.join(extractionPath, relativePath);
+        await fs.mkdir(path.dirname(filePath), { recursive: true });
+        await fs.writeFile(filePath, content);
+      }
+    }
+    
+    // Parse EPUB structure
+    const structure = await parseEpubStructure(extractionPath);
+    const metadata = await extractEpubMetadata(extractionPath);
+    
+    // Store original file
+    const storedPath = path.join(STORAGE_BASE, 'books', bookId.toString(), filename);
+    await fs.writeFile(storedPath, buffer);
+    
+    return {
+      success: true,
+      structure,
+      metadata,
+      extractionPath,
+      storedPath,
+      hash: createHash('sha256').update(buffer).digest('hex')
+    };
+  } catch (error) {
+    console.error('EPUB structure preservation failed:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+export async function preserveHtmlStructure(bookId: number, buffer: Buffer, filename: string) {
+  try {
+    // Store original file
+    const storedPath = path.join(STORAGE_BASE, 'books', bookId.toString(), filename);
+    await fs.mkdir(path.dirname(storedPath), { recursive: true });
+    await fs.writeFile(storedPath, buffer);
+    
+    // Parse HTML structure
+    const htmlContent = buffer.toString('utf-8');
+    const structure = await parseHtmlStructure(htmlContent);
+    const metadata = extractHtmlMetadata(htmlContent);
+    
+    return {
+      success: true,
+      structure,
+      metadata,
+      storedPath,
+      hash: createHash('sha256').update(buffer).digest('hex')
+    };
+  } catch (error) {
+    console.error('HTML structure preservation failed:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+async function parseEpubStructure(extractionPath: string) {
+  const containerPath = path.join(extractionPath, 'META-INF', 'container.xml');
+  const containerXml = await fs.readFile(containerPath, 'utf-8');
+  const { DOMParser } = await import('@xmldom/xmldom');
+  const parser = new DOMParser();
+  const containerDoc = parser.parseFromString(containerXml, 'text/xml');
+  
+  const opfPath = containerDoc.getElementsByTagName('rootfile')[0]?.getAttribute('full-path');
+  if (!opfPath) throw new Error('OPF file not found');
+  
+  const opfFullPath = path.join(extractionPath, opfPath);
+  const opfXml = await fs.readFile(opfFullPath, 'utf-8');
+  const opfDoc = parser.parseFromString(opfXml, 'text/xml');
+  
+  // Parse manifest
+  const manifest: Record<string, any> = {};
+  const manifestItems = opfDoc.getElementsByTagName('item');
+  for (let i = 0; i < manifestItems.length; i++) {
+    const item = manifestItems[i];
+    const id = item.getAttribute('id');
+    if (id) {
+      manifest[id] = {
+        href: item.getAttribute('href'),
+        mediaType: item.getAttribute('media-type')
+      };
+    }
+  }
+  
+  // Parse spine
+  const spine: string[] = [];
+  const spineItems = opfDoc.getElementsByTagName('itemref');
+  for (let i = 0; i < spineItems.length; i++) {
+    const idref = spineItems[i].getAttribute('idref');
+    if (idref) spine.push(idref);
+  }
+  
+  return {
+    opfPath,
+    manifest,
+    spine
+  };
+}
+
+async function parseHtmlStructure(htmlContent: string) {
+  const cheerio = await import('cheerio');
+  const $ = cheerio.load(htmlContent);
+  
+  // Extract chapter structure from headings
+  const chapters: any[] = [];
+  $('h1, h2, h3').each((i, el) => {
+    const $el = $(el);
+    chapters.push({
+      level: parseInt(el.tagName.charAt(1)),
+      title: $el.text().trim(),
+      id: $el.attr('id') || `chapter-${i}`
+    });
+  });
+  
+  return { chapters };
+}
+
+function extractHtmlMetadata(htmlContent: string) {
+  const titleMatch = htmlContent.match(/<title>([^<]+)<\/title>/i);
+  const authorMatch = htmlContent.match(/<meta[^>]+name=["']author["'][^>]+content=["']([^"']+)["']/i);
+  
+  return {
+    title: titleMatch?.[1] || null,
+    author: authorMatch?.[1] || null
+  };
+}
+
+async function extractEpubMetadata(extractionPath: string) {
+  try {
+    const containerPath = path.join(extractionPath, 'META-INF', 'container.xml');
+    const containerXml = await fs.readFile(containerPath, 'utf-8');
+    const { DOMParser } = await import('@xmldom/xmldom');
+    const parser = new DOMParser();
+    const containerDoc = parser.parseFromString(containerXml, 'text/xml');
+    
+    const opfPath = containerDoc.getElementsByTagName('rootfile')[0]?.getAttribute('full-path');
+    if (!opfPath) return {};
+    
+    const opfFullPath = path.join(extractionPath, opfPath);
+    const opfXml = await fs.readFile(opfFullPath, 'utf-8');
+    const opfDoc = parser.parseFromString(opfXml, 'text/xml');
+    
+    const metadata: Record<string, any> = {};
+    const metadataEl = opfDoc.getElementsByTagName('metadata')[0];
+    
+    if (metadataEl) {
+      const title = metadataEl.getElementsByTagName('dc:title')[0]?.textContent;
+      const creator = metadataEl.getElementsByTagName('dc:creator')[0]?.textContent;
+      
+      if (title) metadata.title = title;
+      if (creator) metadata.creator = creator;
+    }
+    
+    return metadata;
+  } catch (error) {
+    return {};
   }
 }

@@ -26,9 +26,9 @@ export async function GET(request: NextRequest) {
     for (const table of existingTables) {
       try {
         const countResult = await query(`SELECT COUNT(*) as count FROM ${table}`);
-        tableCounts[table] = parseInt(countResult.rows[0].count) || 0;
+        (tableCounts as any)[table] = parseInt(countResult.rows[0].count) || 0;
       } catch (e) {
-        tableCounts[table] = `Error: ${e instanceof Error ? e.message : 'Unknown error'}`;
+        (tableCounts as any)[table] = `Error: ${e instanceof Error ? e.message : 'Unknown error'}`;
       }
     }
 

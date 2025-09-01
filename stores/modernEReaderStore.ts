@@ -7,13 +7,20 @@ export interface ModernBook {
   title: string;
   author: string;
   cover_image_url?: string;
-  book_type: 'physical' | 'ebook' | 'hybrid';
-  primary_format: 'epub' | 'html' | 'pdf';
-  word_count: number;
-  reading_time_minutes: number;
-  language: string;
+  format: 'epub' | 'html' | 'pdf';
+  contentUrl: string;
+  structure?: {
+    toc?: Array<{ title: string; href: string; level: number }>;
+    spine?: Array<{ id: string; href: string }>;
+    metadata?: Record<string, unknown>;
+  };
+  preservedFormat?: boolean;
+  metadata: {
+    wordCount: number;
+    estimatedReadingTime: number;
+    pages: number;
+  };
   chapters: BookChapter[];
-  table_of_contents: TableOfContentsItem[];
 }
 
 export interface BookChapter {
@@ -359,7 +366,18 @@ export const useModernEReaderStore = create<ModernEReaderState>()(
       uiState: defaultUIState,
 
       // Book Management Actions
-      loadBook: async (bookId: string, userId: string) => {
+      loadBook: async (bookId: string, userId: string, bookData?: ModernBook) => {
+        if (bookData) {
+          // Direct load with provided book data
+          set(state => ({
+            currentBook: bookData,
+            currentChapter: bookData.chapters[0] || null,
+            uiState: { ...state.uiState, isLoading: false, error: null }
+          }));
+          get().startReadingSession();
+          return;
+        }
+
         set(state => ({
           uiState: { ...state.uiState, isLoading: true, error: null }
         }));
@@ -377,7 +395,32 @@ export const useModernEReaderStore = create<ModernEReaderState>()(
             throw new Error('Failed to load book');
           }
 
-          const bookData = await response.json();
+          const data = await response.json();
+
+          // Convert API response to ModernBook format
+          const book: ModernBook = {
+            id: bookId,
+            title: data.title,
+            author: data.author,
+            cover_image_url: data.coverImage,
+            format: data.contentType || 'html',
+            contentUrl: `/api/books/${bookId}/content`,
+            structure: data.structure,
+            preservedFormat: data.preservedFormat || false,
+            metadata: {
+              wordCount: data.wordCount || 0,
+              estimatedReadingTime: Math.ceil((data.wordCount || 0) / 200),
+              pages: Math.ceil((data.wordCount || 0) / 250)
+            },
+            chapters: data.chapters || [{
+              id: 'chapter-1',
+              chapter_number: 1,
+              chapter_title: data.title,
+              content_html: data.content || '',
+              word_count: data.wordCount || 0,
+              reading_time_minutes: Math.ceil((data.wordCount || 0) / 200)
+            }]
+          };
 
           // Fetch reading progress
           const progressResponse = await fetch(`/api/reading/progress/${bookId}`, {
@@ -400,8 +443,8 @@ export const useModernEReaderStore = create<ModernEReaderState>()(
           const notes = notesResponse.ok ? (await notesResponse.json()).notes : [];
 
           set(state => ({
-            currentBook: bookData.book,
-            currentChapter: bookData.book.chapters[0] || null,
+            currentBook: book,
+            currentChapter: book.chapters[0] || null,
             readingProgress: progress,
             highlights,
             notes,
@@ -459,7 +502,7 @@ export const useModernEReaderStore = create<ModernEReaderState>()(
 
         const wordsPerPage = 250; // Approximate
         const targetWords = page * wordsPerPage;
-        const position = Math.floor((targetWords / currentBook.word_count) * 100);
+        const position = Math.floor((targetWords / currentBook.metadata.wordCount) * 100);
         
         get().goToPosition(position);
       },
@@ -500,7 +543,9 @@ export const useModernEReaderStore = create<ModernEReaderState>()(
         set({ readingProgress: updatedProgress });
 
         // Debounced API call to save progress
-        clearTimeout((window as any).progressSaveTimeout);
+        if (typeof window !== 'undefined') {
+          clearTimeout((window as any).progressSaveTimeout);
+        }
         (window as any).progressSaveTimeout = setTimeout(async () => {
           try {
             await fetch(`/api/reading/progress/${currentBook.id}`, {

@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     if (user_id) {
       whereConditions.push(`ul.user_id = $${paramIndex}`);
-      queryParams.push(parseInt(user_id));
+      queryParams.push(user_id);
       paramIndex++;
     }
 

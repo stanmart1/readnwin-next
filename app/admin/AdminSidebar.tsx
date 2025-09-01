@@ -19,7 +19,7 @@ export default function AdminSidebar({ activeTab, onTabChange, isOpen, onToggle,
 
   const [showProfile, setShowProfile] = useState(false);
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'super_admin';
+  
   const { permissions, loading: permissionsLoading } = usePermissions(false);
 
   const adminUser = session?.user;

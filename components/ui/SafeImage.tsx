@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { fetchBookCover } from '@/utils/bookCoverFetcher';
 
 interface SafeImageProps {
@@ -98,15 +99,14 @@ export default function SafeImage({
   };
 
   return (
-    <img
+    <Image
       src={imgSrc}
       alt={alt}
-      width={width}
-      height={height}
+      width={width || 200}
+      height={height || 300}
       className={className}
       style={style}
       onError={handleError}
-      loading="lazy"
       {...props}
     />
   );

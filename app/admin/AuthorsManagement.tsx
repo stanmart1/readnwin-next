@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import Pagination from '@/components/Pagination';
 import Modal from '@/components/ui/Modal';
@@ -42,11 +42,7 @@ export default function AuthorsManagement() {
     status: ''
   });
 
-  useEffect(() => {
-    loadAuthors();
-  }, [pagination.page, filters.search, filters.status]);
-
-  const loadAuthors = async () => {
+  const loadAuthors = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -74,7 +70,11 @@ export default function AuthorsManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, filters.search, filters.status]);
+
+  useEffect(() => {
+    loadAuthors();
+  }, [loadAuthors]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

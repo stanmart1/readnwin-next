@@ -58,7 +58,12 @@ export default function CheckoutPage() {
   const analytics = session ? authAnalytics : guestAnalytics;
   
   const [isLoading, setIsLoading] = useState(false);
-  const [checkoutSummary, setCheckoutSummary] = useState<any>(null);
+  const [checkoutSummary, setCheckoutSummary] = useState<{
+    subtotal: number;
+    tax: number;
+    shipping: number;
+    total: number;
+  } | null>(null);
   const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
 
   // Flutterwave inline payment hook
@@ -132,7 +137,10 @@ export default function CheckoutPage() {
     }
   }, [status, router, cartItems]);
 
-  const handleCheckoutComplete = async (orderData: any) => {
+  const handleCheckoutComplete = async (orderData: {
+    formData: Record<string, unknown>;
+    total: number;
+  }) => {
     try {
       setIsLoading(true);
       
@@ -184,7 +192,14 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleInlinePayment = async (result: any) => {
+  const handleInlinePayment = async (result: {
+    order: {
+      id: number;
+      order_number: string;
+      total_amount: number;
+      shipping_address?: { phone?: string };
+    };
+  }) => {
     try {
       // Extract payment data from result
       const paymentData = {

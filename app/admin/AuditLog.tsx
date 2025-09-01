@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { formatDateTime } from '@/utils/dateUtils';
 
@@ -23,7 +23,7 @@ interface AuditLog {
 }
 
 export default function AuditLog() {
-  const { data: session } = useSession();
+  
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -42,7 +42,7 @@ export default function AuditLog() {
   const [showFilters, setShowFilters] = useState(false);
 
   // Fetch audit logs
-  const fetchAuditLogs = async (page: number = 1) => {
+  const fetchAuditLogs = useCallback(async (page: number = 1) => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -73,15 +73,15 @@ export default function AuditLog() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   useEffect(() => {
     fetchAuditLogs();
-  }, []);
+  }, [fetchAuditLogs]);
 
   useEffect(() => {
     fetchAuditLogs(1);
-  }, [filters]);
+  }, [fetchAuditLogs]);
 
   const getActionColor = (action: string) => {
     if (action.includes('create')) return 'bg-gradient-to-r from-green-500 to-teal-500';

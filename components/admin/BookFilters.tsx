@@ -5,14 +5,16 @@ interface Category {
   name: string;
 }
 
+interface BookFilters {
+  search: string;
+  status: string;
+  category_id: number | undefined;
+}
+
 interface BookFiltersProps {
-  filters: {
-    search: string;
-    status: string;
-    category_id: number | undefined;
-  };
+  filters: BookFilters;
   categories: Category[];
-  onFiltersChange: (filters: any) => void;
+  onFiltersChange: (updater: (prev: BookFilters) => BookFilters) => void;
 }
 
 export default function BookFilters({ filters, categories, onFiltersChange }: BookFiltersProps) {

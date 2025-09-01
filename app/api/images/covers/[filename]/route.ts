@@ -14,7 +14,7 @@ export async function GET(
       const placeholderPath = join(process.cwd(), 'public', 'placeholder-book.jpg');
       if (existsSync(placeholderPath)) {
         const placeholderBuffer = readFileSync(placeholderPath);
-        return new NextResponse(placeholderBuffer, {
+        return new NextResponse(new Uint8Array(placeholderBuffer), {
           headers: {
             'Content-Type': 'image/jpeg',
             'Cache-Control': 'public, max-age=86400'
@@ -54,7 +54,7 @@ export async function GET(
       const placeholderPath = join(process.cwd(), 'public', 'placeholder-book.jpg');
       if (existsSync(placeholderPath)) {
         const placeholderBuffer = readFileSync(placeholderPath);
-        return new NextResponse(placeholderBuffer, {
+        return new NextResponse(new Uint8Array(placeholderBuffer), {
           headers: {
             'Content-Type': 'image/jpeg',
             'Cache-Control': 'public, max-age=86400'
@@ -67,7 +67,7 @@ export async function GET(
     const imageBuffer = readFileSync(coverPath);
     const contentType = getContentType(sanitizedFilename);
     
-    return new NextResponse(imageBuffer, {
+    return new NextResponse(new Uint8Array(imageBuffer), {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=86400'

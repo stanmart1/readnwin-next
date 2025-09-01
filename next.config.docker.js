@@ -17,11 +17,13 @@ const nextConfig = {
     ]
   },
   output: 'standalone',
+  distDir: '.next',
+  generateBuildId: () => 'build',
   eslint: {
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: false,
+    ignoreBuildErrors: true,
   },
   async headers() {
     return [

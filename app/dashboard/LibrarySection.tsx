@@ -388,7 +388,7 @@ export default function LibrarySection() {
                               <i className="ri-book-line"></i>
                             </span>
                           </div>
-                        )
+                        )}
                       </div>
                     </div>
                   </div>

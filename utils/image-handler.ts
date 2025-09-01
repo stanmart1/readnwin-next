@@ -101,7 +101,6 @@ export class ImageHandler {
       }
     });
   }
-  }
 
   static async checkImageExists(filename: string, subfolder?: string): Promise<boolean> {
     const possiblePaths = this.getImagePaths(filename, subfolder);

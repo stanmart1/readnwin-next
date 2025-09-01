@@ -171,6 +171,7 @@ export default function BulkLibraryManagement({ preSelectedBook, preSelectedUser
   const getFilteredBooks = () => {
     let filtered = books;
     
+    // Only filter by ebook if checkbox is checked
     if (filterEbooksOnly) {
       filtered = filtered.filter(book => book.format === 'ebook');
     }
@@ -207,10 +208,10 @@ export default function BulkLibraryManagement({ preSelectedBook, preSelectedUser
           </h2>
           <p className="text-gray-600">
             {preSelectedBook 
-              ? `Assign this ebook to multiple users at once` 
+              ? `Assign this book to multiple users at once` 
               : preSelectedUsers && preSelectedUsers.length > 0
-              ? `Assign multiple ebooks to the selected user${preSelectedUsers.length > 1 ? 's' : ''} at once`
-              : 'Assign ebooks to multiple users at once'
+              ? `Assign multiple books to the selected user${preSelectedUsers.length > 1 ? 's' : ''} at once`
+              : 'Assign books to multiple users at once'
             }
           </p>
         </div>
@@ -341,7 +342,7 @@ export default function BulkLibraryManagement({ preSelectedBook, preSelectedUser
                     onChange={(e) => setFilterEbooksOnly(e.target.checked)}
                     className="mr-2"
                   />
-                  <span className="text-sm">Ebooks only</span>
+                  <span className="text-sm">Filter by format (uncheck to show all)</span>
                 </div>
                 <input
                   type="text"

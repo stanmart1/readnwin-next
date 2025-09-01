@@ -46,6 +46,15 @@ export async function GET(
       if (accessResult.rows.length === 0) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
+    } else {
+      // No user session - only allow public books
+      const publicCheck = await secureQuery(`
+        SELECT 1 FROM books WHERE id = $1 AND (price = 0 OR visibility = 'public')
+      `, [bookId]);
+      
+      if (publicCheck.rows.length === 0) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+      }
     }
 
     // Serve file from extracted EPUB
@@ -55,9 +64,13 @@ export async function GET(
     
     const fullPath = path.join(storagePath, bookId.toString(), 'extracted', filePath);
     
+    console.log(`📄 Serving EPUB file: ${filePath} for book ${bookId}`);
+    
     try {
       const fileContent = await fs.readFile(fullPath);
       const mimeType = mime.getType(fullPath) || 'application/octet-stream';
+      
+      console.log(`✅ Successfully served EPUB file: ${filePath}`);
       
       return new NextResponse(fileContent as BodyInit, {
         headers: {
@@ -66,6 +79,7 @@ export async function GET(
         }
       });
     } catch (error) {
+      console.error(`❌ EPUB file not found: ${fullPath}`, error);
       return NextResponse.json({ error: 'File not found' }, { status: 404 });
     }
 

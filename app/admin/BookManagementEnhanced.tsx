@@ -375,7 +375,7 @@ export default function BookManagementEnhanced() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex overflow-x-auto scrollbar-thin px-3 sm:px-4 md:px-6">
-              {['books', 'library', 'analytics', 'categories', 'authors'].map((section) => (
+              {['books', 'library', 'categories', 'authors'].map((section) => (
                 <button
                   key={section}
                   onClick={() => setActiveSection(section)}
@@ -436,22 +436,32 @@ export default function BookManagementEnhanced() {
               </div>
 
               {skeletonLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <CardSkeleton key={i} />
+                <div className="space-y-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="bg-white rounded-lg shadow-md p-4 animate-pulse">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                        <div className="w-12 h-16 bg-gray-200 rounded"></div>
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                          <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                        </div>
+                        <div className="w-16 h-6 bg-gray-200 rounded"></div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               ) : books.length === 0 ? (
-                <div className="text-center py-8 sm:py-12 px-4">
-                  <i className="ri-book-line text-4xl sm:text-5xl text-gray-400 mb-4 block"></i>
-                  <h3 className="text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">No books found</h3>
-                  <p className="mt-2 text-sm text-gray-500 leading-relaxed break-words max-w-sm mx-auto">
+                <div className="text-center py-12 px-4">
+                  <i className="ri-book-line text-5xl text-gray-400 mb-4 block"></i>
+                  <h3 className="text-lg font-medium text-gray-900">No books found</h3>
+                  <p className="mt-2 text-sm text-gray-500 max-w-sm mx-auto">
                     Get started by uploading your first book to build your digital library.
                   </p>
                   <div className="mt-6">
                     <button
                       onClick={() => setShowAddModal(true)}
-                      className="btn-primary text-sm font-medium inline-flex items-center gap-2 px-4 py-2.5"
+                      className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 font-medium inline-flex items-center gap-2"
                     >
                       <i className="ri-add-line"></i>
                       Add Book
@@ -468,17 +478,37 @@ export default function BookManagementEnhanced() {
                   />
 
                   {pagination.pages > 1 && (
-                    <div className="mt-6 md:mt-8">
-                      <Pagination
-                        currentPage={pagination.page}
-                        totalPages={pagination.pages}
-                        totalItems={pagination.total}
-                        itemsPerPage={pagination.limit}
-                        onPageChange={(page) => {
-                          setPagination(prev => ({ ...prev, page }));
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                      />
+                    <div className="bg-white rounded-lg shadow-md p-6 mt-6">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-gray-700">
+                          Showing {books.length} of {pagination.total} books
+                        </div>
+                        <div className="flex space-x-2">
+                          <button 
+                            onClick={() => {
+                              setPagination(prev => ({ ...prev, page: pagination.page - 1 }));
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            disabled={pagination.page === 1}
+                            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                          >
+                            Previous
+                          </button>
+                          <span className="px-4 py-2 bg-blue-600 text-white rounded-md">
+                            {pagination.page}
+                          </span>
+                          <button 
+                            onClick={() => {
+                              setPagination(prev => ({ ...prev, page: pagination.page + 1 }));
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            disabled={pagination.page === pagination.pages}
+                            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </>
@@ -487,7 +517,6 @@ export default function BookManagementEnhanced() {
           )}
 
           {activeSection === 'library' && <LibraryManagement />}
-          {activeSection === 'analytics' && <BookAnalytics />}
           {activeSection === 'categories' && <CategoriesManagement />}
           {activeSection === 'authors' && <AuthorsManagement />}
         </div>

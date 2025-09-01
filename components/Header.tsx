@@ -99,8 +99,16 @@ export default function Header() {
                   onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                   className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 transition-colors cursor-pointer"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                    <i className="ri-user-line text-white text-sm"></i>
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center overflow-hidden">
+                    {session?.user?.profileImage ? (
+                      <img
+                        src={session.user.profileImage}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <i className="ri-user-line text-white text-sm"></i>
+                    )}
                   </div>
                   <span className="hidden md:block text-sm font-medium">{session.user.firstName || session.user.email}</span>
                   <i className="ri-arrow-down-s-line text-sm"></i>
@@ -122,6 +130,10 @@ export default function Header() {
                     <Link href="/dashboard" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
                       <i className="ri-dashboard-line mr-3"></i>
                       <span className="font-medium">Dashboard</span>
+                    </Link>
+                    <Link href="/dashboard/profile" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
+                      <i className="ri-user-line mr-3"></i>
+                      <span className="font-medium">Profile</span>
                     </Link>
                     <Link href="/dashboard/orders" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
                       <i className="ri-shopping-bag-line mr-3"></i>
@@ -259,8 +271,16 @@ export default function Header() {
                   {session ? (
                     <div className="space-y-3">
                       <div className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-gray-200">
-                        <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                          <i className="ri-user-line text-white text-sm"></i>
+                        <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center overflow-hidden">
+                          {session?.user?.profileImage ? (
+                            <img
+                              src={session.user.profileImage}
+                              alt="Profile"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <i className="ri-user-line text-white text-sm"></i>
+                          )}
                         </div>
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-900">{session.user?.firstName || 'User'}</p>

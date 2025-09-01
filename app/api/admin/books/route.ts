@@ -292,6 +292,8 @@ export async function POST(request: NextRequest) {
             const structureResult = await preserveEpubStructure(bookId, buffer, ebook_file.name);
             
             if (structureResult.success) {
+              console.log(`✅ EPUB structure preserved for book ${bookId}`);
+              
               // Update book_files with structure preservation data
               await query(`
                 UPDATE book_files SET 
@@ -315,7 +317,8 @@ export async function POST(request: NextRequest) {
                   creator = EXCLUDED.creator,
                   spine_order = EXCLUDED.spine_order,
                   manifest = EXCLUDED.manifest,
-                  navigation = EXCLUDED.navigation
+                  navigation = EXCLUDED.navigation,
+                  opf_path = EXCLUDED.opf_path
               `, [
                 bookId,
                 structureResult.metadata?.title || title,
@@ -327,9 +330,13 @@ export async function POST(request: NextRequest) {
                 structureResult.structure?.opfPath || null,
                 null // ncxPath placeholder
               ]);
+              
+              console.log(`✅ EPUB database records created for book ${bookId}`);
+            } else {
+              console.warn(`⚠️ EPUB structure preservation failed for book ${bookId}:`, structureResult.error);
             }
           } catch (epubError) {
-            console.warn('EPUB structure preservation failed:', epubError);
+            console.error(`❌ EPUB structure preservation error for book ${bookId}:`, epubError);
           }
         } else if (fileFormat === 'html') {
           try {

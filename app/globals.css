@@ -268,4 +268,37 @@
   .animate-fadeIn {
     animation: fadeIn 0.3s ease-out;
   }
+  
+  /* Mobile profile optimizations */
+  .profile-mobile-optimized {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  .profile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .profile-swipe-indicator {
+    position: relative;
+  }
+  
+  .profile-swipe-indicator::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 3px;
+    background: #e5e7eb;
+    border-radius: 2px;
+  }
+  
+  @media (max-width: 768px) {
+    .profile-swipe-indicator::after {
+      background: #9ca3af;
+    }
+  }
 }

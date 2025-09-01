@@ -102,6 +102,8 @@ export async function GET(
             basePath: `/api/ebooks/${bookId}/`
           };
           
+          console.log(`✅ Serving EPUB structure for book ${bookId}`);
+          
           // For EPUB, return structure info instead of converted content
           return NextResponse.json({
             id: book.id.toString(),
@@ -115,9 +117,11 @@ export async function GET(
             createdAt: book.created_at,
             updatedAt: book.updated_at
           });
+        } else {
+          console.warn(`⚠️ No EPUB structure found for book ${bookId}`);
         }
       } catch (error) {
-        console.error('EPUB structure serving error:', error);
+        console.error(`❌ EPUB structure serving error for book ${bookId}:`, error);
       }
     } else if (book.preserve_structure && book.file_format === 'html') {
       try {

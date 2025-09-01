@@ -28,15 +28,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Book IDs array is required' }, { status: 400 });
     }
 
-    // Verify all books exist and are ebooks
+    // Verify all books exist (both physical and ebook)
     const bookResult = await query(`
-      SELECT id, title, book_type FROM books 
-      WHERE id = ANY($1) AND book_type = 'ebook'
+      SELECT id, title, format FROM books 
+      WHERE id = ANY($1)
     `, [bookIds]);
 
     if (bookResult.rows.length !== bookIds.length) {
       return NextResponse.json({ 
-        error: 'Some books not found or are not ebooks' 
+        error: 'Some books not found' 
       }, { status: 400 });
     }
 

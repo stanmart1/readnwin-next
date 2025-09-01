@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
 
     // Create directory based on environment
     const uploadsDir = process.env.NODE_ENV === 'production'
-      ? join('/app/storage/uploads/profiles')
-      : join(process.cwd(), 'public', 'uploads', 'profiles');
+      ? join('/app/storage/assets/profiles')
+      : join(process.cwd(), 'storage', 'assets', 'profiles');
 
     if (!existsSync(uploadsDir)) {
       await mkdir(uploadsDir, { recursive: true });
@@ -51,6 +51,13 @@ export async function POST(request: NextRequest) {
     await writeFile(filePath, buffer);
 
     const imageUrl = `/api/images/profiles/${fileName}`;
+
+    // Update user's profile image in database
+    const { query } = await import('@/utils/database');
+    await query(
+      'UPDATE users SET profile_image = $1 WHERE id = $2',
+      [imageUrl, session.user.id]
+    );
 
     return NextResponse.json({
       success: true,

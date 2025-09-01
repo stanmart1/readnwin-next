@@ -137,33 +137,34 @@ export default function UserManagement() {
       }
 
       if (data.success) {
-        // Fetch roles for each user
-        const usersWithRoles = await Promise.all(
-          data.users.map(async (user) => {
-            try {
-              const rolesResponse = await fetch(`/api/admin/users/${user.id}/roles`);
-              const rolesData = await rolesResponse.json();
-              return {
-                ...user,
-                roles: rolesData.success ? rolesData.roles.map((userRole: any) => ({
-                  id: userRole.role?.id || userRole.role_id,
-                  name: userRole.role?.name || userRole.role_name,
-                  display_name: userRole.role?.display_name || userRole.role_display_name,
-                  description: userRole.role?.description || userRole.role_description,
-                  priority: userRole.role?.priority || userRole.role_priority || 0,
-                  is_system_role: userRole.role?.is_system_role || userRole.role_is_system_role || false,
-                  created_at: userRole.role?.created_at || userRole.role_created_at
-                })) : []
-              };
-            } catch (error) {
-              console.error(`Error fetching roles for user ${user.id}:`, error);
-              return {
-                ...user,
-                roles: []
-              };
-            }
-          })
-        );
+        // Fetch roles for each user with rate limiting
+        const usersWithRoles = [];
+        for (const user of data.users) {
+          try {
+            const rolesResponse = await fetch(`/api/admin/users/${user.id}/roles`);
+            const rolesData = await rolesResponse.json();
+            usersWithRoles.push({
+              ...user,
+              roles: rolesData.success ? rolesData.roles.map((userRole: any) => ({
+                id: userRole.role?.id || userRole.role_id,
+                name: userRole.role?.name || userRole.role_name,
+                display_name: userRole.role?.display_name || userRole.role_display_name,
+                description: userRole.role?.description || userRole.role_description,
+                priority: userRole.role?.priority || userRole.role_priority || 0,
+                is_system_role: userRole.role?.is_system_role || userRole.role_is_system_role || false,
+                created_at: userRole.role?.created_at || userRole.role_created_at
+              })) : []
+            });
+            // Add small delay to prevent rate limiting
+            await new Promise(resolve => setTimeout(resolve, 100));
+          } catch (error) {
+            console.error(`Error fetching roles for user ${user.id}:`, error);
+            usersWithRoles.push({
+              ...user,
+              roles: []
+            });
+          }
+        }
         
         setUsers(usersWithRoles);
         setTotalPages(data.pagination.pages);
@@ -210,8 +211,13 @@ export default function UserManagement() {
     fetchRoles();
   }, []);
 
+  // Debounced search effect
   useEffect(() => {
-    fetchUsers(1);
+    const timeoutId = setTimeout(() => {
+      fetchUsers(1);
+    }, 500); // 500ms delay
+    
+    return () => clearTimeout(timeoutId);
   }, [searchTerm, filterRole, filterStatus]);
 
   const handleUserAction = async (userId: number, action: string) => {

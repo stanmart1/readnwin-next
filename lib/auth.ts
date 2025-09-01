@@ -64,6 +64,7 @@ export const authOptions: NextAuthOptions = {
             username: user.username || user.email,
             firstName: user.first_name || '',
             lastName: user.last_name || '',
+            profileImage: user.profile_image || '',
             role: role,
             roleDisplayName: user.role_display_name || 'User',
             roles: user.role_name ? [user.role_name] : ['user'],
@@ -103,10 +104,16 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token, trigger, newSession }) {
       if (token) {
         session.user = { ...session.user, ...token };
       }
+      
+      // Handle session updates (like profile image changes)
+      if (trigger === 'update' && newSession?.profileImage) {
+        session.user.profileImage = newSession.profileImage;
+      }
+      
       return session;
     }
   },

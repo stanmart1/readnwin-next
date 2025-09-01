@@ -46,12 +46,48 @@ export default function BookAnalytics() {
     try {
       setLoading(true);
       const response = await fetch(`/api/admin/analytics/books?range=${timeRange}`);
-      if (!response.ok) throw new Error('Failed to load analytics');
+      if (!response.ok) {
+        console.error('Analytics API error:', response.status, response.statusText);
+        throw new Error(`Failed to load analytics: ${response.status}`);
+      }
       const data = await response.json();
-      setAnalytics(data);
+      
+      // Ensure all required fields exist with defaults
+      const safeData = {
+        totalBooks: data.totalBooks || 0,
+        totalReads: data.totalReads || 0,
+        totalReadingTime: data.totalReadingTime || 0,
+        averageRating: data.averageRating || 0,
+        popularBooks: Array.isArray(data.popularBooks) ? data.popularBooks : [],
+        categoryStats: Array.isArray(data.categoryStats) ? data.categoryStats : [],
+        readingTrends: Array.isArray(data.readingTrends) ? data.readingTrends : [],
+        userEngagement: data.userEngagement || {
+          activeReaders: 0,
+          completionRate: 0,
+          averageSessionTime: 0
+        }
+      };
+      
+      setAnalytics(safeData);
     } catch (error) {
       console.error('Failed to load analytics:', error);
       toast.error('Failed to load analytics data');
+      
+      // Set fallback data to prevent UI crashes
+      setAnalytics({
+        totalBooks: 0,
+        totalReads: 0,
+        totalReadingTime: 0,
+        averageRating: 0,
+        popularBooks: [],
+        categoryStats: [],
+        readingTrends: [],
+        userEngagement: {
+          activeReaders: 0,
+          completionRate: 0,
+          averageSessionTime: 0
+        }
+      });
     } finally {
       setLoading(false);
     }
@@ -166,28 +202,35 @@ export default function BookAnalytics() {
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Most Popular Books</h3>
           <div className="space-y-4">
-            {analytics.popularBooks.map((book, index) => (
-              <div key={book.id} className="flex items-center space-x-4">
-                <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-gray-600">#{index + 1}</span>
-                </div>
-                <img
-                  src={book.cover_image_url || '/placeholder-book.jpg'}
-                  alt={book.title}
-                  className="w-12 h-16 object-cover rounded"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{book.title}</p>
-                  <p className="text-sm text-gray-500 truncate">by {book.author}</p>
-                  <div className="flex items-center mt-1">
-                    <i className="ri-eye-line text-gray-400 text-xs mr-1"></i>
-                    <span className="text-xs text-gray-500">{book.reads} reads</span>
-                    <i className="ri-star-fill text-yellow-400 text-xs ml-3 mr-1"></i>
-                    <span className="text-xs text-gray-500">{book.rating.toFixed(1)}</span>
+            {analytics.popularBooks.length > 0 ? (
+              analytics.popularBooks.map((book, index) => (
+                <div key={book.id} className="flex items-center space-x-4">
+                  <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium text-gray-600">#{index + 1}</span>
+                  </div>
+                  <img
+                    src={book.cover_image_url || '/placeholder-book.jpg'}
+                    alt={book.title}
+                    className="w-12 h-16 object-cover rounded"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{book.title}</p>
+                    <p className="text-sm text-gray-500 truncate">by {book.author}</p>
+                    <div className="flex items-center mt-1">
+                      <i className="ri-eye-line text-gray-400 text-xs mr-1"></i>
+                      <span className="text-xs text-gray-500">{book.reads} reads</span>
+                      <i className="ri-star-fill text-yellow-400 text-xs ml-3 mr-1"></i>
+                      <span className="text-xs text-gray-500">{book.rating.toFixed(1)}</span>
+                    </div>
                   </div>
                 </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <i className="ri-book-line text-3xl text-gray-400 mb-2 block"></i>
+                <p className="text-gray-500">No popular books data available</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -195,20 +238,27 @@ export default function BookAnalytics() {
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Books by Category</h3>
           <div className="space-y-4">
-            {analytics.categoryStats.map((category) => (
-              <div key={category.category}>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm font-medium text-gray-700">{category.category}</span>
-                  <span className="text-sm text-gray-500">{category.count} books</span>
+            {analytics.categoryStats.length > 0 ? (
+              analytics.categoryStats.map((category) => (
+                <div key={category.category}>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-medium text-gray-700">{category.category}</span>
+                    <span className="text-sm text-gray-500">{category.count} books</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full"
+                      style={{ width: `${category.percentage}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full"
-                    style={{ width: `${category.percentage}%` }}
-                  ></div>
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <i className="ri-pie-chart-line text-3xl text-gray-400 mb-2 block"></i>
+                <p className="text-gray-500">No category data available</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -244,24 +294,33 @@ export default function BookAnalytics() {
       {/* Reading Trends Chart */}
       <div className="bg-white p-6 rounded-lg border border-gray-200">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Reading Trends</h3>
-        <div className="h-64 flex items-end justify-between space-x-2">
-          {analytics.readingTrends.map((trend, index) => {
-            const maxReads = Math.max(...analytics.readingTrends.map(t => t.reads));
-            const height = (trend.reads / maxReads) * 100;
-            return (
-              <div key={index} className="flex-1 flex flex-col items-center">
-                <div
-                  className="w-full bg-blue-500 rounded-t"
-                  style={{ height: `${height}%` }}
-                  title={`${trend.reads} reads on ${new Date(trend.date).toLocaleDateString()}`}
-                ></div>
-                <div className="mt-2 text-xs text-gray-500 text-center">
-                  {new Date(trend.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        {analytics.readingTrends.length > 0 ? (
+          <div className="h-64 flex items-end justify-between space-x-2">
+            {analytics.readingTrends.map((trend, index) => {
+              const maxReads = Math.max(...analytics.readingTrends.map(t => t.reads));
+              const height = maxReads > 0 ? (trend.reads / maxReads) * 100 : 0;
+              return (
+                <div key={index} className="flex-1 flex flex-col items-center">
+                  <div
+                    className="w-full bg-blue-500 rounded-t"
+                    style={{ height: `${height}%`, minHeight: height > 0 ? '4px' : '0px' }}
+                    title={`${trend.reads} reads on ${new Date(trend.date).toLocaleDateString()}`}
+                  ></div>
+                  <div className="mt-2 text-xs text-gray-500 text-center">
+                    {new Date(trend.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="h-64 flex items-center justify-center">
+            <div className="text-center">
+              <i className="ri-line-chart-line text-4xl text-gray-400 mb-2 block"></i>
+              <p className="text-gray-500">No reading trends data available</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

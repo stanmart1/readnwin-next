@@ -9,6 +9,8 @@ declare module "next-auth" {
       firstName?: string
       lastName?: string
       username?: string
+      profileImage?: string
+      role?: string
       roleDisplayName?: string
       accessToken?: string
     }
@@ -21,6 +23,8 @@ declare module "next-auth" {
     firstName?: string
     lastName?: string
     username?: string
+    profileImage?: string
+    role?: string
     roleDisplayName?: string
   }
 }

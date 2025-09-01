@@ -120,10 +120,18 @@ export default function WelcomeHeader() {
         </div>
         
         <div className="hidden md:flex items-center space-x-4 ml-6">
-          <div className="w-24 h-24 rounded-full bg-white/20 border-4 border-white/20 flex items-center justify-center">
-            <span className="text-2xl font-bold text-white">
-              {getUserInitials()}
-            </span>
+          <div className="w-24 h-24 rounded-full bg-white/20 border-4 border-white/20 flex items-center justify-center overflow-hidden">
+            {session?.user?.profileImage ? (
+              <img
+                src={session.user.profileImage}
+                alt="Profile"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-2xl font-bold text-white">
+                {getUserInitials()}
+              </span>
+            )}
           </div>
         </div>
       </div>

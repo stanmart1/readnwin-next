@@ -4,6 +4,66 @@ import { authOptions } from '@/lib/auth';
 import { rbacService } from '@/utils/rbac-service';
 import { ecommerceService } from '@/utils/ecommerce-service';
 import { query } from '@/utils/database';
+import { sanitizeLogInput, validateInput } from '@/utils/security-safe';
+
+// Helper function for processing individual bulk assignments
+async function processBulkAssignment(userId: number, bookId: number, reason: string, adminId: string, books: any[]) {
+  try {
+    // Check if book already exists in user's library
+    const existingBook = await query(`
+      SELECT id FROM user_library 
+      WHERE user_id = $1 AND book_id = $2
+    `, [userId, bookId]);
+
+    if (existingBook.rows.length > 0) {
+      return {
+        type: 'skipped',
+        data: {
+          userId,
+          bookId,
+          reason: 'Book already in library'
+        }
+      };
+    }
+
+    // Add book to user's library
+    const success = await ecommerceService.addToLibrary(userId, bookId);
+
+    if (success) {
+      // Log the admin action with sanitized data
+      const bookTitle = books.find(b => b.id === bookId)?.title || 'Unknown';
+      await query(`
+        INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, admin_user_id)
+        VALUES ($1, 'library_bulk_add', 'user_library', $2, $3, $4)
+      `, [userId, bookId, JSON.stringify({ 
+        bookTitle: sanitizeLogInput(bookTitle),
+        reason: reason,
+        assignedBy: adminId,
+        bulkOperation: true
+      }), adminId]);
+
+      return {
+        type: 'success',
+        data: {
+          userId,
+          bookId,
+          message: 'Book added successfully'
+        }
+      };
+    } else {
+      return {
+        type: 'failed',
+        data: {
+          userId,
+          bookId,
+          error: 'Failed to add book'
+        }
+      };
+    }
+  } catch (error) {
+    throw error;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,61 +118,38 @@ export async function POST(request: NextRequest) {
       skipped: [] as Array<{ userId: number; bookId: number; reason: string }>
     };
 
-    // Process each user-book combination
+    // Sanitize reason input
+    const sanitizedReason = sanitizeLogInput(reason || 'Bulk admin assignment');
+    
+    // Use batch processing for better performance
+    const batchPromises = [];
+    
     for (const userId of userIds) {
       for (const bookId of bookIds) {
-        try {
-          // Check if book already exists in user's library
-          const existingBook = await query(`
-            SELECT id FROM user_library 
-            WHERE user_id = $1 AND book_id = $2
-          `, [userId, bookId]);
-
-          if (existingBook.rows.length > 0) {
-            results.skipped.push({
-              userId,
-              bookId,
-              reason: 'Book already in library'
-            });
-            continue;
-          }
-
-          // Add book to user's library
-          const success = await ecommerceService.addToLibrary(userId, bookId);
-
-          if (success) {
-            // Log the admin action
-            await query(`
-              INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, admin_user_id)
-              VALUES ($1, 'library_bulk_add', 'user_library', $2, $3, $4)
-            `, [userId, bookId, JSON.stringify({ 
-              bookTitle: bookResult.rows.find(b => b.id === bookId)?.title,
-              reason: reason || 'Bulk admin assignment',
-              assignedBy: session.user.id,
-              bulkOperation: true
-            }), session.user.id]);
-
-            results.success.push({
-              userId,
-              bookId,
-              message: 'Book added successfully'
-            });
-          } else {
-            results.failed.push({
-              userId,
-              bookId,
-              error: 'Failed to add book'
-            });
-          }
-        } catch (error) {
-          results.failed.push({
-            userId,
-            bookId,
-            error: 'Database error'
-          });
-        }
+        batchPromises.push(
+          processBulkAssignment(userId, bookId, sanitizedReason, session.user.id, bookResult.rows)
+            .then(result => {
+              if (result.type === 'success') {
+                results.success.push(result.data);
+              } else if (result.type === 'skipped') {
+                results.skipped.push(result.data);
+              } else {
+                results.failed.push(result.data);
+              }
+            })
+            .catch(error => {
+              results.failed.push({
+                userId,
+                bookId,
+                error: error.message || 'Database error'
+              });
+            })
+        );
       }
     }
+    
+    // Process all assignments concurrently
+    await Promise.all(batchPromises);
 
     return NextResponse.json({ 
       success: true, 

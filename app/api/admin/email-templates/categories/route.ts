@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth';
 import { rbacService } from '@/utils/rbac-service';
 import { emailTemplateService } from '@/utils/email-template-service';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     // Verify authentication

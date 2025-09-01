@@ -1,5 +1,6 @@
 import { query } from './database';
 import { ecommerceService } from './ecommerce-service-new';
+import { sanitizeLogInput } from './security-safe';
 
 export class LibrarySyncService {
   /**
@@ -15,13 +16,16 @@ export class LibrarySyncService {
         WHERE oi.order_id = $1
       `, [orderId]);
 
-      // Add each book to user library
-      for (const item of orderItems.rows) {
+      // Add books to user library in batch for better performance
+      const bookPromises = orderItems.rows.map(async (item) => {
         await ecommerceService.addToUserLibrary(userId, item.book_id, orderId);
-        console.log(`✅ Synced book "${item.title}" to user ${userId} library`);
-      }
+        console.log(`✅ Synced book "${sanitizeLogInput(item.title)}" to user ${userId} library`);
+        return item;
+      });
+      
+      await Promise.all(bookPromises);
 
-      console.log(`✅ Library sync completed for order ${orderId}`);
+      console.log(`✅ Library sync completed for order ${sanitizeLogInput(orderId.toString())}`);
     } catch (error) {
       console.error('❌ Library sync failed:', error);
       throw error;
@@ -42,26 +46,35 @@ export class LibrarySyncService {
         throw new Error('Book not found');
       }
 
-      // Add to library with admin assignment type
-      await query(`
-        INSERT INTO user_library (user_id, book_id, access_type, added_at)
-        VALUES ($1, $2, 'admin_assigned', CURRENT_TIMESTAMP)
-        ON CONFLICT (user_id, book_id) DO UPDATE SET
-          access_type = 'admin_assigned',
-          added_at = CURRENT_TIMESTAMP
-      `, [userId, bookId]);
+      // Use transaction for atomicity
+      await query('BEGIN');
+      try {
+        // Add to library with admin assignment type
+        await query(`
+          INSERT INTO user_library (user_id, book_id, access_type, added_at)
+          VALUES ($1, $2, 'admin_assigned', CURRENT_TIMESTAMP)
+          ON CONFLICT (user_id, book_id) DO UPDATE SET
+            access_type = 'admin_assigned',
+            added_at = CURRENT_TIMESTAMP
+        `, [userId, bookId]);
 
-      // Log the assignment
-      await query(`
-        INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, admin_user_id)
-        VALUES ($1, 'library_add', 'user_library', $2, $3, $4)
-      `, [userId, bookId, JSON.stringify({
-        bookTitle: bookResult.rows[0].title,
-        reason: reason || 'Admin assignment',
-        assignedBy: adminId
-      }), adminId]);
+        // Log the assignment
+        await query(`
+          INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, admin_user_id)
+          VALUES ($1, 'library_add', 'user_library', $2, $3, $4)
+        `, [userId, bookId, JSON.stringify({
+          bookTitle: sanitizeLogInput(bookResult.rows[0].title),
+          reason: sanitizeLogInput(reason || 'Admin assignment'),
+          assignedBy: adminId
+        }), adminId]);
+        
+        await query('COMMIT');
+      } catch (error) {
+        await query('ROLLBACK');
+        throw error;
+      }
 
-      console.log(`✅ Admin assigned book "${bookResult.rows[0].title}" to user ${userId}`);
+      console.log(`✅ Admin assigned book "${sanitizeLogInput(bookResult.rows[0].title)}" to user ${userId}`);
     } catch (error) {
       console.error('❌ Admin book assignment failed:', error);
       throw error;
@@ -105,7 +118,7 @@ export class LibrarySyncService {
         }), adminId]);
       }
 
-      console.log(`✅ Removed book "${bookResult.rows[0].title}" from user ${userId} library`);
+      console.log(`✅ Removed book "${sanitizeLogInput(bookResult.rows[0].title)}" from user ${userId} library`);
     } catch (error) {
       console.error('❌ Book removal failed:', error);
       throw error;
@@ -122,35 +135,42 @@ export class LibrarySyncService {
     issues: string[];
   }> {
     try {
+      // Combined query for better performance
       const result = await query(`
+        WITH library_stats AS (
+          SELECT 
+            COUNT(*) as total_books,
+            COUNT(CASE WHEN access_type = 'purchased' THEN 1 END) as purchased_books,
+            COUNT(CASE WHEN access_type = 'admin_assigned' THEN 1 END) as assigned_books
+          FROM user_library ul
+          JOIN books b ON ul.book_id = b.id
+          WHERE ul.user_id = $1 AND COALESCE(ul.status, 'active') = 'active'
+        ),
+        orphaned_stats AS (
+          SELECT COUNT(*) as orphaned_count
+          FROM user_library ul
+          LEFT JOIN books b ON ul.book_id = b.id
+          WHERE ul.user_id = $1 AND b.id IS NULL
+        )
         SELECT 
-          COUNT(*) as total_books,
-          COUNT(CASE WHEN access_type = 'purchased' THEN 1 END) as purchased_books,
-          COUNT(CASE WHEN access_type = 'admin_assigned' THEN 1 END) as assigned_books
-        FROM user_library ul
-        JOIN books b ON ul.book_id = b.id
-        WHERE ul.user_id = $1 AND ul.status = 'active'
+          ls.total_books,
+          ls.purchased_books,
+          ls.assigned_books,
+          os.orphaned_count
+        FROM library_stats ls, orphaned_stats os
       `, [userId]);
 
       const stats = result.rows[0];
       const issues: string[] = [];
 
-      // Check for orphaned library entries
-      const orphanedResult = await query(`
-        SELECT COUNT(*) as orphaned_count
-        FROM user_library ul
-        LEFT JOIN books b ON ul.book_id = b.id
-        WHERE ul.user_id = $1 AND b.id IS NULL
-      `, [userId]);
-
-      if (parseInt(orphanedResult.rows[0].orphaned_count) > 0) {
-        issues.push(`${orphanedResult.rows[0].orphaned_count} orphaned library entries found`);
+      if (+stats.orphaned_count > 0) {
+        issues.push(`${stats.orphaned_count} orphaned library entries found`);
       }
 
       return {
-        totalBooks: parseInt(stats.total_books),
-        purchasedBooks: parseInt(stats.purchased_books),
-        assignedBooks: parseInt(stats.assigned_books),
+        totalBooks: +stats.total_books,
+        purchasedBooks: +stats.purchased_books,
+        assignedBooks: +stats.assigned_books,
         issues
       };
     } catch (error) {

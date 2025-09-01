@@ -4,6 +4,30 @@ import { authOptions } from '@/lib/auth';
 import { rbacService } from '@/utils/rbac-service';
 import { ecommerceService } from '@/utils/ecommerce-service-new';
 import { query } from '@/utils/database';
+import { sanitizeLogInput } from '@/utils/security-safe';
+
+// Helper function to validate admin access and privilege escalation
+async function validateAdminAccess(session: any, userId: number) {
+  // Check if user is admin
+  const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
+  if (!isAdmin) {
+    return { error: 'Admin access required', status: 403 };
+  }
+
+  // Check if current user is super_admin
+  const isSuperAdmin = session.user.role === 'super_admin';
+  
+  // Get user roles to check if target user is super_admin
+  const userRoles = await rbacService.getUserRoles(userId);
+  const targetUserIsSuperAdmin = userRoles.some((role: any) => role.role_name === 'super_admin');
+  
+  // Prevent non-super_admin users from accessing super_admin user libraries
+  if (targetUserIsSuperAdmin && !isSuperAdmin) {
+    return { error: 'Access denied: Insufficient privileges', status: 403 };
+  }
+
+  return { error: null, status: 200 };
+}
 
 export async function GET(
   request: NextRequest,
@@ -26,16 +50,10 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
     }
 
-    // Check if current user is super_admin
-    const isSuperAdmin = session.user.role === 'super_admin';
-    
-    // Get user roles to check if target user is super_admin
-    const userRoles = await rbacService.getUserRoles(userId);
-    const targetUserIsSuperAdmin = userRoles.some((role: any) => role.role_name === 'super_admin');
-    
-    // Prevent non-super_admin users from accessing super_admin user libraries
-    if (targetUserIsSuperAdmin && !isSuperAdmin) {
-      return NextResponse.json({ error: 'Access denied: Insufficient privileges' }, { status: 403 });
+    // Validate authorization
+    const authResult = await validateAdminAccess(session, userId);
+    if (authResult.error) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
     // Get user's library
@@ -73,16 +91,10 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
     }
 
-    // Check if current user is super_admin
-    const isSuperAdmin = session.user.role === 'super_admin';
-    
-    // Get user roles to check if target user is super_admin
-    const userRoles = await rbacService.getUserRoles(userId);
-    const targetUserIsSuperAdmin = userRoles.some((role: any) => role.role_name === 'super_admin');
-    
-    // Prevent non-super_admin users from modifying super_admin user libraries
-    if (targetUserIsSuperAdmin && !isSuperAdmin) {
-      return NextResponse.json({ error: 'Access denied: Cannot modify super administrator libraries' }, { status: 403 });
+    // Validate authorization
+    const authResult = await validateAdminAccess(session, userId);
+    if (authResult.error) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
     const { bookId, reason } = await request.json();
@@ -107,7 +119,7 @@ export async function POST(
 
       return NextResponse.json({ 
         success: true, 
-        message: 'Book added to user library successfully' 
+        message: 'Book added to user library successfully'
       });
     } catch (libraryError) {
       // Check if it's a duplicate entry error
@@ -154,6 +166,12 @@ export async function DELETE(
 
     if (!bookId) {
       return NextResponse.json({ error: 'Book ID is required' }, { status: 400 });
+    }
+
+    // Validate authorization for DELETE operation
+    const authResult = await validateAdminAccess(session, userId);
+    if (authResult.error) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
     // Get book info for audit log

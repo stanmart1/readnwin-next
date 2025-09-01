@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 
 interface Book {
@@ -52,6 +52,7 @@ export default function UserLibraryManagement({ userId, userName, onClose }: Use
         setUserLibrary(data.library || []);
       } else {
         console.error('Failed to fetch user library');
+        setMessage({ type: 'error', text: 'Failed to load user library. Please try again.' });
       }
     } catch (error) {
       console.error('Error fetching user library:', error);
@@ -69,6 +70,7 @@ export default function UserLibraryManagement({ userId, userName, onClose }: Use
       }
     } catch (error) {
       console.error('Error fetching available books:', error);
+      setMessage({ type: 'error', text: 'Failed to load available books. Please try again.' });
     }
   };
 
@@ -130,7 +132,7 @@ export default function UserLibraryManagement({ userId, userName, onClose }: Use
     }
   };
 
-  const getBooksNotInLibrary = () => {
+  const getBooksNotInLibrary = useMemo(() => {
     const userBookIds = userLibrary.map(book => book.id);
     let filteredBooks = availableBooks.filter(book => !userBookIds.includes(book.id));
     
@@ -148,7 +150,7 @@ export default function UserLibraryManagement({ userId, userName, onClose }: Use
     }
     
     return filteredBooks;
-  };
+  }, [userLibrary, availableBooks, filterEbooksOnly, searchTerm]);
 
   const handleBulkAssignment = async () => {
     if (selectedBooks.length === 0) {
@@ -199,10 +201,10 @@ export default function UserLibraryManagement({ userId, userName, onClose }: Use
     );
   };
 
-  const selectAllBooks = () => {
-    const availableBooks = getBooksNotInLibrary();
-    setSelectedBooks(availableBooks.map(book => book.id));
-  };
+  const selectAllBooks = useCallback(() => {
+    const filteredAvailableBooks = getBooksNotInLibrary;
+    setSelectedBooks(filteredAvailableBooks.map(book => book.id));
+  }, [getBooksNotInLibrary]);
 
   const clearSelection = () => {
     setSelectedBooks([]);
@@ -355,7 +357,7 @@ export default function UserLibraryManagement({ userId, userName, onClose }: Use
                 </div>
 
                 <div className="max-h-96 overflow-y-auto space-y-2">
-                  {getBooksNotInLibrary().map((book) => (
+                  {getBooksNotInLibrary.map((book) => (
                     <div key={book.id} className="bg-white rounded-lg p-3 border border-gray-200">
                       <div className="flex items-center">
                         <input
@@ -421,7 +423,7 @@ export default function UserLibraryManagement({ userId, userName, onClose }: Use
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 >
                   <option value="">Select a book to assign</option>
-                  {getBooksNotInLibrary().map((book) => (
+                  {getBooksNotInLibrary.map((book) => (
                     <option key={book.id} value={book.id}>
                       {book.title} - {book.author_name}
                     </option>

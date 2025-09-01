@@ -7,6 +7,74 @@ import {
 } from '@/types/ecommerce';
 
 export class EcommerceService {
+  // Database initialization
+  async ensureCartTableExists(): Promise<void> {
+    try {
+      // Create cart_items table if it doesn't exist
+      await query(`
+        CREATE TABLE IF NOT EXISTS cart_items (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          book_id INTEGER NOT NULL,
+          quantity INTEGER NOT NULL DEFAULT 1,
+          format VARCHAR(20) DEFAULT 'ebook',
+          added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT unique_user_book UNIQUE(user_id, book_id)
+        )
+      `);
+
+      // Add missing columns to cart_items
+      const cartColumns = await query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'cart_items'
+      `);
+      
+      const existingColumns = cartColumns.rows.map(row => row.column_name);
+      
+      if (!existingColumns.includes('format')) {
+        await query('ALTER TABLE cart_items ADD COLUMN format VARCHAR(20) DEFAULT \'ebook\'');
+      }
+      
+      if (!existingColumns.includes('added_at')) {
+        await query('ALTER TABLE cart_items ADD COLUMN added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+      }
+      
+      if (!existingColumns.includes('updated_at')) {
+        await query('ALTER TABLE cart_items ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+      }
+
+      // Ensure books table has required columns
+      const bookColumns = await query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'books'
+      `);
+      
+      const existingBookColumns = bookColumns.rows.map(row => row.column_name);
+      
+      if (!existingBookColumns.includes('format')) {
+        await query('ALTER TABLE books ADD COLUMN format VARCHAR(20) DEFAULT \'ebook\'');
+      }
+      
+      if (!existingBookColumns.includes('stock_quantity')) {
+        await query('ALTER TABLE books ADD COLUMN stock_quantity INTEGER DEFAULT 0');
+      }
+      
+      if (!existingBookColumns.includes('original_price')) {
+        await query('ALTER TABLE books ADD COLUMN original_price DECIMAL(10,2)');
+      }
+
+      // Update NULL values
+      await query('UPDATE cart_items SET format = \'ebook\' WHERE format IS NULL');
+      await query('UPDATE books SET format = \'ebook\' WHERE format IS NULL');
+      
+    } catch (error) {
+      console.error('Error ensuring cart table exists:', error);
+      throw error;
+    }
+  }
+
   // Book Management
   async getBookById(id: number): Promise<Book | null> {
     try {
@@ -16,7 +84,8 @@ export class EcommerceService {
           b.title,
           b.author_id,
           b.category_id,
-          b.price,
+          COALESCE(b.price, 0) as price,
+          b.original_price,
           b.isbn,
           b.description,
           b.language,
@@ -24,15 +93,16 @@ export class EcommerceService {
           b.publication_date,
           b.publisher,
           'ebook' as book_type,
-          COALESCE(b.format, 'unknown') as format,
+          COALESCE(b.format, 'ebook') as format,
+          COALESCE(b.stock_quantity, 0) as stock_quantity,
           'pending' as parsing_status,
           b.cover_image_url,
           b.ebook_file_url,
           b.status,
           b.created_at,
           b.updated_at,
-          a.name as author_name,
-          c.name as category_name
+          COALESCE(a.name, 'Unknown Author') as author_name,
+          COALESCE(c.name, 'Uncategorized') as category_name
         FROM books b
         LEFT JOIN authors a ON b.author_id = a.id
         LEFT JOIN categories c ON b.category_id = c.id
@@ -129,70 +199,40 @@ export class EcommerceService {
         throw new Error('Quantity must be positive');
       }
 
-      // Check if book exists and has stock
       const book = await this.getBookById(bookId);
       if (!book) {
         throw new Error('Book not found');
       }
 
-      // Only check stock for physical books with inventory tracking
       if (book.format === 'physical' && book.stock_quantity !== null && book.stock_quantity < quantity) {
         throw new Error('Insufficient stock');
       }
 
-      // Check if item already exists in cart
       const existingItem = await query(`
         SELECT * FROM cart_items WHERE user_id = $1 AND book_id = $2
       `, [userId, bookId]);
 
       if (existingItem.rows.length > 0) {
-        // Update quantity and ensure format is correct
         const newQuantity = existingItem.rows[0].quantity + quantity;
-        try {
-          await query(`
-            UPDATE cart_items SET quantity = $1, format = $2 WHERE user_id = $3 AND book_id = $4
-          `, [newQuantity, book.format || 'ebook', userId, bookId]);
-        } catch (formatError) {
-          // Fallback if format column doesn't exist
-          console.log('Format column not found in existing item update, using fallback');
-          await query(`
-            UPDATE cart_items SET quantity = $1 WHERE user_id = $2 AND book_id = $3
-          `, [newQuantity, userId, bookId]);
-        }
-
-        const items = await this.getCartItems(userId);
-        const cartItem = items.find(item => item.book_id === bookId);
-        if (!cartItem) {
-          throw new Error('Failed to retrieve cart item after updating');
-        }
-        return cartItem;
+        await query(`
+          UPDATE cart_items SET quantity = $1, format = $2, updated_at = CURRENT_TIMESTAMP 
+          WHERE user_id = $3 AND book_id = $4
+        `, [newQuantity, book.format || 'ebook', userId, bookId]);
       } else {
-        // Add new item - check if format column exists
-        try {
-          const result = await query(`
-            INSERT INTO cart_items (user_id, book_id, quantity, format)
-            VALUES ($1, $2, $3, $4)
-            RETURNING *
-          `, [userId, bookId, quantity, book.format || 'ebook']);
-        } catch (formatError) {
-          // Fallback if format column doesn't exist
-          console.log('Format column not found, using fallback insert');
-          const result = await query(`
-            INSERT INTO cart_items (user_id, book_id, quantity)
-            VALUES ($1, $2, $3)
-            RETURNING *
-          `, [userId, bookId, quantity]);
-        }
-
-        const items = await this.getCartItems(userId);
-        const cartItem = items.find(item => item.book_id === bookId);
-        if (!cartItem) {
-          throw new Error('Failed to retrieve cart item after adding');
-        }
-        return cartItem;
+        await query(`
+          INSERT INTO cart_items (user_id, book_id, quantity, format)
+          VALUES ($1, $2, $3, $4)
+        `, [userId, bookId, quantity, book.format || 'ebook']);
       }
+
+      const items = await this.getCartItems(userId);
+      const cartItem = items.find(item => item.book_id === bookId);
+      if (!cartItem) {
+        throw new Error('Failed to retrieve cart item');
+      }
+      return cartItem;
     } catch (error) {
-      console.error('Error adding to cart:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('Error adding to cart:', error);
       throw error;
     }
   }

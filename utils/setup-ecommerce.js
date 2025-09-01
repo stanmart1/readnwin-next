@@ -2,18 +2,29 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-// Database configuration
-const pool = new Pool({
-  user: process.env.DB_USER || 'avnadmin',
-  host: process.env.DB_HOST || 'readnwin-nextjs-book-nextjs.b.aivencloud.com',
-  database: process.env.DB_NAME || 'defaultdb',
-  password: process.env.DB_PASSWORD || 'AVNS_Xv38UAMF77xN--vUfeX',
-  port: parseInt(process.env.DB_PORT || '28428'),
-  ssl: {
-    rejectUnauthorized: false,
-    ca: process.env.DB_CA_CERT,
-  },
-});
+// Safe database configuration
+function getDatabaseConfig() {
+  const requiredVars = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+  const missing = requiredVars.filter(varName => !process.env[varName]);
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+
+  return {
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: parseInt(process.env.DB_PORT || '5432'),
+    ssl: process.env.DB_SSL === 'true' ? {
+      rejectUnauthorized: true, // Always validate certificates in production
+      ca: process.env.DB_CA_CERT,
+    } : false,
+  };
+}
+
+const pool = new Pool(getDatabaseConfig());
 
 async function setupEcommerce() {
   const client = await pool.connect();

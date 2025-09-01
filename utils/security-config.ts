@@ -1,62 +1,55 @@
-interface SecurityConfig {
-  sessionTimeout: number;
-  maxLoginAttempts: number;
-  passwordMinLength: number;
-  requireStrongPasswords: boolean;
-  enableRateLimit: boolean;
-  enableCSRF: boolean;
-  enableHTTPS: boolean;
-  allowedOrigins: string[];
+// Security configuration with safe defaults
+export const SECURITY_CONFIG = {
+  // Input validation limits
+  MAX_STRING_LENGTH: 10000,
+  MAX_EMAIL_LENGTH: 254,
+  MAX_PASSWORD_LENGTH: 128,
+  MIN_PASSWORD_LENGTH: 6,
+  
+  // File upload limits
+  MAX_IMAGE_SIZE: 5 * 1024 * 1024, // 5MB
+  MAX_EBOOK_SIZE: 50 * 1024 * 1024, // 50MB
+  ALLOWED_IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
+  ALLOWED_EBOOK_TYPES: ['application/epub+zip', 'application/pdf'],
+  
+  // Rate limiting (requests per minute)
+  RATE_LIMIT_LOGIN: 5,
+  RATE_LIMIT_API: 100,
+  RATE_LIMIT_UPLOAD: 10,
+  
+  // Session security
+  SESSION_TIMEOUT: 24 * 60 * 60 * 1000, // 24 hours
+  CSRF_TOKEN_LENGTH: 32,
+  
+  // Database security
+  MAX_QUERY_PARAMS: 100,
+  QUERY_TIMEOUT: 30000, // 30 seconds
+  
+  // Logging
+  LOG_RETENTION_DAYS: 30,
+  MAX_LOG_SIZE: 100 * 1024 * 1024, // 100MB
+  
+  // Environment checks
+  REQUIRE_HTTPS_PRODUCTION: true,
+  REQUIRE_SECURE_HEADERS: true,
+  
+  // Content Security Policy
+  CSP_DIRECTIVES: {
+    'default-src': ["'self'"],
+    'script-src': ["'self'", "'unsafe-inline'", 'https://checkout.flutterwave.com'],
+    'style-src': ["'self'", "'unsafe-inline'"],
+    'img-src': ["'self'", 'data:', 'https:'],
+    'font-src': ["'self'"],
+    'connect-src': ["'self'", 'https://api.flutterwave.com'],
+    'frame-src': ["'none'"],
+    'object-src': ["'none'"],
+    'base-uri': ["'self'"],
+    'form-action': ["'self'"]
+  }
+};
+
+// Environment-specific overrides
+if (process.env.NODE_ENV === 'development') {
+  SECURITY_CONFIG.REQUIRE_HTTPS_PRODUCTION = false;
+  SECURITY_CONFIG.CSP_DIRECTIVES['script-src'].push("'unsafe-eval'");
 }
-
-const defaultConfig: SecurityConfig = {
-  sessionTimeout: 24 * 60 * 60 * 1000, // 24 hours
-  maxLoginAttempts: 5,
-  passwordMinLength: 8,
-  requireStrongPasswords: true,
-  enableRateLimit: true,
-  enableCSRF: true,
-  enableHTTPS: process.env.NODE_ENV === 'production',
-  allowedOrigins: process.env.NODE_ENV === 'production' 
-    ? ['https://readnwin.com', 'https://www.readnwin.com']
-    : ['http://localhost:3000']
-};
-
-export const getSecurityConfig = (): SecurityConfig => {
-  return {
-    ...defaultConfig,
-    sessionTimeout: parseInt(process.env.SESSION_TIMEOUT || '86400000'),
-    maxLoginAttempts: parseInt(process.env.MAX_LOGIN_ATTEMPTS || '5'),
-    passwordMinLength: parseInt(process.env.PASSWORD_MIN_LENGTH || '8'),
-    requireStrongPasswords: process.env.REQUIRE_STRONG_PASSWORDS !== 'false',
-    enableRateLimit: process.env.ENABLE_RATE_LIMIT !== 'false',
-    enableCSRF: process.env.ENABLE_CSRF !== 'false',
-    enableHTTPS: process.env.ENABLE_HTTPS !== 'false'
-  };
-};
-
-export const validateSecurityConfig = (): { isValid: boolean; errors: string[] } => {
-  const config = getSecurityConfig();
-  const errors: string[] = [];
-  
-  if (config.sessionTimeout < 60000) { // Less than 1 minute
-    errors.push('Session timeout too short (minimum 1 minute)');
-  }
-  
-  if (config.maxLoginAttempts < 3 || config.maxLoginAttempts > 10) {
-    errors.push('Max login attempts should be between 3 and 10');
-  }
-  
-  if (config.passwordMinLength < 8) {
-    errors.push('Password minimum length should be at least 8');
-  }
-  
-  if (process.env.NODE_ENV === 'production' && !config.enableHTTPS) {
-    errors.push('HTTPS must be enabled in production');
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-};

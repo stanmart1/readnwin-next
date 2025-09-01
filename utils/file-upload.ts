@@ -1,6 +1,7 @@
 import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { join, basename } from 'path';
 import { existsSync } from 'fs';
+import { validatePath } from './security-safe';
 
 export interface UploadedFile {
   filename: string;
@@ -60,7 +61,13 @@ export class FileUploadService {
       const extension = originalName.split('.').pop()?.toLowerCase();
       const sanitizedName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
       const filename = `${timestamp}_${randomString}_${sanitizedName}`;
-      const filePath = join(fullPath, filename);
+      const safeFilename = basename(filename); // Prevent path traversal
+      const filePath = join(fullPath, safeFilename);
+      
+      // Validate path is within allowed directory
+      if (!validatePath(filePath, this.uploadDir)) {
+        throw new Error('Invalid file path detected');
+      }
 
       console.log(`📄 Uploading file: ${originalName} -> ${filename}`);
       console.log(`📄 Full file path: ${filePath}`);

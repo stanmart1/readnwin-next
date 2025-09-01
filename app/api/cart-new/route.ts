@@ -61,7 +61,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🛒 Cart POST API called');
+    
     const session = await getServerSession(authOptions);
+    console.log('Session check:', { hasSession: !!session, userId: session?.user?.id });
     
     if (!session?.user?.id) {
       console.log('❌ No session or user ID found in cart POST API');
@@ -71,18 +74,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { book_id, quantity = 1 } = body;
-
-    // Validation
-    if (!book_id || typeof book_id !== 'number') {
+    let body;
+    try {
+      body = await request.json();
+      console.log('Request body:', body);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
       return NextResponse.json(
-        { error: 'Valid book ID is required' },
+        { error: 'Invalid JSON in request body' },
         { status: 400 }
       );
     }
 
-    if (quantity < 1 || quantity > 99) {
+    const { book_id, quantity = 1 } = body;
+
+    // Enhanced validation
+    if (!book_id) {
+      console.log('❌ Missing book_id');
+      return NextResponse.json(
+        { error: 'Book ID is required' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof book_id !== 'number' || isNaN(book_id) || book_id <= 0) {
+      console.log('❌ Invalid book_id:', book_id, typeof book_id);
+      return NextResponse.json(
+        { error: 'Valid book ID is required (must be a positive number)' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof quantity !== 'number' || isNaN(quantity) || quantity < 1 || quantity > 99) {
+      console.log('❌ Invalid quantity:', quantity, typeof quantity);
       return NextResponse.json(
         { error: 'Quantity must be between 1 and 99' },
         { status: 400 }
@@ -90,7 +114,29 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = parseInt(session.user.id);
+    if (isNaN(userId)) {
+      console.log('❌ Invalid user ID:', session.user.id);
+      return NextResponse.json(
+        { error: 'Invalid user session' },
+        { status: 401 }
+      );
+    }
+
+    console.log('✅ Validation passed, calling ecommerceService.addToCart', { userId, book_id, quantity });
+    
+    // Ensure cart_items table exists before proceeding
+    try {
+      await ecommerceService.ensureCartTableExists();
+    } catch (tableError) {
+      console.error('Failed to ensure cart table exists:', tableError);
+      return NextResponse.json(
+        { success: false, error: 'Database initialization error' },
+        { status: 503 }
+      );
+    }
+    
     const cartItem = await ecommerceService.addToCart(userId, book_id, quantity);
+    console.log('✅ Cart item added successfully:', cartItem?.id);
 
     return NextResponse.json({
       success: true,
@@ -99,29 +145,59 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error adding to cart:', error);
+    console.error('❌ Error adding to cart:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    });
     
     if (error instanceof Error) {
-      if (error.message.includes('not found')) {
+      // Database connection errors
+      if (error.message.includes('connect') || error.message.includes('ECONNREFUSED')) {
+        console.error('Database connection error');
+        return NextResponse.json(
+          { success: false, error: 'Database connection error' },
+          { status: 503 }
+        );
+      }
+      
+      // Book not found
+      if (error.message.includes('not found') || error.message.includes('Book not found')) {
         return NextResponse.json(
           { success: false, error: 'Book not found' },
           { status: 404 }
         );
       }
       
-      if (error.message.includes('Insufficient stock')) {
+      // Stock issues
+      if (error.message.includes('Insufficient stock') || error.message.includes('stock')) {
         return NextResponse.json(
           { success: false, error: 'Insufficient stock available' },
           { status: 400 }
         );
       }
       
-      if (error.message.includes('format')) {
-        // Handle format column issues gracefully
-        console.log('Format column issue, attempting fallback');
+      // Database schema issues
+      if (error.message.includes('column') || error.message.includes('relation') || error.message.includes('format')) {
+        console.log('Database schema issue detected:', error.message);
         return NextResponse.json(
           { success: false, error: 'Database schema issue - please contact support' },
           { status: 500 }
+        );
+      }
+      
+      // PostgreSQL specific errors
+      if (error.message.includes('duplicate key') || (error as any).code === '23505') {
+        return NextResponse.json(
+          { success: false, error: 'Item already in cart' },
+          { status: 409 }
+        );
+      }
+      
+      if ((error as any).code === '23503') {
+        return NextResponse.json(
+          { success: false, error: 'Invalid book reference' },
+          { status: 400 }
         );
       }
     }

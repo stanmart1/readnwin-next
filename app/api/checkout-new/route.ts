@@ -5,14 +5,14 @@ import { ecommerceService } from '@/utils/ecommerce-service-new';
 import { FlutterwaveService } from '@/utils/flutterwave-service';
 import { CheckoutFormData, OrderResponse } from '@/types/ecommerce';
 import { query } from '@/utils/database';
-import { sanitizeLogInput } from '@/utils/security';
+import { sanitizeLogInput } from '@/utils/security-safe';
 
 export async function POST(request: NextRequest) {
   try {
     console.log('🔍 Checkout API called');
     
     const session = await getServerSession(authOptions);
-    console.log('🔍 Session:', sanitizeLogInput(JSON.stringify(session, null, 2)));
+    console.log('🔍 Session:', sanitizeLogInput(session));
     
     if (!session?.user?.id) {
       console.log('❌ No session or user ID');
@@ -23,16 +23,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body: CheckoutFormData | { formData: CheckoutFormData } = await request.json();
-    console.log('🔍 Request body:', sanitizeLogInput(JSON.stringify(body, null, 2)));
+    console.log('🔍 Request body:', sanitizeLogInput(body));
     
     // Handle nested formData structure from frontend
     const requestData = 'formData' in body ? body : { formData: body as CheckoutFormData };
     const { formData } = requestData;
     
-    console.log('🔍 Form data:', sanitizeLogInput(JSON.stringify(formData, null, 2)));
-    console.log('🔍 Form data shipping:', sanitizeLogInput(JSON.stringify(formData.shipping, null, 2)));
-    console.log('🔍 Form data billing:', sanitizeLogInput(JSON.stringify(formData.billing, null, 2)));
-    console.log('🔍 Form data payment:', sanitizeLogInput(JSON.stringify(formData.payment, null, 2)));
+    console.log('🔍 Form data:', sanitizeLogInput(formData));
+    console.log('🔍 Form data shipping:', sanitizeLogInput(formData.shipping));
+    console.log('🔍 Form data billing:', sanitizeLogInput(formData.billing));
+    console.log('🔍 Form data payment:', sanitizeLogInput(formData.payment));
     
     const userId = parseInt(session.user.id);
     console.log('🔍 User ID:', userId);
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     // Get cart analytics to determine checkout flow
     console.log('🔍 Getting cart analytics...');
     const analytics = await ecommerceService.getCartAnalytics(userId);
-    console.log('🔍 Analytics:', sanitizeLogInput(JSON.stringify(analytics, null, 2)));
+    console.log('🔍 Analytics:', sanitizeLogInput(analytics));
     
     const isEbookOnly = analytics.isEbookOnly;
     console.log('🔍 Is ebook only:', isEbookOnly);
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       formData.shippingMethod?.id,
       formData.discountCode
     );
-    console.log('🔍 Order created:', sanitizeLogInput(JSON.stringify(order, null, 2)));
+    console.log('🔍 Order created:', sanitizeLogInput(order));
     
     if (!order || !order.id) {
       console.error('❌ Order creation failed - no order ID returned');

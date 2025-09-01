@@ -1,0 +1,36 @@
+/* Mobile-specific cart optimizations */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Prevent horizontal scrolling on mobile */
+.cart-container {
+  overflow-x: hidden;
+}
+
+/* Ensure proper touch targets on mobile */
+@media (max-width: 640px) {
+  .cart-button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .cart-quantity-control {
+    min-height: 36px;
+    min-width: 36px;
+  }
+}
+
+/* Fix for potential layout shifts */
+.cart-item-image {
+  aspect-ratio: 3/4;
+  object-fit: cover;
+}
+
+/* Prevent text overflow in price display */
+.cart-price {
+  white-space: nowrap;
+}

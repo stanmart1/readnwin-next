@@ -1,5 +1,6 @@
 // Flutterwave Payment Service
 import dotenv from 'dotenv';
+import { timeSafeEqual } from './security-safe';
 
 // Load environment variables from .env.local
 dotenv.config({ path: '.env.local' });
@@ -279,7 +280,7 @@ export class FlutterwaveService {
         .update(payload)
         .digest('hex');
       
-      return hash === signature;
+      return timeSafeEqual(hash, signature);
     } catch (error) {
       console.error('Error validating webhook signature:', error);
       return false;
@@ -305,7 +306,7 @@ export class FlutterwaveService {
    */
   verifyPaymentHash(data: any, providedHash: string): boolean {
     const generatedHash = this.generatePaymentHash(data);
-    return generatedHash === providedHash;
+    return timeSafeEqual(generatedHash, providedHash);
   }
 
   /**

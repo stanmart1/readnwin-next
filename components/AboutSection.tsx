@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import OptimizedImage from './ui/OptimizedImage';
 
 interface AboutContent {
   hero: {
@@ -125,19 +125,14 @@ export default function AboutSection() {
           {/* Left Column - Image */}
           <div className="relative">
             <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-              <Image
+              <OptimizedImage
                 src={aboutContent.aboutSection?.image || '/images/about.png'}
                 alt={aboutContent.aboutSection?.imageAlt || 'ReadnWin about section - Empowering minds through reading'}
                 width={600}
                 height={400}
                 className="w-full h-auto object-cover"
                 priority
-                onError={(e) => {
-                  // Fallback to default image if uploaded image fails to load
-                  const target = e.target as HTMLImageElement;
-                  target.src = '/images/about.png';
-                  console.warn('Failed to load about section image, using fallback');
-                }}
+                fallbackSrc="/images/placeholder.svg"
               />
             </div>
           </div>

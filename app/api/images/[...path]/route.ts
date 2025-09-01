@@ -10,12 +10,20 @@ export async function GET(
 ) {
   try {
     const imagePath = params.path.join('/');
+    console.log('Image API: Requested path:', imagePath);
+    
+    // Validate path
+    if (!imagePath || imagePath.includes('..')) {
+      console.error('Image API: Invalid path:', imagePath);
+      return new NextResponse('Invalid path', { status: 400 });
+    }
     
     // Try storage system first for book covers
     if (imagePath.includes('covers/') || imagePath.includes('books/')) {
       const baseStoragePath = process.env.NODE_ENV === 'production' ? '/app/storage' : join(process.cwd(), 'storage');
       const storagePath = join(baseStoragePath, imagePath);
       
+      console.log('Image API: Checking storage path:', storagePath);
       if (existsSync(storagePath)) {
         const imageBuffer = await readFile(storagePath);
         const ext = imagePath.split('.').pop()?.toLowerCase();
@@ -26,12 +34,15 @@ export async function GET(
           case 'gif': contentType = 'image/gif'; break;
           case 'webp': contentType = 'image/webp'; break;
           case 'svg': contentType = 'image/svg+xml'; break;
+          case 'jpg':
+          case 'jpeg': contentType = 'image/jpeg'; break;
         }
 
-        return new NextResponse(new Uint8Array(imageBuffer), {
+        return new NextResponse(imageBuffer, {
           headers: {
             'Content-Type': contentType,
             'Cache-Control': 'public, max-age=86400',
+            'Content-Length': imageBuffer.length.toString(),
           },
         });
       }
@@ -39,8 +50,10 @@ export async function GET(
     
     // Fallback to public images
     const fullPath = join(process.cwd(), 'public', 'images', imagePath);
+    console.log('Image API: Checking public path:', fullPath);
     
     if (!existsSync(fullPath)) {
+      console.error('Image API: File not found:', fullPath);
       return new NextResponse('Image not found', { status: 404 });
     }
 
@@ -53,12 +66,16 @@ export async function GET(
       case 'gif': contentType = 'image/gif'; break;
       case 'webp': contentType = 'image/webp'; break;
       case 'svg': contentType = 'image/svg+xml'; break;
+      case 'jpg':
+      case 'jpeg': contentType = 'image/jpeg'; break;
     }
 
-    return new NextResponse(new Uint8Array(imageBuffer), {
+    console.log('Image API: Serving image:', fullPath, 'Type:', contentType, 'Size:', imageBuffer.length);
+    return new NextResponse(imageBuffer, {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000, immutable',
+        'Content-Length': imageBuffer.length.toString(),
       },
     });
   } catch (error) {

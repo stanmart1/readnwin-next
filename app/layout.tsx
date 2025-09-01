@@ -9,6 +9,8 @@ import PreloadDisabler from './components/PreloadDisabler'
 // import { NavigationLoader } from '../components/ui/NavigationLoader'
 import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 import FlutterwaveScriptLoader from '../components/FlutterwaveScriptLoader'
+import ErrorSuppressor from '../components/ErrorSuppressor'
+import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration'
 import { initializeSecurityPatches } from '@/utils/apply-security-patches'
 import '@/utils/errorSuppression'
 
@@ -46,6 +48,8 @@ export default async function RootLayout({
         <Providers session={session}>
           <ErrorBoundary>
             {/* <NavigationLoader /> */}
+            <ErrorSuppressor />
+            <ServiceWorkerRegistration />
             <FlutterwaveScriptLoader />
             {children}
           </ErrorBoundary>

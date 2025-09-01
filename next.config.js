@@ -10,7 +10,7 @@ const nextConfig = {
     serverComponentsExternalPackages: ['bcryptjs']
   },
   images: {
-    domains: ['localhost', 'readnwin.com'],
+    domains: ['localhost', 'readnwin.com', 'via.placeholder.com', 'images.unsplash.com', 'picsum.photos'],
     remotePatterns: [
       {
         protocol: 'https',
@@ -20,7 +20,12 @@ const nextConfig = {
         protocol: 'http',
         hostname: 'localhost',
       }
-    ]
+    ],
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    unoptimized: true,
+    minimumCacheTTL: 60,
+    formats: ['image/webp', 'image/avif']
   },
   async headers() {
     return [

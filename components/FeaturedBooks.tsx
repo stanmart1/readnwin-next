@@ -95,6 +95,7 @@ export default function FeaturedBooks() {
       const data = await response.json();
 
       if (data.success) {
+        console.log('📚 Books data:', data.books.slice(0, 2)); // Debug first 2 books
         setBooks(data.books);
       } else {
         setError(data.error || 'Failed to fetch books');

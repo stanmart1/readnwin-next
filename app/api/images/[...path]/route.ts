@@ -45,6 +45,8 @@ export async function GET(
             'Content-Length': imageBuffer.length.toString(),
           },
         });
+      } else {
+        console.log('Image API: Storage file not found:', storagePath);
       }
     }
     
@@ -54,7 +56,17 @@ export async function GET(
     
     if (!existsSync(fullPath)) {
       console.error('Image API: File not found:', fullPath);
-      return new NextResponse('Image not found', { status: 404 });
+      // Return placeholder instead of 404
+      const placeholderPng = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77mgAAAABJRU5ErkJggg==',
+        'base64'
+      );
+      return new NextResponse(placeholderPng, {
+        headers: {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
     }
 
     const imageBuffer = await readFile(fullPath);

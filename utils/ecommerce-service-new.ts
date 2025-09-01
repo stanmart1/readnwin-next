@@ -10,10 +10,17 @@ export class EcommerceService {
   // Database initialization
   async ensureCartTableExists(): Promise<void> {
     try {
-      await query(`
-        DO $$ 
-        BEGIN
-          CREATE TABLE IF NOT EXISTS cart_items (
+      // Check if table exists first
+      const tableCheck = await query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_name = 'cart_items'
+        )
+      `);
+      
+      if (!tableCheck.rows[0].exists) {
+        await query(`
+          CREATE TABLE cart_items (
             id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL,
             book_id INTEGER NOT NULL,
@@ -23,19 +30,12 @@ export class EcommerceService {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT unique_user_book UNIQUE(user_id, book_id)
-          );
-          
-          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'books' AND column_name = 'format') THEN
-            ALTER TABLE books ADD COLUMN format VARCHAR(20) DEFAULT 'ebook';
-          END IF;
-          
-          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'books' AND column_name = 'stock_quantity') THEN
-            ALTER TABLE books ADD COLUMN stock_quantity INTEGER DEFAULT 0;
-          END IF;
-        END $$;
-      `);
+          )
+        `);
+        console.log('✅ Cart table created successfully');
+      }
     } catch (error) {
-      console.error('Error ensuring cart table exists:', error);
+      console.error('Database check/creation failed:', error);
       throw error;
     }
   }
@@ -57,8 +57,8 @@ export class EcommerceService {
           b.pages,
           b.publication_date,
           b.publisher,
-          'ebook' as book_type,
-          COALESCE(b.format, 'ebook') as format,
+          COALESCE(b.book_type, b.format, 'ebook') as book_type,
+          COALESCE(b.book_type, b.format, 'ebook') as format,
           COALESCE(b.stock_quantity, 0) as stock_quantity,
           'pending' as parsing_status,
           b.cover_image_url,

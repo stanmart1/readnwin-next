@@ -506,6 +506,7 @@ export class ModernBookService {
       const result = await query(`
         SELECT 
           b.*,
+          COALESCE(b.book_type, b.format, 'ebook') as format,
           a.name as author_name,
           c.name as category_name
         FROM books b
@@ -633,6 +634,7 @@ export class ModernBookService {
       const booksResult = await query(`
         SELECT 
           b.*,
+          COALESCE(b.book_type, b.format, 'ebook') as format,
           a.name as author_name,
           c.name as category_name
         FROM books b

@@ -59,7 +59,7 @@ class RateLimiter {
 // Pre-configured rate limiters
 export const apiRateLimiter = new RateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: process.env.NODE_ENV === 'development' ? 1000 : 100
+  maxRequests: process.env.NODE_ENV === 'development' ? 3000 : 3000
 });
 
 export const authRateLimiter = new RateLimiter({

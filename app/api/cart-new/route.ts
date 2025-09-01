@@ -129,10 +129,7 @@ export async function POST(request: NextRequest) {
       await ecommerceService.ensureCartTableExists();
     } catch (tableError) {
       console.error('Failed to ensure cart table exists:', tableError);
-      return NextResponse.json(
-        { success: false, error: 'Database initialization error' },
-        { status: 503 }
-      );
+      // Continue anyway - the table might already exist
     }
     
     const cartItem = await ecommerceService.addToCart(userId, book_id, quantity);

@@ -73,18 +73,29 @@ export class EcommerceService {
     try {
       const result = await query(`
         SELECT 
-          ci.*,
-          b.id as book_id,
-          b.title, b.price, b.original_price, b.cover_image_url, b.author_id,
-          b.category_id, b.format, b.status, b.stock_quantity,
-          a.name as author_name,
-          c.name as category_name
+          ci.id,
+          ci.user_id,
+          ci.book_id,
+          ci.quantity,
+          COALESCE(ci.added_at, ci.created_at, CURRENT_TIMESTAMP) as added_at,
+          COALESCE(ci.format, b.format, 'ebook') as format,
+          b.title, 
+          COALESCE(b.price, 0) as price, 
+          b.original_price, 
+          b.cover_image_url, 
+          b.author_id,
+          b.category_id, 
+          b.format as book_format, 
+          b.status, 
+          COALESCE(b.stock_quantity, 0) as stock_quantity,
+          COALESCE(a.name, 'Unknown Author') as author_name,
+          COALESCE(c.name, 'Uncategorized') as category_name
         FROM cart_items ci
         JOIN books b ON ci.book_id = b.id
         LEFT JOIN authors a ON b.author_id = a.id
         LEFT JOIN categories c ON b.category_id = c.id
         WHERE ci.user_id = $1 AND b.status = 'published'
-        ORDER BY ci.created_at DESC
+        ORDER BY COALESCE(ci.added_at, ci.created_at, CURRENT_TIMESTAMP) DESC
       `, [userId]);
 
       return result.rows.map(row => ({
@@ -92,18 +103,18 @@ export class EcommerceService {
         user_id: row.user_id,
         book_id: row.book_id,
         quantity: row.quantity,
-        added_at: row.created_at,
+        added_at: row.added_at,
         book: {
           id: row.book_id,
-          title: row.title,
-          author_name: row.author_name,
-          price: row.price,
-          original_price: row.original_price,
+          title: row.title || 'Unknown Title',
+          author_name: row.author_name || 'Unknown Author',
+          price: parseFloat(row.price) || 0,
+          original_price: row.original_price ? parseFloat(row.original_price) : null,
           cover_image_url: row.cover_image_url,
-          category_name: row.category_name,
-          format: row.format,
-          status: row.status,
-          stock_quantity: row.stock_quantity
+          category_name: row.category_name || 'Uncategorized',
+          format: row.book_format || 'ebook',
+          status: row.status || 'published',
+          stock_quantity: parseInt(row.stock_quantity) || 0
         }
       }));
     } catch (error) {
@@ -137,9 +148,17 @@ export class EcommerceService {
       if (existingItem.rows.length > 0) {
         // Update quantity and ensure format is correct
         const newQuantity = existingItem.rows[0].quantity + quantity;
-        await query(`
-          UPDATE cart_items SET quantity = $1, format = $2 WHERE user_id = $3 AND book_id = $4
-        `, [newQuantity, book.format, userId, bookId]);
+        try {
+          await query(`
+            UPDATE cart_items SET quantity = $1, format = $2 WHERE user_id = $3 AND book_id = $4
+          `, [newQuantity, book.format || 'ebook', userId, bookId]);
+        } catch (formatError) {
+          // Fallback if format column doesn't exist
+          console.log('Format column not found in existing item update, using fallback');
+          await query(`
+            UPDATE cart_items SET quantity = $1 WHERE user_id = $2 AND book_id = $3
+          `, [newQuantity, userId, bookId]);
+        }
 
         const items = await this.getCartItems(userId);
         const cartItem = items.find(item => item.book_id === bookId);
@@ -148,12 +167,22 @@ export class EcommerceService {
         }
         return cartItem;
       } else {
-        // Add new item
-        const result = await query(`
-          INSERT INTO cart_items (user_id, book_id, quantity, format)
-          VALUES ($1, $2, $3, $4)
-          RETURNING *
-        `, [userId, bookId, quantity, book.format]);
+        // Add new item - check if format column exists
+        try {
+          const result = await query(`
+            INSERT INTO cart_items (user_id, book_id, quantity, format)
+            VALUES ($1, $2, $3, $4)
+            RETURNING *
+          `, [userId, bookId, quantity, book.format || 'ebook']);
+        } catch (formatError) {
+          // Fallback if format column doesn't exist
+          console.log('Format column not found, using fallback insert');
+          const result = await query(`
+            INSERT INTO cart_items (user_id, book_id, quantity)
+            VALUES ($1, $2, $3)
+            RETURNING *
+          `, [userId, bookId, quantity]);
+        }
 
         const items = await this.getCartItems(userId);
         const cartItem = items.find(item => item.book_id === bookId);
@@ -184,9 +213,17 @@ export class EcommerceService {
         throw new Error('Insufficient stock');
       }
 
-      await query(`
-        UPDATE cart_items SET quantity = $1, format = $2 WHERE user_id = $3 AND book_id = $4
-      `, [quantity, book?.format || 'ebook', userId, bookId]);
+      try {
+        await query(`
+          UPDATE cart_items SET quantity = $1, format = $2 WHERE user_id = $3 AND book_id = $4
+        `, [quantity, book?.format || 'ebook', userId, bookId]);
+      } catch (formatError) {
+        // Fallback if format column doesn't exist
+        console.log('Format column not found in update, using fallback');
+        await query(`
+          UPDATE cart_items SET quantity = $1 WHERE user_id = $2 AND book_id = $3
+        `, [quantity, userId, bookId]);
+      }
 
       const items = await this.getCartItems(userId);
       const cartItem = items.find(item => item.book_id === bookId);
@@ -625,7 +662,7 @@ export class EcommerceService {
         LEFT JOIN books b ON ul.book_id = b.id
         LEFT JOIN authors a ON b.author_id = a.id
         LEFT JOIN categories c ON b.category_id = c.id
-        WHERE ul.user_id = $1
+        WHERE ul.user_id = $1 AND COALESCE(ul.status, 'active') = 'active'
         ORDER BY COALESCE(ul.purchase_date, ul.added_at, ul.created_at) DESC
       `, [userId]);
 

@@ -26,6 +26,12 @@ const rateLimit = (ip: string, limit: number = 100, window: number = 60000) => {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
+  // Handle direct uploads requests by redirecting to API
+  if (pathname.startsWith('/uploads/')) {
+    const apiPath = pathname.replace('/uploads/', '/api/uploads/');
+    return NextResponse.redirect(new URL(apiPath, request.url));
+  }
+  
   // HTTPS enforcement in production
   if (process.env.NODE_ENV === 'production' && request.headers.get('x-forwarded-proto') !== 'https') {
     return NextResponse.redirect(`https://${request.headers.get('host')}${request.nextUrl.pathname}${request.nextUrl.search}`, 301);

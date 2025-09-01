@@ -10,7 +10,7 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
       "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
       "img-src 'self' data: https: blob:",
-      "connect-src 'self' https://api.flutterwave.com https://api.paystack.co",
+      "connect-src 'self' https://api.flutterwave.com https://api.paystack.co https://checkout.flutterwave.com https://picsum.photos https://fastly.picsum.photos https://images.unsplash.com https://images-na.ssl-images-amazon.com",
       "frame-src 'self' https://checkout.flutterwave.com https://checkout-v3-ui-prod.f4b-flutterwave.com https://js.stripe.com",
       "object-src 'none'",
       "base-uri 'self'",

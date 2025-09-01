@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ImageHandler } from '@/utils/image-handler';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
@@ -9,14 +10,27 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { path: string[] } }
 ) {
-  try {
-    const filePath = params.path.join('/');
-    
-    if (!filePath) {
-      return new NextResponse('File path is required', { status: 400 });
-    }
+  const filePath = params.path.join('/');
+  
+  if (!filePath) {
+    return new NextResponse('File path is required', { status: 400 });
+  }
 
-    // Check multiple possible locations
+  // Extract filename and subfolder
+  const pathParts = filePath.split('/');
+  const filename = pathParts[pathParts.length - 1];
+  const subfolder = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : undefined;
+
+  // Check if it's an image file
+  const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
+  const ext = filename.split('.').pop()?.toLowerCase();
+  
+  if (ext && imageExtensions.includes(ext)) {
+    return ImageHandler.serveImage(filename, subfolder);
+  }
+
+  // Handle non-image files (PDFs, etc.)
+  try {
     const possiblePaths = [
       join(process.cwd(), 'public', 'uploads', filePath),
       join(process.cwd(), 'uploads', filePath),
@@ -32,21 +46,22 @@ export async function GET(
     }
 
     if (!fullPath) {
-      return new NextResponse('File not found', { status: 404 });
+      return new NextResponse('File not found', { 
+        status: 404,
+        headers: {
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'no-cache'
+        }
+      });
     }
 
     const fileBuffer = await readFile(fullPath);
-    const ext = filePath.split('.').pop()?.toLowerCase();
     
     let contentType = 'application/octet-stream';
     switch (ext) {
-      case 'png': contentType = 'image/png'; break;
-      case 'jpg':
-      case 'jpeg': contentType = 'image/jpeg'; break;
-      case 'gif': contentType = 'image/gif'; break;
-      case 'webp': contentType = 'image/webp'; break;
-      case 'svg': contentType = 'image/svg+xml'; break;
       case 'pdf': contentType = 'application/pdf'; break;
+      case 'epub': contentType = 'application/epub+zip'; break;
+      case 'txt': contentType = 'text/plain'; break;
     }
 
     return new NextResponse(fileBuffer, {
@@ -57,7 +72,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error serving upload file:', error);
+    console.error('Error serving file:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

@@ -272,31 +272,34 @@ export function GuestCartProvider({ children }: { children: ReactNode }) {
     if (cartItems.length === 0) return true;
 
     try {
-      const response = await fetch('/api/cart/transfer-guest-cart', {
+      console.log('🔄 Transferring guest cart to user:', userId);
+      const response = await fetch('/api/cart/transfer-guest', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId,
-          cartItems: cartItems.map(item => ({
+          guest_cart_items: cartItems.map(item => ({
             book_id: item.book_id,
             quantity: item.quantity
           }))
         }),
       });
 
-      if (response.ok) {
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        console.log('✅ Cart transfer successful:', result.message);
         // Clear guest cart after successful transfer
         await clearCart();
         return true;
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to transfer cart');
+        console.error('❌ Cart transfer failed:', result.error);
+        setError(result.error || 'Failed to transfer cart');
         return false;
       }
     } catch (err) {
-      console.error('Error transferring cart:', err);
+      console.error('❌ Error transferring cart:', err);
       setError('Failed to transfer cart to account');
       return false;
     }

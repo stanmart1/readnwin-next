@@ -10,7 +10,7 @@ const nextConfig = {
     serverComponentsExternalPackages: ['bcryptjs']
   },
   images: {
-    domains: ['localhost', 'readnwin.com', 'via.placeholder.com', 'images.unsplash.com', 'picsum.photos'],
+    domains: ['localhost', 'readnwin.com', 'via.placeholder.com', 'images.unsplash.com', 'picsum.photos', 'fastly.picsum.photos'],
     remotePatterns: [
       {
         protocol: 'https',

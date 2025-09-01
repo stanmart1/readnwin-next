@@ -153,13 +153,13 @@ export default function BookManagementEnhanced() {
         },
         body: JSON.stringify({
           user_id: selectedUser.id,
-          book_id: selectedBookForAction.id,
-          access_type: 'full'
+          book_id: selectedBookForAction.id
         }),
       });
 
       if (response.ok) {
-        toast.success(`Book "${selectedBookForAction.title}" assigned to ${selectedUser.name} successfully!`);
+        const bookType = selectedBookForAction.format === 'physical' ? 'Physical Book' : 'Ebook';
+        toast.success(`${bookType} "${selectedBookForAction.title}" assigned to ${selectedUser.name} successfully!`);
         setShowAssignModal(false);
         setSelectedUser(null);
         setUserSearchQuery('');

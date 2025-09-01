@@ -105,6 +105,21 @@ export async function POST(request: NextRequest) {
             [orderId]
           );
 
+          // Add books to user library (both ebook and physical)
+          const orderItemsResult = await client.query(
+            'SELECT book_id, format FROM order_items WHERE order_id = $1',
+            [orderId]
+          );
+
+          for (const item of orderItemsResult.rows) {
+            await client.query(
+              `INSERT INTO user_library (user_id, book_id, order_id, purchase_date, access_type)
+               VALUES ($1, $2, $3, CURRENT_TIMESTAMP, 'purchased')
+               ON CONFLICT (user_id, book_id) DO NOTHING`,
+              [session.user.id, item.book_id, orderId]
+            );
+          }
+
           // Add order status history
           await client.query(
             `INSERT INTO order_status_history (order_id, status, notes, created_by)

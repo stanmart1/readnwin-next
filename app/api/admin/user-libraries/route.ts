@@ -120,17 +120,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Book already assigned to this user' }, { status: 400 });
     }
 
-    // Create new assignment
+    // Get book details to determine type
+    const bookQuery = `SELECT title, format FROM books WHERE id = $1`;
+    const bookResult = await query(bookQuery, [book_id]);
+    
+    if (bookResult.rows.length === 0) {
+      return NextResponse.json({ error: 'Book not found' }, { status: 404 });
+    }
+    
+    const book = bookResult.rows[0];
+
+    // Create new assignment (works for both ebook and physical books)
     const insertQuery = `
-      INSERT INTO user_library (user_id, book_id, acquired_at, access_type)
-      VALUES ($1, $2, NOW(), 'assigned')
+      INSERT INTO user_library (user_id, book_id, purchase_date, access_type)
+      VALUES ($1, $2, CURRENT_TIMESTAMP, 'assigned')
+      ON CONFLICT (user_id, book_id) DO UPDATE SET
+        access_type = 'assigned',
+        purchase_date = CURRENT_TIMESTAMP
       RETURNING id
     `;
     const result = await query(insertQuery, [user_id, book_id]);
 
+    const bookType = book.format === 'physical' ? 'Physical book' : 'Ebook';
     return NextResponse.json({ 
-      message: 'Book assigned successfully',
-      id: result.rows[0].id
+      message: `${bookType} "${book.title}" assigned successfully`,
+      id: result.rows[0].id,
+      book_type: book.format
     });
 
   } catch (error) {

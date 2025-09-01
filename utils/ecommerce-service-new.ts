@@ -613,13 +613,20 @@ export class EcommerceService {
     try {
       const result = await query(`
         SELECT 
-          ul.id, ul.user_id, ul.book_id, ul.order_id, ul.purchase_date, 
-          ul.download_count, ul.last_downloaded_at, ul.is_favorite,
-          b.title, b.cover_image_url, b.format, b.ebook_file_url
+          ul.id, ul.user_id, ul.book_id, 
+          ul.order_id,
+          COALESCE(ul.purchase_date, ul.added_at, ul.created_at, CURRENT_TIMESTAMP) as purchase_date,
+          COALESCE(ul.download_count, 0) as download_count,
+          ul.last_downloaded_at,
+          COALESCE(ul.is_favorite, false) as is_favorite,
+          b.title, b.cover_image_url, b.format, b.ebook_file_url,
+          a.name as author_name, c.name as category_name
         FROM user_library ul
-        JOIN books b ON ul.book_id = b.id
+        LEFT JOIN books b ON ul.book_id = b.id
+        LEFT JOIN authors a ON b.author_id = a.id
+        LEFT JOIN categories c ON b.category_id = c.id
         WHERE ul.user_id = $1
-        ORDER BY ul.purchase_date DESC
+        ORDER BY COALESCE(ul.purchase_date, ul.added_at, ul.created_at) DESC
       `, [userId]);
 
       return result.rows.map(row => ({
@@ -628,22 +635,22 @@ export class EcommerceService {
         book_id: row.book_id,
         order_id: row.order_id,
         purchase_date: row.purchase_date,
-        download_count: row.download_count,
+        download_count: row.download_count || 0,
         last_downloaded_at: row.last_downloaded_at,
-        is_favorite: row.is_favorite,
+        is_favorite: row.is_favorite || false,
         book: {
           id: row.book_id,
-          title: row.title,
-          author_name: 'Unknown Author',
-          category_name: 'Uncategorized',
+          title: row.title || '[DEFAULT] Unknown Title',
+          author_name: row.author_name || '[DEFAULT] Unknown Author',
+          category_name: row.category_name || '[DEFAULT] Uncategorized',
           cover_image_url: row.cover_image_url,
-          format: row.format,
+          format: row.format || 'ebook',
           ebook_file_url: row.ebook_file_url
         }
       }));
     } catch (error) {
       console.error('Error getting user library:', error);
-      throw error;
+      return []; // Return empty array instead of throwing
     }
   }
 

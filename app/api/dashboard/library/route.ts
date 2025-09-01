@@ -16,8 +16,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
     }
 
-    // Use the unified ecommerce service for library data
-    const libraryItems = await ecommerceService.getUserLibrary(userId);
+    // Use the unified ecommerce service for library data with fallback
+    let libraryItems = [];
+    try {
+      libraryItems = await ecommerceService.getUserLibrary(userId);
+    } catch (error) {
+      console.error('Error fetching library from ecommerce service:', error);
+      libraryItems = [];
+    }
 
     // Transform to match dashboard component expectations
     const books = libraryItems.map(item => ({

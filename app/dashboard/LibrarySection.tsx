@@ -301,7 +301,7 @@ export default function LibrarySection() {
                   {/* Action Button */}
                   {book.book_type === 'ebook' ? (
                     <Link
-                      href={`/dashboard?tab=library`}
+                      href={`/read/${book.id}`}
                       className="w-full inline-flex items-center justify-center px-2 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all"
                     >
                       <i className={`${book.progress_percentage > 0 ? 'ri-play-line' : 'ri-book-open-line'} mr-1 sm:mr-2 text-sm`}></i>
@@ -313,14 +313,11 @@ export default function LibrarySection() {
                       </span>
                     </Link>
                   ) : (
-                    <Link
-                      href={`/book/${book.id}?tab=reviews`}
-                      className="w-full inline-flex items-center justify-center px-2 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 text-white text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl hover:from-amber-700 hover:to-amber-800 shadow-sm hover:shadow-md transition-all"
-                    >
-                      <i className="ri-star-line mr-1 sm:mr-2 text-sm"></i>
-                      <span className="hidden sm:inline">Leave Review</span>
-                      <span className="sm:hidden">Review</span>
-                    </Link>
+                    <div className="w-full inline-flex items-center justify-center px-2 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-gray-400 to-gray-500 text-white text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl shadow-sm transition-all">
+                      <i className="ri-book-line mr-1 sm:mr-2 text-sm"></i>
+                      <span className="hidden sm:inline">Physical Book</span>
+                      <span className="sm:hidden">Physical</span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -372,7 +369,7 @@ export default function LibrarySection() {
                       <div className="flex-shrink-0 ml-4">
                         {book.book_type === 'ebook' ? (
                           <Link
-                            href={`/dashboard?tab=library`}
+                            href={`/read/${book.id}`}
                             className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all"
                           >
                             <i className={`${book.progress_percentage > 0 ? 'ri-play-line' : 'ri-book-open-line'} mr-1 sm:mr-2`}></i>
@@ -384,17 +381,14 @@ export default function LibrarySection() {
                             </span>
                           </Link>
                         ) : (
-                          <Link
-                            href={`/book/${book.id}?tab=reviews`}
-                            className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-700 text-white text-xs sm:text-sm font-medium rounded-lg hover:from-amber-700 hover:to-amber-800 shadow-sm hover:shadow-md transition-all"
-                          >
-                            <i className="ri-star-line mr-1 sm:mr-2"></i>
-                            <span className="hidden sm:inline">Review</span>
+                          <div className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-gray-400 to-gray-500 text-white text-xs sm:text-sm font-medium rounded-lg shadow-sm transition-all">
+                            <i className="ri-book-line mr-1 sm:mr-2"></i>
+                            <span className="hidden sm:inline">Physical</span>
                             <span className="sm:hidden">
-                              <i className="ri-star-line"></i>
+                              <i className="ri-book-line"></i>
                             </span>
-                          </Link>
-                        )}
+                          </div>
+                        )
                       </div>
                     </div>
                   </div>

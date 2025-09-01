@@ -9,25 +9,25 @@ export default function HeroSection() {
     {
       id: '1',
       title: 'Bestseller',
-      image: 'https://covers.openlibrary.org/b/id/8225261-L.jpg',
+      image: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1474154022i/3735293.jpg',
       position: 'top-left'
     },
     {
       id: '2',
       title: 'New Release',
-      image: 'https://covers.openlibrary.org/b/id/12593080-L.jpg',
+      image: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1602190253i/55539565.jpg',
       position: 'bottom-left'
     },
     {
       id: '3',
       title: "Editor's Pick",
-      image: 'https://covers.openlibrary.org/b/id/10909258-L.jpg',
+      image: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1535115320i/40121378.jpg',
       position: 'top-right'
     },
     {
       id: '4',
       title: 'Must Read',
-      image: 'https://covers.openlibrary.org/b/id/240726-L.jpg',
+      image: 'https://images-na.ssl-images-amazon.com/images/S/compressed.photo.goodreads.com/books/1654371463i/18144590.jpg',
       position: 'bottom-right'
     }
   ];

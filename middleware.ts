@@ -31,10 +31,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(`https://${request.headers.get('host')}${request.nextUrl.pathname}${request.nextUrl.search}`, 301);
   }
   
-  // Rate limiting
-  const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
-  if (!rateLimit(ip, 100, 60000)) {
-    return new NextResponse('Too Many Requests', { status: 429 });
+  // Rate limiting - exclude static assets and images
+  if (!pathname.startsWith('/_next/') && 
+      !pathname.startsWith('/api/uploads/') && 
+      !pathname.startsWith('/api/images/') &&
+      !pathname.includes('.') && 
+      !pathname.startsWith('/favicon')) {
+    const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+    if (!rateLimit(ip, 1000, 60000)) {
+      return new NextResponse('Too Many Requests', { status: 429 });
+    }
   }
   
   // Security headers
@@ -70,6 +76,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.).*)',
   ]
 };

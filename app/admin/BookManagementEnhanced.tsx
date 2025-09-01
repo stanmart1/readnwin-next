@@ -30,6 +30,12 @@ interface Book {
   cover_image_url: string;
   format: string;
   created_at: string;
+  description?: string;
+  isbn?: string;
+  pages?: number;
+  language?: string;
+  publisher?: string;
+  publication_date?: string;
 }
 
 interface Category {
@@ -749,76 +755,184 @@ export default function BookManagementEnhanced() {
         <Modal 
           isOpen={showDetailsModal} 
           onClose={() => setShowDetailsModal(false)}
-          className="max-w-sm xs:max-w-md sm:max-w-2xl md:max-w-3xl w-full mx-2 xs:mx-3 sm:mx-4"
+          className="max-w-4xl w-full mx-4"
         >
-          <div className="p-3 xs:p-4 sm:p-6">
-            <div className="flex items-start xs:items-center gap-2 xs:gap-3 mb-4 xs:mb-5 sm:mb-6">
-              <div className="flex-shrink-0 w-8 xs:w-10 h-8 xs:h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                <i className="ri-book-line text-gray-600 text-sm xs:text-base"></i>
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <i className="ri-book-line text-blue-600"></i>
               </div>
-              <h3 className="text-sm xs:text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">Book Details</h3>
+              <h2 className="text-xl font-semibold text-gray-900">Book Details</h2>
             </div>
             {selectedBookForAction && (
-              <div className="space-y-4 xs:space-y-5 sm:space-y-6">
-                <div className="flex flex-col sm:flex-row gap-3 xs:gap-4 sm:gap-6">
-                  <div className="flex-shrink-0 mx-auto sm:mx-0">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Cover Image Section */}
+                <div className="lg:col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Cover Image
+                  </label>
+                  <div className="relative">
                     <img
                       src={selectedBookForAction.cover_image_url || '/placeholder-book.jpg'}
                       alt={selectedBookForAction.title}
-                      className="w-24 xs:w-28 sm:w-32 h-30 xs:h-35 sm:h-40 object-cover rounded-lg shadow-md"
+                      className="w-full h-64 object-cover rounded-lg border shadow-md"
                     />
                   </div>
-                  <div className="flex-1 space-y-3 xs:space-y-4">
-                    <div className="text-center sm:text-left">
-                      <h4 className="text-base xs:text-lg sm:text-xl font-bold text-gray-900 leading-tight break-words">{selectedBookForAction.title}</h4>
-                      <p className="text-sm xs:text-base sm:text-lg text-gray-600 break-words">by {selectedBookForAction.author_name}</p>
-                    </div>
-                    <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 xs:gap-3 sm:gap-4">
-                      <div>
-                        <span className="text-xs xs:text-sm font-medium text-gray-500">Category</span>
-                        <p className="text-xs xs:text-sm text-gray-900 break-words">{selectedBookForAction.category_name}</p>
-                      </div>
-                      <div>
-                        <span className="text-xs xs:text-sm font-medium text-gray-500">Format</span>
-                        <p className="text-xs xs:text-sm text-gray-900 capitalize">{selectedBookForAction.format}</p>
-                      </div>
-                      <div>
-                        <span className="text-xs xs:text-sm font-medium text-gray-500">Price</span>
-                        <p className="text-xs xs:text-sm font-semibold text-green-600">₦{selectedBookForAction.price.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <span className="text-xs xs:text-sm font-medium text-gray-500">Stock</span>
-                        <p className="text-xs xs:text-sm text-gray-900">{selectedBookForAction.stock_quantity}</p>
-                      </div>
-                      <div>
-                        <span className="text-xs xs:text-sm font-medium text-gray-500">Status</span>
-                        <span className={`inline-flex px-1.5 xs:px-2 py-0.5 xs:py-1 text-xs font-medium rounded-full ${
-                          selectedBookForAction.status === 'published' ? 'bg-green-100 text-green-800' :
-                          selectedBookForAction.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {selectedBookForAction.status}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs xs:text-sm font-medium text-gray-500">Featured</span>
-                        <p className="text-xs xs:text-sm text-gray-900">{selectedBookForAction.is_featured ? 'Yes' : 'No'}</p>
-                      </div>
+                </div>
+
+                {/* Book Information */}
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Title
+                      </label>
+                      <p className="text-base font-semibold text-gray-900">{selectedBookForAction.title}</p>
                     </div>
                     <div>
-                      <span className="text-xs xs:text-sm font-medium text-gray-500">Created</span>
-                      <p className="text-xs xs:text-sm text-gray-900">{new Date(selectedBookForAction.created_at).toLocaleDateString()}</p>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Author
+                      </label>
+                      <p className="text-base text-gray-900">{selectedBookForAction.author_name}</p>
                     </div>
+                  </div>
+
+                  {(selectedBookForAction as any).description && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Description
+                      </label>
+                      <p className="text-sm text-gray-700 leading-relaxed">{(selectedBookForAction as any).description}</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Price
+                      </label>
+                      <p className="text-lg font-semibold text-green-600">₦{selectedBookForAction.price.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Stock Quantity
+                      </label>
+                      <p className="text-base text-gray-900">{selectedBookForAction.stock_quantity}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Status
+                      </label>
+                      <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${
+                        selectedBookForAction.status === 'published' ? 'bg-green-100 text-green-800' :
+                        selectedBookForAction.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {selectedBookForAction.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Category
+                      </label>
+                      <p className="text-base text-gray-900">{selectedBookForAction.category_name}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Format
+                      </label>
+                      <p className="text-base text-gray-900 capitalize">{selectedBookForAction.format}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(selectedBookForAction as any).isbn && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          ISBN
+                        </label>
+                        <p className="text-base text-gray-900">{(selectedBookForAction as any).isbn}</p>
+                      </div>
+                    )}
+                    {(selectedBookForAction as any).pages && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Pages
+                        </label>
+                        <p className="text-base text-gray-900">{(selectedBookForAction as any).pages}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(selectedBookForAction as any).language && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Language
+                        </label>
+                        <p className="text-base text-gray-900">{(selectedBookForAction as any).language}</p>
+                      </div>
+                    )}
+                    {(selectedBookForAction as any).publisher && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Publisher
+                        </label>
+                        <p className="text-base text-gray-900">{(selectedBookForAction as any).publisher}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(selectedBookForAction as any).publication_date && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Publication Date
+                        </label>
+                        <p className="text-base text-gray-900">{new Date((selectedBookForAction as any).publication_date).toLocaleDateString()}</p>
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Featured
+                      </label>
+                      <span className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-full ${
+                        selectedBookForAction.is_featured ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        <i className={`ri-${selectedBookForAction.is_featured ? 'star' : 'star-line'} mr-1`}></i>
+                        {selectedBookForAction.is_featured ? 'Featured' : 'Not Featured'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Created
+                    </label>
+                    <p className="text-base text-gray-900">{new Date(selectedBookForAction.created_at).toLocaleDateString()}</p>
                   </div>
                 </div>
               </div>
             )}
-            <div className="flex justify-end mt-4 xs:mt-5 sm:mt-6">
+            <div className="flex justify-end gap-3 pt-6 border-t mt-6">
               <button
                 onClick={() => setShowDetailsModal(false)}
-                className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs xs:text-sm font-medium"
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setShowEditModal(true);
+                }}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <i className="ri-edit-line"></i>
+                Edit Book
               </button>
             </div>
           </div>

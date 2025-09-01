@@ -24,14 +24,15 @@ interface Book {
 interface BulkLibraryManagementProps {
   onClose: () => void;
   preSelectedBook?: Book;
+  preSelectedUsers?: User[];
 }
 
-export default function BulkLibraryManagement({  preSelectedBook }: BulkLibraryManagementProps) {
+export default function BulkLibraryManagement({ preSelectedBook, preSelectedUsers }: BulkLibraryManagementProps) {
   
   const [users, setUsers] = useState<User[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<number[]>(preSelectedUsers ? preSelectedUsers.map(u => u.id) : []);
   const [selectedBooks, setSelectedBooks] = useState<number[]>(preSelectedBook ? [preSelectedBook.id] : []);
   const [reason, setReason] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -200,11 +201,15 @@ export default function BulkLibraryManagement({  preSelectedBook }: BulkLibraryM
         {/* Header */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-gray-900">
-            {preSelectedBook ? `Assign "${preSelectedBook.title}" to Users` : 'Bulk Library Management'}
+            {preSelectedBook ? `Assign "${preSelectedBook.title}" to Users` : 
+             preSelectedUsers && preSelectedUsers.length > 0 ? `Assign Books to ${preSelectedUsers.map(u => `${u.first_name} ${u.last_name}`).join(', ')}` :
+             'Bulk Library Management'}
           </h2>
           <p className="text-gray-600">
             {preSelectedBook 
               ? `Assign this ebook to multiple users at once` 
+              : preSelectedUsers && preSelectedUsers.length > 0
+              ? `Assign multiple ebooks to the selected user${preSelectedUsers.length > 1 ? 's' : ''} at once`
               : 'Assign ebooks to multiple users at once'
             }
           </p>
@@ -240,26 +245,27 @@ export default function BulkLibraryManagement({  preSelectedBook }: BulkLibraryM
           </div>
         )}
 
-        <div className={`grid gap-6 ${preSelectedBook ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
-          {/* Users Selection */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Select Users</h3>
-              <div className="space-x-2">
-                <button
-                  onClick={selectAllUsers}
-                  className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={clearUserSelection}
-                  className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
-                >
-                  Clear
-                </button>
+        <div className={`grid gap-6 ${preSelectedBook || (preSelectedUsers && preSelectedUsers.length > 0) ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
+          {/* Users Selection - Only show if no pre-selected users */}
+          {!(preSelectedUsers && preSelectedUsers.length > 0) && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Select Users</h3>
+                <div className="space-x-2">
+                  <button
+                    onClick={selectAllUsers}
+                    className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={clearUserSelection}
+                    className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
-            </div>
 
             <div className="mb-4">
               <input
@@ -300,13 +306,14 @@ export default function BulkLibraryManagement({  preSelectedBook }: BulkLibraryM
               ))}
             </div>
 
-            <div className="mt-2 text-sm text-gray-600">
-              Selected: {selectedUsers.length} users
+              <div className="mt-2 text-sm text-gray-600">
+                Selected: {selectedUsers.length} users
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Books Selection - Only show if no pre-selected book */}
-          {!preSelectedBook && (
+          {!preSelectedBook && !(preSelectedUsers && preSelectedUsers.length > 0) && (
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Select Books</h3>
@@ -396,6 +403,31 @@ export default function BulkLibraryManagement({  preSelectedBook }: BulkLibraryM
                     <i className="ri-file-text-line mr-1"></i>
                     Ebook
                   </span>
+                </div>
+              </div>
+            )}
+            {preSelectedUsers && preSelectedUsers.length > 0 && (
+              <div className="mb-4 p-3 bg-white rounded-lg border border-blue-200">
+                <h4 className="font-medium text-blue-900 mb-2">Selected User{preSelectedUsers.length > 1 ? 's' : ''}:</h4>
+                <div className="space-y-2">
+                  {preSelectedUsers.map(user => (
+                    <div key={user.id} className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-white font-semibold text-xs">
+                          {user.first_name?.charAt(0) || ''}{user.last_name?.charAt(0) || ''}
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="font-medium text-gray-900">{user.first_name} {user.last_name}</h5>
+                        <p className="text-sm text-gray-500">{user.email}</p>
+                      </div>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {user.status}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

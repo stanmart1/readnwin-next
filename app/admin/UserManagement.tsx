@@ -8,7 +8,6 @@ import { useNotifications } from '@/components/ui/Notification';
 import { LoadingSpinner, LoadingButton } from '@/components/ui/LoadingSpinner';
 import Modal from '@/components/ui/Modal';
 import UserReadingAnalytics from './UserReadingAnalytics';
-import UserLibraryManagement from './UserLibraryManagement';
 import BulkLibraryManagement from './BulkLibraryManagement';
 
 interface User {
@@ -87,8 +86,8 @@ export default function UserManagement() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [showUserReadingAnalytics, setShowUserReadingAnalytics] = useState(false);
   const [selectedUserForAnalytics, setSelectedUserForAnalytics] = useState<number | null>(null);
-  const [showUserLibraryManagement, setShowUserLibraryManagement] = useState(false);
-  const [selectedUserForLibrary, setSelectedUserForLibrary] = useState<number | null>(null);
+  const [showAssignBooksModal, setShowAssignBooksModal] = useState(false);
+  const [selectedUserForAssignment, setSelectedUserForAssignment] = useState<User | null>(null);
   const [showBulkLibraryManagement, setShowBulkLibraryManagement] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
@@ -268,9 +267,10 @@ export default function UserManagement() {
     } else if (action === 'reading-analytics') {
       setSelectedUserForAnalytics(userId);
       setShowUserReadingAnalytics(true);
-    } else if (action === 'library-management') {
-      setSelectedUserForLibrary(userId);
-      setShowUserLibraryManagement(true);
+    } else if (action === 'assign-books') {
+      const user = users.find(u => u.id === userId);
+      setSelectedUserForAssignment(user || null);
+      setShowAssignBooksModal(true);
     } else if (action === 'password' && user) {
       setPasswordUser(user);
       setNewPassword('');
@@ -735,11 +735,15 @@ export default function UserManagement() {
                 Delete
               </LoadingButton>
               <button
-                onClick={() => setShowBulkLibraryManagement(true)}
+                onClick={() => {
+                  const selectedUserObjects = users.filter(u => selectedUsers.includes(u.id));
+                  setSelectedUserForAssignment(selectedUserObjects.length === 1 ? selectedUserObjects[0] : null);
+                  setShowBulkLibraryManagement(true);
+                }}
                 className="px-4 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white text-sm rounded-full hover:from-green-600 hover:to-blue-600 transition-all duration-300"
               >
-                <i className="ri-book-line mr-1"></i>
-                Assign Ebooks
+                <i className="ri-book-add-line mr-1"></i>
+                Assign Books
               </button>
             </div>
           </div>
@@ -830,12 +834,12 @@ export default function UserManagement() {
                 Analytics
               </button>
               <button
-                onClick={() => handleUserAction(user.id, 'library-management')}
+                onClick={() => handleUserAction(user.id, 'assign-books')}
                 className="text-green-600 hover:text-green-800 flex items-center text-sm whitespace-nowrap"
-                title="Manage Library"
+                title="Assign Books"
               >
-                <i className="ri-book-line mr-1"></i>
-                Library
+                <i className="ri-book-add-line mr-1"></i>
+                Assign Books
               </button>
               <button
                 onClick={() => handleEditUser(user)}
@@ -982,11 +986,11 @@ export default function UserManagement() {
                         <i className="ri-line-chart-line"></i>
                       </button>
                       <button
-                        onClick={() => handleUserAction(user.id, 'library-management')}
+                        onClick={() => handleUserAction(user.id, 'assign-books')}
                         className="text-green-600 hover:text-green-800 cursor-pointer transition-colors duration-200"
-                        title="Manage Library"
+                        title="Assign Books"
                       >
-                        <i className="ri-book-line"></i>
+                        <i className="ri-book-add-line"></i>
                       </button>
                       <button
                         onClick={() => handleEditUser(user)}
@@ -1483,23 +1487,56 @@ export default function UserManagement() {
         )}
       </Modal>
 
-        {/* User Library Management Modal */}
-        {showUserLibraryManagement && selectedUserForLibrary && (
-          <UserLibraryManagement
-            userId={selectedUserForLibrary}
-            userName={(users.find(u => u.id === selectedUserForLibrary)?.first_name || '') + ' ' + (users.find(u => u.id === selectedUserForLibrary)?.last_name || '') || 'User'}
-            onClose={() => {
-              setShowUserLibraryManagement(false);
-              setSelectedUserForLibrary(null);
-            }}
-          />
+        {/* Assign Books Modal */}
+        {showAssignBooksModal && selectedUserForAssignment && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-7xl w-full mx-4 max-h-[90vh] overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Assign Books to {selectedUserForAssignment.first_name} {selectedUserForAssignment.last_name}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowAssignBooksModal(false);
+                    setSelectedUserForAssignment(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <i className="ri-close-line text-xl"></i>
+                </button>
+              </div>
+              <BulkLibraryManagement
+                preSelectedUsers={[selectedUserForAssignment]}
+                onClose={() => {
+                  setShowAssignBooksModal(false);
+                  setSelectedUserForAssignment(null);
+                }}
+              />
+            </div>
+          </div>
         )}
 
         {/* Bulk Library Management Modal */}
         {showBulkLibraryManagement && (
-          <BulkLibraryManagement
-            onClose={() => setShowBulkLibraryManagement(false)}
-          />
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-7xl w-full mx-4 max-h-[90vh] overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Assign Books to Selected Users
+                </h2>
+                <button
+                  onClick={() => setShowBulkLibraryManagement(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <i className="ri-close-line text-xl"></i>
+                </button>
+              </div>
+              <BulkLibraryManagement
+                preSelectedUsers={users.filter(u => selectedUsers.includes(u.id))}
+                onClose={() => setShowBulkLibraryManagement(false)}
+              />
+            </div>
+          </div>
         )}
 
         {/* Password Update Modal */}

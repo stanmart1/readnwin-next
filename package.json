@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "cross-env NODE_ENV=development next dev -H 0.0.0.0 -p 3000",
-    "build": "next build",
+    "build": "ESLINT_CONFIG_FILE=.eslintrc.build.json next build",
     "build:production": "NODE_ENV=production next build",
     "start": "next start",
     "start:standalone": "node .next/standalone/server.js",

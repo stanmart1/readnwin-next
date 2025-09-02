@@ -120,6 +120,15 @@ export async function POST(request: NextRequest) {
             );
           }
 
+          // Clear user's cart after successful payment
+          try {
+            await client.query('DELETE FROM cart_items WHERE user_id = $1', [session.user.id]);
+            console.log('Cart cleared after successful payment verification');
+          } catch (cartError) {
+            console.error('Error clearing cart after payment:', cartError);
+            // Don't fail for cart clearing issues
+          }
+
           // Add order status history
           await client.query(
             `INSERT INTO order_status_history (order_id, status, notes, created_by)

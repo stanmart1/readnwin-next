@@ -26,14 +26,13 @@ export default function AdminSidebar({ activeTab, onTabChange, isOpen, onToggle,
 
   // Filter tabs based on actual user permissions from database
   const visibleTabs = (() => {
-    if (!session?.user?.id) return [];
+    if (!session?.user) return [];
     
     // Wait for permissions to load for all users
     if (permissionsLoading) return [];
     
     // Debug logging
     console.log('🔍 AdminSidebar - User permissions:', permissions);
-    console.log('🔍 AdminSidebar - User role:', session?.user?.role);
     
     // Use getVisibleTabs function for permission-based filtering
     const tabs = getVisibleTabs(permissions);
@@ -101,10 +100,10 @@ export default function AdminSidebar({ activeTab, onTabChange, isOpen, onToggle,
               {!isCollapsed && (
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {adminUser ? `${adminUser.firstName} ${adminUser.lastName}` : 'Admin User'}
+                    {adminUser?.name || 'Admin User'}
                   </p>
                   <p className="text-xs text-gray-600 truncate">
-                    {adminUser?.roleDisplayName || 'Administrator'}
+                    Administrator
                   </p>
                 </div>
               )}

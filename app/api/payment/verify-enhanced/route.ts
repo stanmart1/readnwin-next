@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
 
           // Clear user's cart after successful payment verification
           try {
-            await ecommerceService.clearCartAfterPaymentSuccess(userId, order.id);
+            await ecommerceService.clearCart(userId);
             safeLog.info('✅ Cart cleared after confirmed payment success');
           } catch (cartError) {
             safeLog.error('❌ Error clearing cart after payment success:', cartError);

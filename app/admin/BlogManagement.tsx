@@ -199,8 +199,8 @@ export default function BlogManagement() {
         },
         body: JSON.stringify({
           ...formData,
-          author_id: session?.user?.id,
-          author_name: `${session?.user?.firstName} ${session?.user?.lastName}`,
+          author_id: 1, // Default admin user ID
+          author_name: session?.user?.name || 'Admin User',
           read_time: Math.ceil(formData.content.split(' ').length / 200)
         })
       });

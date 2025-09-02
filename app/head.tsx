@@ -24,8 +24,7 @@ export default function Head() {
       <meta name="next-router-prefetch-on-hover" content="false" />
       <meta name="next-router-prefetch-on-viewport" content="false" />
       
-      {/* Early error handler */}
-      <script src="/error-handler.js" />
+
     </>
   )
 } 

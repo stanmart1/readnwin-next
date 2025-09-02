@@ -62,6 +62,7 @@ export default function BookManagementEnhanced() {
   const [showAddModal, setShowAddModal] = useState(false);
   
   // Use custom hook for book management
+  const bookManagement = useBookManagement();
   const {
     books,
     loading,
@@ -70,12 +71,11 @@ export default function BookManagementEnhanced() {
     pagination,
     setFilters,
     setPagination,
-    loadBooks,
     updateBook,
     deleteBooks,
     batchUpdateBooks,
     setError
-  } = useBookManagement();
+  } = bookManagement;
   
   // Loading states
   
@@ -122,7 +122,7 @@ export default function BookManagementEnhanced() {
   const handleModalClose = () => {
     setShowAddModal(false);
     // Refresh the books list after successful upload
-    loadBooks();
+    window.location.reload();
   };
 
   const loadAuthorsAndCategories = async () => {
@@ -779,7 +779,7 @@ export default function BookManagementEnhanced() {
           authors={authors}
           onSuccess={() => {
             // Refresh the books list
-            loadBooks();
+            window.location.reload();
           }}
         />
 

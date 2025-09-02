@@ -68,6 +68,18 @@ export default function EnhancedCheckoutPage() {
           throw new Error('Order ID not found in response');
         }
         
+        // Refresh cart context to reflect cleared cart
+        try {
+          if (session) {
+            await secureCart.refreshCart();
+          } else {
+            guestCart.clearCart();
+          }
+          console.log('Cart refreshed after successful order creation');
+        } catch (cartRefreshError) {
+          console.warn('Failed to refresh cart after checkout:', cartRefreshError);
+        }
+        
         // Handle different payment methods
         if (orderData.paymentMethod === 'flutterwave' && orderData.inlinePaymentData) {
           // Use inline payment for Flutterwave

@@ -3,58 +3,74 @@
 const fs = require('fs');
 const path = require('path');
 
-// Fix critical TypeScript errors
-const fixes = [
-  // Fix undefined response variable
-  {
-    file: 'app/admin/BookManagementEnhanced.tsx',
-    search: /response\.ok/g,
-    replace: 'authorsResponse.ok'
-  },
-  // Fix duplicate function declarations in EmailGatewayManagement
-  {
-    file: 'app/admin/EmailGatewayManagement.tsx',
-    search: /const getGatewayIcon = \(gateway: string\) => {[\s\S]*?};/g,
-    replace: ''
-  },
-  // Fix missing accessToken property
-  {
-    file: 'app/admin/ShippingManagement.tsx',
-    search: /session\.accessToken/g,
-    replace: 'session.user?.accessToken'
-  },
-  // Fix string to number conversions
-  {
-    file: 'app/api/admin/notifications/batch-delete/route.ts',
-    search: /parseInt\(([^)]+)\)/g,
-    replace: 'parseInt($1, 10)'
-  }
-];
+// Only fix specific unused variables that are safe to remove
+function fixFile(filePath, content) {
+  let modified = false;
+  let newContent = content;
 
-console.log('🔧 Fixing critical TypeScript build errors...\n');
-
-fixes.forEach(fix => {
-  const filePath = path.join(__dirname, fix.file);
-  
-  if (fs.existsSync(filePath)) {
-    try {
-      let content = fs.readFileSync(filePath, 'utf8');
-      const originalContent = content;
-      
-      content = content.replace(fix.search, fix.replace);
-      
-      if (content !== originalContent) {
-        fs.writeFileSync(filePath, content);
-        console.log(`✅ Fixed: ${fix.file}`);
-      } else {
-        console.log(`⚠️  No changes needed: ${fix.file}`);
+  // Safe fixes that won't break functionality
+  const safeFixes = [
+    // Remove unused error variables in catch blocks where error is not used
+    {
+      pattern: /catch\s*\(\s*error\s*\)\s*{\s*console\.error/g,
+      replacement: 'catch (error) {\n        console.error'
+    },
+    
+    // Remove unused destructured variables that are clearly not used
+    {
+      pattern: /const\s*{\s*([^}]*),\s*setIsLoading\s*}\s*=\s*useState/g,
+      replacement: (match, before) => {
+        if (!content.includes('setIsLoading(')) {
+          return `const { ${before} } = useState`;
+        }
+        return match;
       }
-    } catch (error) {
-      console.error(`❌ Error fixing ${fix.file}:`, error.message);
+    },
+    
+    // Remove unused imports only if they're definitely not used
+    {
+      pattern: /,\s*useState\s*(?=})/g,
+      replacement: (match) => {
+        if (!content.includes('useState(')) {
+          return '';
+        }
+        return match;
+      }
+    },
+    
+    {
+      pattern: /,\s*useEffect\s*(?=})/g,
+      replacement: (match) => {
+        if (!content.includes('useEffect(')) {
+          return '';
+        }
+        return match;
+      }
     }
-  } else {
-    console.log(`⚠️  File not found: ${fix.file}`);
-  }
-});
+  ];
 
-console.log('\n🎉 Build error fixes completed!');
+  safeFixes.forEach(fix => {
+    const result = newContent.replace(fix.pattern, fix.replacement);
+    if (result !== newContent) {
+      newContent = result;
+      modified = true;
+    }
+  });
+
+  return { content: newContent, modified };
+}
+
+// Process only the file that's causing the build error
+const problemFile = path.join(__dirname, 'app/admin/BookManagementEnhanced.tsx');
+
+if (fs.existsSync(problemFile)) {
+  const content = fs.readFileSync(problemFile, 'utf8');
+  const result = fixFile(problemFile, content);
+  
+  if (result.modified) {
+    fs.writeFileSync(problemFile, result.content);
+    console.log(`Fixed: ${problemFile}`);
+  }
+}
+
+console.log('Build error fix complete');

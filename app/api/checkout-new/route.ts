@@ -231,6 +231,16 @@ export async function POST(request: NextRequest) {
       // Don't throw error here as the order was created successfully
     }
 
+    // Clear cart after successful order creation (for all payment methods)
+    try {
+      console.log('🔍 Clearing cart after successful order creation...');
+      await ecommerceService.clearCart(userId);
+      console.log('✅ Cart cleared successfully after order creation');
+    } catch (cartError) {
+      console.error('❌ Error clearing cart after order creation:', sanitizeLogInput(cartError));
+      // Don't fail the entire checkout for cart clearing issues
+    }
+
     // Handle different payment methods
     if (formData.payment.method === 'bank_transfer') {
       console.log('🔍 Processing bank transfer...');
@@ -361,7 +371,7 @@ export async function POST(request: NextRequest) {
           paymentUrl: result.data.link, // Keep for backward compatibility
           inlinePaymentData: flutterwaveService.prepareInlinePaymentData(paymentData),
           reference: transactionId,
-          message: 'Inline Flutterwave payment ready...'
+          message: 'Order created successfully. Cart cleared. Proceed with payment.'
         } as OrderResponse);
 
       } catch (error) {

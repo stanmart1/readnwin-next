@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { sanitizePath, validateFilePath, safeLog } from '@/utils/security';
 
 export async function GET(
   request: NextRequest,
@@ -24,7 +25,7 @@ export async function GET(
     }
     
     // Sanitize filename to prevent path traversal
-    const sanitizedFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '');
+    const sanitizedFilename = sanitizePath(filename);
     
     // Try multiple possible paths for cover images (check main covers directory first)
     const possiblePaths = [
@@ -43,9 +44,18 @@ export async function GET(
     
     let coverPath = null;
     for (const path of possiblePaths) {
-      if (existsSync(path)) {
-        coverPath = path;
-        break;
+      try {
+        // Validate path is safe before checking existence
+        const basePath = process.env.NODE_ENV === 'production' ? '/app/storage' : join(process.cwd(), 'storage');
+        validateFilePath(sanitizedFilename, basePath);
+        
+        if (existsSync(path)) {
+          coverPath = path;
+          break;
+        }
+      } catch (pathError) {
+        safeLog.warn('Invalid path detected:', path);
+        continue;
       }
     }
     
@@ -75,7 +85,7 @@ export async function GET(
     });
     
   } catch (error) {
-    console.error('Error serving cover image:', error);
+    safeLog.error('Error serving cover image:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

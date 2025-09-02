@@ -12,6 +12,10 @@ export async function GET(request: NextRequest) {
     }
     
     const userId = parseInt(session.user.id);
+    
+    if (isNaN(userId)) {
+      return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
+    }
 
     // Fetch user profile data with fallback for missing columns
     const profileResult = await query(`
@@ -22,7 +26,7 @@ export async function GET(request: NextRequest) {
         COALESCE(u.first_name, '') as first_name,
         COALESCE(u.last_name, '') as last_name,
         COALESCE(u.bio, '') as bio,
-        COALESCE(u.avatar_url, u.profile_image, '') as profile_image,
+        COALESCE(u.profile_image, u.avatar_url, '') as profile_image,
         COALESCE(u.is_student, false) as is_student,
         u.status,
         u.created_at,
@@ -141,7 +145,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, profile });
   } catch (error) {
     console.error('Error fetching profile:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    
+    // Check if it's a database connection error
+    if (error instanceof Error && error.message.includes('connect')) {
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 503 });
+    }
+    
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    }, { status: 500 });
   }
 }
 

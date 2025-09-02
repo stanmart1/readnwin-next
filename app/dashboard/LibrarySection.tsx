@@ -10,8 +10,7 @@ interface LibraryBook {
   title: string;
   author_name: string;
   cover_image_url?: string;
-  book_type: 'physical' | 'ebook' | 'hybrid';
-  primary_format?: string;
+  format: 'physical' | 'ebook' | 'hybrid';
   progress_percentage: number;
   last_read_at?: string;
   completed_at?: string;
@@ -260,11 +259,11 @@ export default function LibrarySection() {
                   {/* Book Type Badge */}
                   <div className="absolute top-2 right-2">
                     <span className={`px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-xs font-medium backdrop-blur-sm ${
-                      book.book_type === 'ebook' 
+                      book.format === 'ebook' 
                         ? 'bg-blue-600/90 text-white' 
                         : 'bg-amber-600/90 text-white'
                     }`}>
-                      {book.book_type === 'ebook' ? 'Digital' : 'Physical'}
+                      {book.format === 'ebook' ? 'Digital' : 'Physical'}
                     </span>
                   </div>
 
@@ -299,7 +298,7 @@ export default function LibrarySection() {
                   </div>
 
                   {/* Action Button */}
-                  {book.book_type === 'ebook' ? (
+                  {book.format === 'ebook' ? (
                     <Link
                       href={`/reading/${book.id}`}
                       className="w-full inline-flex items-center justify-center px-2 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all"
@@ -357,17 +356,17 @@ export default function LibrarySection() {
                             <span>{Math.round(book.total_reading_time_seconds / 3600)}h read</span>
                           )}
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            book.book_type === 'ebook' 
+                            book.format === 'ebook' 
                               ? 'bg-blue-100 text-blue-800' 
                               : 'bg-amber-100 text-amber-800'
                           }`}>
-                            {book.book_type === 'ebook' ? 'Digital' : 'Physical'}
+                            {book.format === 'ebook' ? 'Digital' : 'Physical'}
                           </span>
                         </div>
                       </div>
                       
                       <div className="flex-shrink-0 ml-4">
-                        {book.book_type === 'ebook' ? (
+                        {book.format === 'ebook' ? (
                           <Link
                             href={`/reading/${book.id}`}
                             className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all"

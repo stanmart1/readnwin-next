@@ -55,6 +55,8 @@ export default function GuestCheckoutEnhanced() {
     getSubtotal,
     getTotalSavings,
     getTotalItems,
+    updateQuantity,
+    removeFromCart,
     transferCartToUser
   } = useGuestCart();
   
@@ -343,6 +345,12 @@ export default function GuestCheckoutEnhanced() {
 
   if (session) {
     return null; // Will redirect to regular checkout
+  }
+
+  // Immediate check for empty cart to prevent form flash
+  if (cartItems.length === 0 && !cartLoading) {
+    router.push('/cart-new');
+    return null;
   }
 
   return (
@@ -748,12 +756,20 @@ export default function GuestCheckoutEnhanced() {
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-md p-6 sticky top-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Order Summary</h2>
+                <button
+                  onClick={() => router.push('/cart-new')}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Edit Cart
+                </button>
+              </div>
               
               {/* Cart Items */}
               <div className="space-y-3 mb-4">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="flex items-center space-x-3">
+                  <div key={item.id} className="flex items-center space-x-3 p-2 border border-gray-100 rounded">
                     <img
                       src={item.book?.cover_image_url || '/placeholder-book.png'}
                       alt={item.book?.title}
@@ -763,9 +779,28 @@ export default function GuestCheckoutEnhanced() {
                       <h4 className="text-sm font-medium text-gray-900 truncate">
                         {item.book?.title}
                       </h4>
-                      <p className="text-sm text-gray-500">
-                        Qty: {item.quantity}
-                      </p>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <button
+                          onClick={() => updateQuantity(item.book_id, item.quantity - 1)}
+                          disabled={item.quantity <= 1}
+                          className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          -
+                        </button>
+                        <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(item.book_id, item.quantity + 1)}
+                          className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-50"
+                        >
+                          +
+                        </button>
+                        <button
+                          onClick={() => removeFromCart(item.book_id)}
+                          className="ml-2 text-red-500 hover:text-red-700 text-xs"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                     <div className="text-sm font-medium text-gray-900">
                       ₦{((item.book?.price || 0) * item.quantity).toLocaleString()}

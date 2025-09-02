@@ -79,7 +79,7 @@ interface CartItem {
   title: string;
   price: number;
   quantity: number;
-  book_type: 'physical' | 'ebook' | 'hybrid';
+  format: 'physical' | 'ebook' | 'hybrid';
 }
 
 interface OrderData {

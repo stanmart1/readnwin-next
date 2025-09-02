@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       message: `${bookType} "${book.title}" assigned successfully`,
       id: result.rows[0].id,
-      book_type: assignedFormat,
+      format: assignedFormat,
       format: assignedFormat
     });
 

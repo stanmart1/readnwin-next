@@ -37,10 +37,36 @@ export async function POST(request: NextRequest) {
     const userId = parseInt(session.user.id);
     console.log('🔍 User ID:', userId);
 
-    // Validate cart has items
+    // Validate cart has items - use CartService directly for reliability
     console.log('🔍 Getting cart items...');
-    const cartItems = await ecommerceService.getCartItems(userId);
-    console.log('🔍 Cart items count:', cartItems.length);
+    let cartItems;
+    try {
+      // Import CartService dynamically to avoid module issues
+      const { cartService } = await import('@/lib/cart/CartService');
+      cartItems = await cartService.getCartItems(userId);
+      console.log('🔍 Cart items count:', cartItems.length);
+    } catch (cartError) {
+      console.error('❌ Error getting cart items:', cartError);
+      // Fallback: check if cart was recently updated (transfer scenario)
+      try {
+        const recentCheck = await query(`
+          SELECT COUNT(*) as count FROM cart_items 
+          WHERE user_id = $1 AND created_at > NOW() - INTERVAL '1 minute'
+        `, [userId]);
+        
+        if (recentCheck.rows[0]?.count > 0) {
+          return NextResponse.json(
+            { error: 'Cart is being processed, please try again in a moment' },
+            { status: 409 }
+          );
+        }
+      } catch {}
+      
+      return NextResponse.json(
+        { error: 'Failed to load cart items. Please try again.' },
+        { status: 500 }
+      );
+    }
     
     if (cartItems.length === 0) {
       console.log('❌ Cart is empty');
@@ -50,52 +76,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get cart analytics to determine checkout flow
-    console.log('🔍 Getting cart analytics...');
-    const analytics = await ecommerceService.getCartAnalytics(userId);
-    console.log('🔍 Analytics:', sanitizeLogInput(analytics));
-    
-    const isEbookOnly = analytics.isEbookOnly;
+    // Determine cart type from items directly using book management system format
+    const isEbookOnly = cartItems.every(item => 
+      item.book?.format === 'ebook'
+    );
     console.log('🔍 Is ebook only:', isEbookOnly);
 
     // Handle shipping addresses based on cart type
     let shippingAddress = formData.shipping;
     let billingAddress = formData.billing;
 
-    if (isEbookOnly) {
-      console.log('🔍 Creating default addresses for e-books...');
-      // For e-books, use default digital delivery addresses
-              const userFirstName = session.user.firstName || 'User';
-        const userLastName = session.user.lastName || 'Name';
-      const userEmail = session.user.email || '';
-      
-      console.log('🔍 User details:', { userFirstName, userLastName, userEmail });
-      
-      shippingAddress = {
-        first_name: formData.shipping?.first_name || userFirstName,
-        last_name: formData.shipping?.last_name || userLastName,
-        email: formData.shipping?.email || userEmail,
-        phone: formData.shipping?.phone || '+2340000000000',
-        address: 'Digital Delivery',
-        city: 'Digital',
-        state: 'Digital',
-        zip_code: '00000',
-        country: 'NG'
-      };
-
-      billingAddress = {
-        sameAsShipping: true,
-        first_name: formData.billing?.first_name || userFirstName,
-        last_name: formData.billing?.last_name || userLastName,
-        address: 'Digital Delivery',
-        city: 'Digital',
-        state: 'Digital',
-        zip_code: '00000',
-        country: 'NG'
-      };
-      
-      console.log('🔍 Created addresses for ebook-only order:', { shippingAddress, billingAddress });
-    } else {
+    if (!isEbookOnly) {
       // For physical books, validate shipping address is required
       if (!formData.shipping || !formData.shipping.first_name || !formData.shipping.address) {
         console.log('❌ Shipping address required for physical books');
@@ -105,6 +96,20 @@ export async function POST(request: NextRequest) {
         );
       }
       console.log('✅ Shipping address provided for physical books');
+    } else {
+      // For ebooks, use minimal address from session
+      shippingAddress = {
+        first_name: session.user.firstName || 'User',
+        last_name: session.user.lastName || 'Name', 
+        email: session.user.email || '',
+        phone: '+2340000000000',
+        address: 'Digital Delivery',
+        city: 'Digital',
+        state: 'Digital', 
+        zip_code: '00000',
+        country: 'NG'
+      };
+      billingAddress = { sameAsShipping: true, ...shippingAddress };
     }
 
     // Validate payment method
@@ -141,14 +146,14 @@ export async function POST(request: NextRequest) {
     // Add eBooks to user library immediately after successful order creation
     // Check if cart has any ebooks by examining cart items
     const hasEbooks = cartItems.some(item => 
-      item.book?.format === 'ebook' || item.book?.format === 'both'
+      item.book?.format === 'ebook'
     );
     
     if (hasEbooks) {
       console.log('📚 Adding eBooks to user library...');
       try {
         for (const item of cartItems) {
-          if (item.book?.format === 'ebook' || item.book?.format === 'both') {
+          if (item.book?.format === 'ebook') {
             await ecommerceService.addToUserLibrary(userId, item.book_id, order.id);
             console.log(`✅ Added eBook "${item.book.title}" to user library`);
           }
@@ -447,8 +452,19 @@ export async function GET(request: NextRequest) {
 
     const userId = parseInt(session.user.id);
     
-    // Validate cart has items
-    const cartItems = await ecommerceService.getCartItems(userId);
+    // Validate cart has items - use CartService directly
+    let cartItems;
+    try {
+      const { cartService } = await import('@/lib/cart/CartService');
+      cartItems = await cartService.getCartItems(userId);
+    } catch (cartError) {
+      console.error('Error getting cart items for checkout summary:', cartError);
+      return NextResponse.json(
+        { error: 'Failed to load cart items' },
+        { status: 500 }
+      );
+    }
+    
     if (cartItems.length === 0) {
       return NextResponse.json(
         { error: 'Cart is empty' },

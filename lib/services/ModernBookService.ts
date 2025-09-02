@@ -16,7 +16,7 @@ export interface BookCreationData {
   short_description?: string;
   
   // Book Type and Format
-  book_type: 'physical' | 'ebook' | 'hybrid';
+  format: 'physical' | 'ebook' | 'both';
   primary_format?: 'epub' | 'html' | 'pdf' | 'hardcover' | 'paperback';
   
   // Pricing
@@ -94,7 +94,7 @@ export interface EnhancedBook {
   isbn?: string;
   description?: string;
   short_description?: string;
-  book_type: 'physical' | 'ebook' | 'hybrid';
+  format: 'physical' | 'ebook' | 'both';
   primary_format?: string;
   price: number;
   original_price?: number;
@@ -157,7 +157,7 @@ export class ModernBookService {
         const bookResult = await client.query(`
           INSERT INTO books (
             title, subtitle, author_id, category_id, isbn, description, short_description,
-            book_type, primary_format, price, original_price, cost_price, currency,
+            format, primary_format, price, original_price, cost_price, currency,
             weight_grams, dimensions, shipping_class, stock_quantity, low_stock_threshold,
             inventory_tracking, download_limit, drm_protected, language, pages,
             publication_date, publisher, edition, status, is_featured, is_bestseller,
@@ -171,7 +171,7 @@ export class ModernBookService {
         `, [
           bookData.title, bookData.subtitle, bookData.author_id, bookData.category_id,
           bookData.isbn, bookData.description, bookData.short_description,
-          bookData.book_type, bookData.primary_format, bookData.price,
+          bookData.format, bookData.primary_format, bookData.price,
           bookData.original_price, bookData.cost_price, bookData.currency || 'NGN',
           bookData.weight_grams, bookData.dimensions ? JSON.stringify(bookData.dimensions) : null,
           bookData.shipping_class, bookData.stock_quantity || 0, bookData.low_stock_threshold || 5,
@@ -203,7 +203,7 @@ export class ModernBookService {
         }
 
         // Process ebook file if provided
-        if (bookData.ebook_file && bookData.book_type !== 'physical') {
+        if (bookData.ebook_file && bookData.format !== 'physical') {
           const ebookResult = await this.processEbookFile(bookData.ebook_file, bookId);
           if (ebookResult.success) {
             // Create book format record
@@ -506,7 +506,6 @@ export class ModernBookService {
       const result = await query(`
         SELECT 
           b.*,
-          COALESCE(b.book_type, b.format, 'ebook') as format,
           a.name as author_name,
           c.name as category_name
         FROM books b
@@ -542,7 +541,7 @@ export class ModernBookService {
     search?: string;
     category_id?: number;
     author_id?: number;
-    book_type?: string;
+    format?: string;
     status?: string;
     is_featured?: boolean;
     is_bestseller?: boolean;
@@ -584,9 +583,9 @@ export class ModernBookService {
         paramIndex++;
       }
 
-      if (filters.book_type) {
-        whereClause += ` AND b.book_type = $${paramIndex}`;
-        params.push(filters.book_type);
+      if (filters.format) {
+        whereClause += ` AND b.format = $${paramIndex}`;
+        params.push(filters.format);
         paramIndex++;
       }
 
@@ -634,7 +633,6 @@ export class ModernBookService {
       const booksResult = await query(`
         SELECT 
           b.*,
-          COALESCE(b.book_type, b.format, 'ebook') as format,
           a.name as author_name,
           c.name as category_name
         FROM books b
@@ -712,7 +710,7 @@ export class ModernBookService {
 
         const allowedFields = [
           'title', 'subtitle', 'author_id', 'category_id', 'isbn', 'description',
-          'short_description', 'book_type', 'primary_format', 'price', 'original_price',
+          'short_description', 'format', 'primary_format', 'price', 'original_price',
           'cost_price', 'currency', 'weight_grams', 'dimensions', 'shipping_class',
           'stock_quantity', 'low_stock_threshold', 'inventory_tracking', 'download_limit',
           'drm_protected', 'language', 'pages', 'publication_date', 'publisher',

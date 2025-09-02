@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
+import { sanitizeApiResponse, safeLog } from '@/utils/security';
 
 export async function GET(
   request: NextRequest,
@@ -60,7 +61,7 @@ export async function GET(
 
     const progress = progressResult.rows[0];
 
-    return NextResponse.json({
+    return NextResponse.json(sanitizeApiResponse({
       bookId: progress.bookId,
       userId: progress.userId,
       currentPosition: progress.currentPosition || 0,
@@ -70,10 +71,10 @@ export async function GET(
       sessionStartTime: progress.sessionStartTime,
       wordsRead: progress.wordsRead || 0,
       chaptersCompleted: progress.chaptersCompleted || 0,
-    });
+    }));
 
   } catch (error) {
-    console.error('Error fetching reading progress:', error);
+    safeLog.error('Error fetching reading progress:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -160,13 +161,13 @@ export async function POST(
       progressData.chaptersCompleted || 0
     ]);
 
-    return NextResponse.json({
+    return NextResponse.json(sanitizeApiResponse({
       success: true,
       progress: result.rows[0]
-    });
+    }));
 
   } catch (error) {
-    console.error('Error saving reading progress:', error);
+    safeLog.error('Error saving reading progress:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -203,7 +204,7 @@ export async function DELETE(
     return NextResponse.json({ success: true });
 
   } catch (error) {
-    console.error('Error deleting reading progress:', error);
+    safeLog.error('Error deleting reading progress:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

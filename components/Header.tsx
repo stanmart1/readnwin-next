@@ -5,18 +5,42 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { useCart } from '@/contexts/CartContextNew';
 import { useGuestCart } from '@/contexts/GuestCartContext';
+import { useSecureCart } from '@/contexts/SecureCartContext';
+import { protectNavigation, ensureNavigationResponsive } from '@/utils/navigationProtection';
+
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-  const [loadingLink, setLoadingLink] = useState<string | null>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { data: session } = useSession();
-  const { getTotalItems } = useCart();
-  const { getTotalItems: getGuestTotalItems } = useGuestCart();
+  
+  const guestCart = useGuestCart();
+  const secureCart = useSecureCart();
+  
+  // Use appropriate cart based on authentication status
+  const totalItems = session ? secureCart.totalItems : guestCart.getTotalItems();
+  const cartItems = session ? secureCart.items : guestCart.cartItems;
+  
+  // Force re-render when cart changes
+  useEffect(() => {
+    // This will trigger a re-render when cart items change
+  }, [cartItems, totalItems]);
+  
+  // Listen for cart refresh events
+  useEffect(() => {
+    const handleCartRefresh = () => {
+      // Force re-render by updating a state
+      setIsMenuOpen(prev => prev);
+    };
+
+    window.addEventListener('cart-refresh', handleCartRefresh);
+    return () => window.removeEventListener('cart-refresh', handleCartRefresh);
+  }, []);
+
+
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -30,22 +54,29 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Protect navigation from interference
+  useEffect(() => {
+    protectNavigation();
+    
+    // Ensure navigation remains responsive after page loads
+    const timer = setTimeout(() => {
+      ensureNavigationResponsive();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/' });
   };
 
-  const handleNavigation = (href: string, linkId: string) => {
-    setLoadingLink(linkId);
+  const closeMenus = () => {
     setIsProfileDropdownOpen(false);
     setIsMenuOpen(false);
-    
-    router.push(href);
-    // Clear loading state after navigation starts
-    setTimeout(() => setLoadingLink(null), 300);
   };
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50 navigation-safe" data-navigation="header">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -59,41 +90,46 @@ export default function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <Link href="/" className="text-gray-600 hover:text-blue-600 transition-colors duration-200">
-              Home
+          <nav className="hidden md:flex items-center space-x-1 navigation-safe">
+            <Link href="/" className="relative px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium group">
+              <span>Home</span>
+              <div className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-blue-600 transition-all duration-200 group-hover:w-4/5 transform -translate-x-1/2"></div>
             </Link>
-            <Link href="/books" className="text-gray-600 hover:text-blue-600 transition-colors duration-200">
-              Books
+            <Link href="/books" className="relative px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium group">
+              <span>Books</span>
+              <div className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-blue-600 transition-all duration-200 group-hover:w-4/5 transform -translate-x-1/2"></div>
             </Link>
-            <Link href="/blog" className="text-gray-600 hover:text-blue-600 transition-colors duration-200">
-              Blog
+            <Link href="/blog" className="relative px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium group">
+              <span>Blog</span>
+              <div className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-blue-600 transition-all duration-200 group-hover:w-4/5 transform -translate-x-1/2"></div>
             </Link>
-            <Link href="/faq" className="text-gray-600 hover:text-blue-600 transition-colors duration-200">
-              FAQ
+            <Link href="/faq" className="relative px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium group">
+              <span>FAQ</span>
+              <div className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-blue-600 transition-all duration-200 group-hover:w-4/5 transform -translate-x-1/2"></div>
             </Link>
-            <Link href="/about" className="text-gray-600 hover:text-blue-600 transition-colors duration-200">
-              About
+            <Link href="/about" className="relative px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium group">
+              <span>About</span>
+              <div className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-blue-600 transition-all duration-200 group-hover:w-4/5 transform -translate-x-1/2"></div>
             </Link>
-            <Link href="/contact" className="text-gray-600 hover:text-blue-600 transition-colors duration-200">
-              Contact
+            <Link href="/contact" className="relative px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium group">
+              <span>Contact</span>
+              <div className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-blue-600 transition-all duration-200 group-hover:w-4/5 transform -translate-x-1/2"></div>
             </Link>
           </nav>
 
           {/* Right side - Cart, User */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 navigation-safe">
             {/* Cart */}
-            <button 
-              onClick={() => router.push('/cart-new')}
-              className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors duration-200"
-            >
-              <i className="ri-shopping-cart-line text-xl"></i>
-              {(session ? getTotalItems() : getGuestTotalItems()) > 0 && (
-                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {(session ? getTotalItems() : getGuestTotalItems()) > 99 ? '99+' : (session ? getTotalItems() : getGuestTotalItems())}
+            <Link href={session ? "/cart/secure" : "/checkout-guest"} className="relative flex items-center justify-center p-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 cursor-pointer navigation-safe" data-navigation="cart-link">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.5 5M7 13l-1.5 5m0 0h9m-9 0a1 1 0 102 0m7 0a1 1 0 102 0" />
+              </svg>
+              {totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse pointer-events-none z-10">
+                  {totalItems > 99 ? '99+' : totalItems}
                 </span>
               )}
-            </button>
+            </Link>
 
             {/* User Menu */}
             {session ? (
@@ -124,25 +160,25 @@ export default function Header() {
                       <Link 
                         href="/admin"
                         className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
-                        onClick={() => setIsProfileDropdownOpen(false)}
+                        onClick={closeMenus}
                       >
                         <i className="ri-admin-line mr-3"></i>
                         <span className="font-medium">Admin Dashboard</span>
                       </Link>
                     )}
-                    <Link href="/dashboard" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
+                    <Link href="/dashboard" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer" onClick={closeMenus}>
                       <i className="ri-dashboard-line mr-3"></i>
                       <span className="font-medium">Dashboard</span>
                     </Link>
-                    <Link href="/dashboard/profile" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
+                    <Link href="/dashboard/profile" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer" onClick={closeMenus}>
                       <i className="ri-user-line mr-3"></i>
                       <span className="font-medium">Profile</span>
                     </Link>
-                    <Link href="/dashboard/orders" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
+                    <Link href="/dashboard/orders" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer" onClick={closeMenus}>
                       <i className="ri-shopping-bag-line mr-3"></i>
                       <span className="font-medium">Orders</span>
                     </Link>
-                    <Link href="/dashboard?tab=library" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
+                    <Link href="/dashboard?tab=library" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer" onClick={closeMenus}>
                       <i className="ri-book-open-line mr-3"></i>
                       <span className="font-medium">My Library</span>
                     </Link>
@@ -157,11 +193,11 @@ export default function Header() {
                 )}
               </div>
             ) : (
-              <div className="hidden md:flex items-center space-x-4">
-                <Link href="/login" className="text-gray-600 hover:text-blue-600 transition-colors duration-200">
+              <div className="hidden md:flex items-center space-x-3">
+                <Link href="/login" className="px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium navigation-safe" data-navigation="login-link">
                   Sign In
                 </Link>
-                <Link href="/register" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200">
+                <Link href="/register" className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-blue-800 hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 font-medium navigation-safe" data-navigation="register-link">
                   Sign Up
                 </Link>
               </div>
@@ -170,7 +206,7 @@ export default function Header() {
             {/* Mobile menu button */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden p-2 text-gray-600 hover:text-blue-600 transition-colors duration-200"
+              className="md:hidden p-2 text-gray-600 hover:text-blue-600 transition-colors duration-200 navigation-safe"
             >
               <i className={`ri-${isMenuOpen ? 'close' : 'menu'}-line text-xl`}></i>
             </button>
@@ -187,7 +223,7 @@ export default function Header() {
             ></div>
             
             {/* Side Drawer */}
-            <div className="md:hidden fixed top-0 right-0 h-full w-72 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out">
+            <div className="md:hidden fixed top-0 right-0 h-full w-72 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out navigation-safe">
               <div className="flex flex-col h-full">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
@@ -206,12 +242,12 @@ export default function Header() {
                 </div>
                 
                 {/* Navigation Links */}
-                <nav className="flex-1 p-4 overflow-y-auto">
+                <nav className="flex-1 p-4 overflow-y-auto navigation-safe">
                   <div className="flex flex-col space-y-2">
                     <Link 
                       href="/" 
                       className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 py-3 px-3 rounded-lg"
-                      onClick={() => setIsMenuOpen(false)}
+                      onClick={closeMenus}
                     >
                       <i className="ri-home-line text-lg"></i>
                       <span className="font-medium">Home</span>
@@ -219,7 +255,7 @@ export default function Header() {
                     <Link 
                       href="/books" 
                       className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 py-3 px-3 rounded-lg"
-                      onClick={() => setIsMenuOpen(false)}
+                      onClick={closeMenus}
                     >
                       <i className="ri-book-line text-lg"></i>
                       <span className="font-medium">Books</span>
@@ -228,7 +264,7 @@ export default function Header() {
                       <Link 
                         href="/dashboard?tab=library" 
                         className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 py-3 px-3 rounded-lg"
-                        onClick={() => setIsMenuOpen(false)}
+                        onClick={closeMenus}
                       >
                         <i className="ri-library-line text-lg"></i>
                         <span className="font-medium">My Library</span>
@@ -237,7 +273,7 @@ export default function Header() {
                     <Link 
                       href="/blog" 
                       className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 py-3 px-3 rounded-lg"
-                      onClick={() => setIsMenuOpen(false)}
+                      onClick={closeMenus}
                     >
                       <i className="ri-article-line text-lg"></i>
                       <span className="font-medium">Blog</span>
@@ -245,7 +281,7 @@ export default function Header() {
                     <Link 
                       href="/faq" 
                       className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 py-3 px-3 rounded-lg"
-                      onClick={() => setIsMenuOpen(false)}
+                      onClick={closeMenus}
                     >
                       <i className="ri-question-line text-lg"></i>
                       <span className="font-medium">FAQ</span>
@@ -253,7 +289,7 @@ export default function Header() {
                     <Link 
                       href="/about" 
                       className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 py-3 px-3 rounded-lg"
-                      onClick={() => setIsMenuOpen(false)}
+                      onClick={closeMenus}
                     >
                       <i className="ri-information-line text-lg"></i>
                       <span className="font-medium">About</span>
@@ -261,7 +297,7 @@ export default function Header() {
                     <Link 
                       href="/contact" 
                       className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 py-3 px-3 rounded-lg"
-                      onClick={() => setIsMenuOpen(false)}
+                      onClick={closeMenus}
                     >
                       <i className="ri-customer-service-line text-lg"></i>
                       <span className="font-medium">Contact</span>
@@ -293,7 +329,7 @@ export default function Header() {
                       <button
                         onClick={() => {
                           handleSignOut();
-                          setIsMenuOpen(false);
+                          closeMenus();
                         }}
                         className="w-full flex items-center justify-center space-x-2 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium"
                       >
@@ -306,7 +342,7 @@ export default function Header() {
                       <Link 
                         href="/login" 
                         className="w-full flex items-center justify-center space-x-2 text-gray-700 hover:text-blue-600 hover:bg-white transition-all duration-200 py-3 px-4 rounded-lg border border-gray-200 font-medium"
-                        onClick={() => setIsMenuOpen(false)}
+                        onClick={closeMenus}
                       >
                         <i className="ri-login-box-line"></i>
                         <span>Sign In</span>
@@ -314,7 +350,7 @@ export default function Header() {
                       <Link 
                         href="/register" 
                         className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium shadow-lg"
-                        onClick={() => setIsMenuOpen(false)}
+                        onClick={closeMenus}
                       >
                         <i className="ri-user-add-line"></i>
                         <span>Sign Up</span>

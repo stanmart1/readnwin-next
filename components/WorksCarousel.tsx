@@ -134,7 +134,8 @@ export default function WorksCarousel() {
     if (!isAutoPlaying || worksImages.length === 0) return;
 
     const interval = setInterval(() => {
-      if (!isTransitioning) {
+      // Check if user is interacting with the page and not transitioning
+      if (!isTransitioning && document.hasFocus()) {
         scrollToNext();
       }
     }, 4000);

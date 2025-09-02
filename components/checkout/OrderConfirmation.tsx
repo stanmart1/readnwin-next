@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { formatNaira, calculateVAT } from '@/utils/currency';
-import { useCart } from '@/contexts/CartContextNew';
+import { useGuestCart } from '@/contexts/GuestCartContext';
 import { useFlutterwaveInline } from '@/hooks/useFlutterwaveInline';
 import { AlertCircle, CheckCircle, Loader2, Upload, X, FileText, Image as ImageIcon } from 'lucide-react';
 import { sanitizeLogInput } from '@/utils/security';
@@ -26,7 +26,7 @@ export default function OrderConfirmation({
 }: OrderConfirmationProps) {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const { isEbookOnly } = useCart();
+  const { isEbookOnly } = useGuestCart();
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderData, setOrderData] = useState<any>(null);
   const [bankTransferData, setBankTransferData] = useState<any>(null);

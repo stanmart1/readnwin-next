@@ -13,11 +13,16 @@ export function useProfile() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api/profile');
+      const response = await fetch('/api/profile', {
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}`);
+        const errorMessage = errorData.error || errorData.message || `HTTP ${response.status}`;
+        throw new Error(errorMessage);
       }
       
       const data = await response.json();
@@ -51,11 +56,13 @@ export function useProfile() {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}`);
+        const errorMessage = errorData.error || errorData.message || `HTTP ${response.status}`;
+        throw new Error(errorMessage);
       }
       
       const data = await response.json();
-      setProfile(data.profile);
+      // Refetch the profile to get updated data
+      await fetchProfile();
       return { success: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update profile';

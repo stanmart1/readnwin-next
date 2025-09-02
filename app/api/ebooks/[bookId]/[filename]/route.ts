@@ -12,83 +12,50 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return new NextResponse('Unauthorized', { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { bookId, filename } = params;
     
-    // Check if user has access to this book
-    const accessResult = await query(`
-      SELECT 1 FROM (
-        SELECT 1 FROM user_library 
-        WHERE user_id = $1 AND book_id = $2
-        
-        UNION
-        
-        SELECT 1 FROM order_items oi
-        JOIN orders o ON oi.order_id = o.id
-        WHERE o.user_id = $1 AND oi.book_id = $2 AND o.payment_status = 'paid'
-        
-        UNION
-        
-        SELECT 1 FROM books b
-        WHERE b.id = $2 AND (b.price = 0 OR b.status = 'free')
-      ) AS access_check
-      LIMIT 1
-    `, [session.user.id, bookId]);
+    // Verify user has access to this book (owns it or is admin)
+    const bookCheck = await query(`
+      SELECT b.id, b.ebook_file_url, ul.user_id as library_user
+      FROM books b
+      LEFT JOIN user_library ul ON b.id = ul.book_id AND ul.user_id = $1
+      WHERE b.id = $2 AND (ul.user_id IS NOT NULL OR $3 IN ('admin', 'super_admin'))
+    `, [parseInt(session.user.id), parseInt(bookId), session.user.role]);
 
-    if (accessResult.rows.length === 0) {
-      return new NextResponse('Access denied', { status: 403 });
+    if (bookCheck.rows.length === 0) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    // Handle path traversal for naked EPUB files
-    const requestPath = decodeURIComponent(filename);
-    const sanitizedPath = requestPath.replace(/\.\./g, '').replace(/^\/+/, '');
-    
-    // Determine file path for naked EPUB structure
-    const basePath = process.env.NODE_ENV === 'production'
-      ? join('/app/storage/books', bookId)
-      : join(process.cwd(), 'storage', 'books', bookId);
-    
-    const filePath = join(basePath, sanitizedPath);
-    
-    // Security check: ensure file is within book directory
-    if (!filePath.startsWith(basePath)) {
-      return new NextResponse('Invalid path', { status: 400 });
-    }
+    // Serve the original e-book file
+    const filePath = join(process.cwd(), 'storage', 'ebooks', filename);
     
     if (!existsSync(filePath)) {
-      return new NextResponse('File not found', { status: 404 });
+      return NextResponse.json({ error: 'File not found' }, { status: 404 });
     }
-    
+
     const fileBuffer = readFileSync(filePath);
-    const contentType = getContentType(sanitizedPath);
+    const fileExtension = filename.toLowerCase().split('.').pop();
     
-    return new NextResponse(new Uint8Array(fileBuffer), {
+    let contentType = 'application/octet-stream';
+    if (fileExtension === 'epub') {
+      contentType = 'application/epub+zip';
+    } else if (fileExtension === 'html' || fileExtension === 'htm') {
+      contentType = 'text/html';
+    }
+
+    return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'private, max-age=3600',
-        'Content-Disposition': `inline; filename="${sanitizedPath.split('/').pop()}"`
+        'Content-Disposition': `inline; filename="${filename}"`,
+        'Cache-Control': 'private, max-age=3600'
       }
     });
-    
-  } catch (error) {
-    console.error('Error serving ebook file:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
-  }
-}
 
-function getContentType(filename: string): string {
-  const ext = filename.toLowerCase().split('.').pop();
-  switch (ext) {
-    case 'epub':
-      return 'application/epub+zip';
-    case 'html':
-    case 'htm':
-      return 'text/html';
-    case 'pdf':
-      return 'application/pdf';
-    default:
-      return 'application/octet-stream';
+  } catch (error) {
+    console.error('Error serving e-book file:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

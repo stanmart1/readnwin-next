@@ -5,7 +5,6 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Trash2, Plus, Minus, ShoppingBag, Download, Package, AlertCircle, User, LogIn } from 'lucide-react';
-import { useCart } from '@/contexts/CartContextNew';
 import { useGuestCart } from '@/contexts/GuestCartContext';
 import Header from '@/components/Header';
 import './cart-mobile.css';
@@ -14,50 +13,21 @@ export default function CartPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   
-  // Use appropriate cart context based on authentication status
-  const { 
-    cartItems: authCartItems, 
-    isLoading: authIsLoading, 
-    error: authError,
-    analytics: authAnalytics,
-    updateQuantity: authUpdateQuantity, 
-    removeFromCart: authRemoveFromCart,
-    isEbookOnly: authIsEbookOnly,
-    isPhysicalOnly: authIsPhysicalOnly,
-    isMixedCart: authIsMixedCart,
-    getSubtotal: authGetSubtotal,
-    getTotalSavings: authGetTotalSavings,
-    getTotalItems: authGetTotalItems
-  } = useCart();
-
+  // Use GuestCartContext which handles both guest and authenticated users
   const {
-    cartItems: guestCartItems,
-    isLoading: guestIsLoading,
-    error: guestError,
-    analytics: guestAnalytics,
-    updateQuantity: guestUpdateQuantity,
-    removeFromCart: guestRemoveFromCart,
-    isEbookOnly: guestIsEbookOnly,
-    isPhysicalOnly: guestIsPhysicalOnly,
-    isMixedCart: guestIsMixedCart,
-    getSubtotal: guestGetSubtotal,
-    getTotalSavings: guestGetTotalSavings,
-    getTotalItems: guestGetTotalItems
+    cartItems,
+    isLoading,
+    error,
+    analytics,
+    updateQuantity,
+    removeFromCart,
+    isEbookOnly,
+    isPhysicalOnly,
+    isMixedCart,
+    getSubtotal,
+    getTotalSavings,
+    getTotalItems
   } = useGuestCart();
-
-  // Use appropriate cart data based on session status
-  const cartItems = session ? authCartItems : guestCartItems;
-  const isLoading = session ? authIsLoading : guestIsLoading;
-  const error = session ? authError : guestError;
-  const analytics = session ? authAnalytics : guestAnalytics;
-  const updateQuantity = session ? authUpdateQuantity : guestUpdateQuantity;
-  const removeFromCart = session ? authRemoveFromCart : guestRemoveFromCart;
-  const isEbookOnly = session ? authIsEbookOnly : guestIsEbookOnly;
-  const isPhysicalOnly = session ? authIsPhysicalOnly : guestIsPhysicalOnly;
-  const isMixedCart = session ? authIsMixedCart : guestIsMixedCart;
-  const getSubtotal = session ? authGetSubtotal : guestGetSubtotal;
-  const getTotalSavings = session ? authGetTotalSavings : guestGetTotalSavings;
-  const getTotalItems = session ? authGetTotalItems : guestGetTotalItems;
 
   const handleUpdateQuantity = async (bookId: number, newQuantity: number) => {
     if (newQuantity < 1) return;

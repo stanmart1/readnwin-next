@@ -1,7 +1,7 @@
 import { writeFile, mkdir } from 'fs/promises';
 import { join, basename } from 'path';
 import { existsSync } from 'fs';
-import { validatePath } from './security-safe';
+import { sanitizePath, validateFilePath, safeLog } from './security';
 
 export interface UploadedFile {
   filename: string;
@@ -27,10 +27,10 @@ export class FileUploadService {
 
   async uploadFile(file: File, subdirectory: string): Promise<UploadedFile> {
     try {
-      console.log(`📤 Starting file upload: ${file.name} to ${subdirectory}`);
-      console.log(`📤 File details: ${file.size} bytes, ${file.type}`);
-      console.log(`📤 Upload directory: ${this.uploadDir}`);
-      console.log(`📤 Environment: ${process.env.NODE_ENV}`);
+      safeLog.info(`📤 Starting file upload: ${file.name} to ${subdirectory}`);
+      safeLog.info(`📤 File details: ${file.size} bytes, ${file.type}`);
+      safeLog.info(`📤 Upload directory: ${this.uploadDir}`);
+      safeLog.info(`📤 Environment: ${process.env.NODE_ENV}`);
       
       // Create directory if it doesn't exist with proper error handling
       const fullPath = join(this.uploadDir, subdirectory);
@@ -47,11 +47,11 @@ export class FileUploadService {
           }
           console.log(`✅ Directory created successfully: ${fullPath}`);
         } catch (mkdirError) {
-          console.error(`❌ Failed to create directory ${fullPath}:`, mkdirError);
+          safeLog.error(`❌ Failed to create directory ${fullPath}:`, mkdirError);
           throw new Error(`Permission denied: Cannot create upload directory. Please check file permissions. Directory: ${fullPath}, Error: ${mkdirError instanceof Error ? mkdirError.message : 'Unknown error'}`);
         }
       } else {
-        console.log(`✅ Directory already exists: ${fullPath}`);
+        safeLog.info(`✅ Directory already exists: ${fullPath}`);
       }
 
       // Generate unique filename with better naming
@@ -61,16 +61,11 @@ export class FileUploadService {
       const extension = originalName.split('.').pop()?.toLowerCase();
       const sanitizedName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
       const filename = `${timestamp}_${randomString}_${sanitizedName}`;
-      const safeFilename = basename(filename); // Prevent path traversal
-      const filePath = join(fullPath, safeFilename);
-      
-      // Validate path is within allowed directory
-      if (!validatePath(filePath, this.uploadDir)) {
-        throw new Error('Invalid file path detected');
-      }
+      const safeFilename = sanitizePath(filename); // Prevent path traversal
+      const filePath = validateFilePath(safeFilename, fullPath);
 
-      console.log(`📄 Uploading file: ${originalName} -> ${filename}`);
-      console.log(`📄 Full file path: ${filePath}`);
+      safeLog.info(`📄 Uploading file: ${originalName} -> ${filename}`);
+      safeLog.info(`📄 Full file path: ${filePath}`);
 
       // Convert File to Buffer and save
       const bytes = await file.arrayBuffer();
@@ -80,7 +75,7 @@ export class FileUploadService {
         await writeFile(filePath, buffer);
         console.log(`✅ File written successfully: ${filePath}`);
       } catch (writeError) {
-        console.error(`❌ Failed to write file ${filePath}:`, writeError);
+        safeLog.error(`❌ Failed to write file ${filePath}:`, writeError);
         throw new Error(`Permission denied: Cannot write file to upload directory. Please check file permissions. File: ${filePath}, Error: ${writeError instanceof Error ? writeError.message : 'Unknown error'}`);
       }
 

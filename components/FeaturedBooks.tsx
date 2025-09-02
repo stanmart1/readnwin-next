@@ -48,7 +48,8 @@ export default function FeaturedBooks() {
     if (!isAutoPlaying || books.length === 0) return;
 
     const interval = setInterval(() => {
-      if (carouselRef.current) {
+      // Check if user is interacting with the page
+      if (document.hasFocus() && carouselRef.current) {
         const scrollAmount = carouselRef.current.offsetWidth * 0.8;
         carouselRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
         
@@ -134,13 +135,13 @@ export default function FeaturedBooks() {
     setSelectedCategory(categoryId);
   };
 
-  const handleMouseEnter = () => {
+  const handleMouseEnter = useCallback(() => {
     setIsAutoPlaying(false);
-  };
+  }, []);
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     setIsAutoPlaying(true);
-  };
+  }, []);
 
   return (
     <div className="py-20 bg-white">

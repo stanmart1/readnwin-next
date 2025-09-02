@@ -1,4 +1,4 @@
-import { query, transaction } from './database.ts';
+import { query, transaction } from './database';
 import {
   Book, CartItem, CartAnalytics, Order, OrderItem, UserLibraryItem,
   ShippingAddress, BillingAddress, ShippingMethod, TaxRate, Discount,
@@ -112,7 +112,7 @@ export class EcommerceService {
           ci.user_id,
           ci.book_id,
           ci.quantity,
-          COALESCE(ci.added_at, ci.created_at, CURRENT_TIMESTAMP) as added_at,
+          ci.created_at as added_at,
           COALESCE(ci.format, b.format, 'ebook') as format,
           b.title, 
           COALESCE(b.price, 0) as price, 
@@ -130,7 +130,7 @@ export class EcommerceService {
         LEFT JOIN authors a ON b.author_id = a.id
         LEFT JOIN categories c ON b.category_id = c.id
         WHERE ci.user_id = $1 AND b.status = 'published'
-        ORDER BY COALESCE(ci.added_at, ci.created_at, CURRENT_TIMESTAMP) DESC
+        ORDER BY ci.created_at DESC
       `, [userId]);
 
       return result.rows.map(row => ({
@@ -179,15 +179,17 @@ export class EcommerceService {
 
       if (existingItem.rows.length > 0) {
         const newQuantity = existingItem.rows[0].quantity + quantity;
+        const totalPrice = book.price * newQuantity;
         await query(`
-          UPDATE cart_items SET quantity = $1, format = $2, updated_at = CURRENT_TIMESTAMP 
-          WHERE user_id = $3 AND book_id = $4
-        `, [newQuantity, book.format || 'ebook', userId, bookId]);
+          UPDATE cart_items SET quantity = $1, format = $2, price = $3, total_price = $4, updated_at = CURRENT_TIMESTAMP 
+          WHERE user_id = $5 AND book_id = $6
+        `, [newQuantity, book.format || 'ebook', book.price, totalPrice, userId, bookId]);
       } else {
+        const totalPrice = book.price * quantity;
         await query(`
-          INSERT INTO cart_items (user_id, book_id, quantity, format)
-          VALUES ($1, $2, $3, $4)
-        `, [userId, bookId, quantity, book.format || 'ebook']);
+          INSERT INTO cart_items (user_id, book_id, quantity, format, price, total_price, created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `, [userId, bookId, quantity, book.format || 'ebook', book.price, totalPrice]);
       }
 
       const items = await this.getCartItems(userId);
@@ -218,17 +220,11 @@ export class EcommerceService {
         throw new Error('Insufficient stock');
       }
 
-      try {
-        await query(`
-          UPDATE cart_items SET quantity = $1, format = $2 WHERE user_id = $3 AND book_id = $4
-        `, [quantity, book?.format || 'ebook', userId, bookId]);
-      } catch (formatError) {
-        // Fallback if format column doesn't exist
-        console.log('Format column not found in update, using fallback');
-        await query(`
-          UPDATE cart_items SET quantity = $1 WHERE user_id = $2 AND book_id = $3
-        `, [quantity, userId, bookId]);
-      }
+      const totalPrice = book.price * quantity;
+      await query(`
+        UPDATE cart_items SET quantity = $1, format = $2, price = $3, total_price = $4, updated_at = CURRENT_TIMESTAMP 
+        WHERE user_id = $5 AND book_id = $6
+      `, [quantity, book?.format || 'ebook', book.price, totalPrice, userId, bookId]);
 
       const items = await this.getCartItems(userId);
       const cartItem = items.find(item => item.book_id === bookId);
@@ -552,7 +548,7 @@ export class EcommerceService {
         ]);
 
         // Update stock for physical books with inventory tracking
-        if ((item.book?.format === 'physical' || item.book?.format === 'both') && item.book?.stock_quantity > 0) {
+        if (item.book?.format === 'physical' && item.book?.stock_quantity > 0) {
           await query(`
             UPDATE books SET stock_quantity = stock_quantity - $1
             WHERE id = $2

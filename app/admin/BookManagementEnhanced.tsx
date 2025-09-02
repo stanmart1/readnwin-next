@@ -70,6 +70,7 @@ export default function BookManagementEnhanced() {
     pagination,
     setFilters,
     setPagination,
+    loadBooks,
     updateBook,
     deleteBooks,
     batchUpdateBooks,
@@ -120,6 +121,8 @@ export default function BookManagementEnhanced() {
   // Reload data when modal closes
   const handleModalClose = () => {
     setShowAddModal(false);
+    // Refresh the books list after successful upload
+    loadBooks();
   };
 
   const loadAuthorsAndCategories = async () => {
@@ -776,7 +779,7 @@ export default function BookManagementEnhanced() {
           authors={authors}
           onSuccess={() => {
             // Refresh the books list
-            window.location.reload();
+            loadBooks();
           }}
         />
 

@@ -24,7 +24,7 @@ export async function GET(
 
     // Get book information first to check type
     const bookResult = await query(`
-      SELECT ebook_file_url, storage_path, book_type, format FROM books 
+      SELECT ebook_file_url, storage_path, format FROM books 
       WHERE id = $1 AND status = 'published'
     `, [bookId]);
 
@@ -35,7 +35,7 @@ export async function GET(
     const book = bookResult.rows[0];
 
     // Check if it's a physical book - prevent digital reading
-    if (book.book_type === 'physical' || book.format === 'physical') {
+    if (book.format === 'physical') {
       return NextResponse.json({ error: 'Physical books cannot be read digitally' }, { status: 403 });
     }
 

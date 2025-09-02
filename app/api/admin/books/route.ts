@@ -1,71 +1,94 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// Force dynamic rendering
-export const dynamic = 'force-dynamic';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { withPermission } from '@/utils/api-protection';
 import { query } from '@/utils/database';
-import { secureQuery } from '@/utils/secure-database';
-import { validateInput, sanitizeInput, requireAuth } from '@/utils/security-middleware';
-import { createHash } from 'crypto';
-import { sanitizeForLog, sanitizeHtml, sanitizeInt } from '@/utils/security';
-import { handleApiError } from '@/utils/error-handler';
-import path from 'path';
+import { sanitizeInt } from '@/utils/security';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
 
-// Lazy load file upload service only when needed
-let fileUploadService: any = null;
+export const dynamic = 'force-dynamic';
 
-function getFileUploadService() {
-  if (!fileUploadService) {
-    try {
-      const { EnhancedFileUploadService } = require('@/utils/enhanced-file-upload-service');
-      fileUploadService = new EnhancedFileUploadService();
-    } catch (error) {
-      console.warn('File upload service not available:', error);
-      return null;
-    }
+function ensureUploadDir() {
+  const uploadDir = join(process.cwd(), 'public', 'uploads', 'covers');
+  if (!existsSync(uploadDir)) {
+    mkdirSync(uploadDir, { recursive: true });
   }
-  return fileUploadService;
+  return uploadDir;
+}
+
+// Extract metadata without altering book structure
+async function extractEbookMetadata(buffer: Buffer, filename: string) {
+  const metadata: any = {};
+  
+  try {
+    if (filename.toLowerCase().endsWith('.epub')) {
+      // Basic EPUB metadata extraction without structure changes
+      const JSZip = (await import('jszip')).default;
+      const zip = await JSZip.loadAsync(buffer);
+      
+      // Read container.xml to find OPF file
+      const containerFile = zip.file('META-INF/container.xml');
+      if (containerFile) {
+        const containerXml = await containerFile.async('text');
+        const opfMatch = containerXml.match(/full-path="([^"]+)"/i);
+        
+        if (opfMatch) {
+          const opfFile = zip.file(opfMatch[1]);
+          if (opfFile) {
+            const opfXml = await opfFile.async('text');
+            
+            // Extract basic metadata
+            const titleMatch = opfXml.match(/<dc:title[^>]*>([^<]+)<\/dc:title>/i);
+            const creatorMatch = opfXml.match(/<dc:creator[^>]*>([^<]+)<\/dc:creator>/i);
+            
+            if (titleMatch) metadata.title = titleMatch[1];
+            if (creatorMatch) metadata.creator = creatorMatch[1];
+            
+            // Count spine items for rough page estimation
+            const spineMatches = opfXml.match(/<itemref[^>]*idref="[^"]+"/gi);
+            if (spineMatches) {
+              metadata.pageCount = Math.max(spineMatches.length * 2, 10);
+            }
+          }
+        }
+      }
+    } else if (filename.toLowerCase().endsWith('.html') || filename.toLowerCase().endsWith('.htm')) {
+      // Basic HTML metadata extraction
+      const htmlContent = buffer.toString('utf-8');
+      
+      const titleMatch = htmlContent.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const authorMatch = htmlContent.match(/<meta[^>]*name=["']author["'][^>]*content=["']([^"']+)["']/i);
+      
+      if (titleMatch) metadata.title = titleMatch[1];
+      if (authorMatch) metadata.creator = authorMatch[1];
+      
+      // Rough word count for page estimation
+      const textContent = htmlContent.replace(/<[^>]*>/g, ' ');
+      const words = textContent.trim().split(/\s+/).filter(w => w.length > 0);
+      metadata.wordCount = words.length;
+      metadata.pageCount = Math.ceil(words.length / 250); // 250 words per page
+    }
+  } catch (error) {
+    console.warn('Metadata extraction failed:', error);
+  }
+  
+  return metadata;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
     const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
     if (!isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-  const startTime = Date.now();
-  
-  try {
-    console.log('🚀 Starting enhanced book creation process...');
+
+    const formData = await request.formData();
     
-    // Authentication handled by middleware
-    console.log('✅ Stage 1 PASSED: User authenticated with proper permissions');
-
-    // Stage 2: Parse Form Data
-    console.log('📋 Stage 2: Parsing form data...');
-    let formData: FormData;
-    try {
-      formData = await request.formData();
-      console.log('✅ Stage 2 PASSED: Form data parsed');
-    } catch (parseError) {
-      console.log('❌ Stage 2 FAILED: Form data parsing error:', sanitizeForLog(parseError));
-      return NextResponse.json(
-        { error: 'Invalid form data' },
-        { status: 400 }
-      );
-    }
-
-    // Stage 3: Extract Basic Book Information
-    console.log('📋 Stage 3: Extracting basic book information...');
     const title = formData.get('title') as string;
     const author_id = formData.get('author_id') as string;
     const category_id = formData.get('category_id') as string;
@@ -76,468 +99,158 @@ export async function POST(request: NextRequest) {
     const pages = formData.get('pages') as string;
     const publication_date = formData.get('publication_date') as string;
     const publisher = formData.get('publisher') as string;
-    const book_type = formData.get('book_type') as string || 'ebook';
+    const format = formData.get('format') as string || 'ebook';
     const stock_quantity = formData.get('stock_quantity') as string;
-    const inventory_enabled = formData.get('inventory_enabled') as string;
-    const low_stock_threshold = formData.get('low_stock_threshold') as string;
-
-    // Validate book_type
-    if (!['ebook', 'physical', 'hybrid'].includes(book_type)) {
-      console.log('❌ Stage 3 FAILED: Invalid book type');
-      return NextResponse.json(
-        { error: 'Invalid book type. Must be: ebook, physical, or hybrid' },
-        { status: 400 }
-      );
-    }
-
-    // Input validation
-    const validation = validateInput({
-      title, author_id, category_id, price, isbn, description, language, pages, publication_date, publisher
-    }, {
-      title: { required: true, type: 'string', maxLength: 255 },
-      author_id: { required: true, type: 'string', pattern: /^\d+$/ },
-      category_id: { required: true, type: 'string', pattern: /^\d+$/ },
-      price: { required: true, type: 'string', pattern: /^\d+(\.\d{1,2})?$/ },
-      isbn: { type: 'string', maxLength: 20 },
-      description: { type: 'string', maxLength: 5000 },
-      language: { type: 'string', maxLength: 10 },
-      pages: { type: 'string', pattern: /^\d+$/ },
-      publisher: { type: 'string', maxLength: 255 }
-    });
-
-    if (!validation.isValid) {
-      console.log('❌ Stage 3 FAILED: Validation errors:', validation.errors);
-      return NextResponse.json(
-        { error: 'Validation failed', details: validation.errors },
-        { status: 400 }
-      );
-    }
-
-    console.log('✅ Stage 3 PASSED: Basic book information extracted');
-
-    // Stage 4: Extract Files
-    console.log('📋 Stage 4: Extracting uploaded files...');
     const cover_image = formData.get('cover_image') as File;
     const ebook_file = formData.get('ebook_file') as File;
 
-    console.log('📁 Files received:', {
-      cover_image: cover_image ? `${cover_image.name} (${cover_image.size} bytes)` : 'none',
-      ebook_file: ebook_file ? `${ebook_file.name} (${ebook_file.size} bytes)` : 'none'
-    });
 
-    // Validate file requirements based on book type
-    if (book_type === 'ebook' && !ebook_file) {
-      console.log('❌ Stage 4 FAILED: E-book file required for ebook type');
-      return NextResponse.json(
-        { error: 'E-book file is required for ebook type books' },
-        { status: 400 }
-      );
+
+    if (!title || !author_id || !category_id || !price) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     if (!cover_image) {
-      console.log('❌ Stage 4 FAILED: Cover image required');
-      return NextResponse.json(
-        { error: 'Cover image is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Cover image is required' }, { status: 400 });
     }
 
-    console.log('✅ Stage 4 PASSED: Files extracted and validated');
-
-    // Stage 5: Create Book Record
-    console.log('📋 Stage 5: Creating book record...');
-    let bookId: number;
-    
-    try {
-      const bookResult = await query(`
-        INSERT INTO books (
-          title, author_id, category_id, price, isbn, description, language, 
-          pages, publication_date, publisher, book_type, stock_quantity, 
-          inventory_enabled, low_stock_threshold, created_by, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-        RETURNING id
-      `, [
-        title,
-        sanitizeInt(author_id),
-        sanitizeInt(category_id),
-        sanitizeInt(price),
-        isbn || null,
-        description || null,
-        language || 'en',
-        pages ? sanitizeInt(pages) : null,
-        publication_date || null,
-        publisher || null,
-        book_type,
-        stock_quantity ? sanitizeInt(stock_quantity) : 0,
-        inventory_enabled === 'true',
-        low_stock_threshold ? sanitizeInt(low_stock_threshold, 10) : 10,
-        sanitizeInt(session.user.id),
-        'published'
-      ]);
-
-      bookId = bookResult.rows[0].id;
-      console.log(`✅ Stage 5 PASSED: Book record created with ID ${bookId}`);
-      
-      // Initialize storage for ebooks
-      if (book_type === 'ebook') {
-        try {
-          const { BookStorage } = await import('@/utils/book-storage');
-          await BookStorage.createDefaultContent(bookId, sanitizeInput(title));
-          console.log(`✅ Default content created for book ${bookId}`);
-        } catch (storageError) {
-          console.warn('⚠️ Failed to create default content:', storageError);
-        }
-      }
-    } catch (dbError) {
-      console.log('❌ Stage 5 FAILED: Database error:', sanitizeForLog(dbError));
-      return NextResponse.json(
-        { error: 'Failed to create book record' },
-        { status: 500 }
-      );
+    if (format === 'ebook' && !ebook_file) {
+      return NextResponse.json({ error: 'E-book file is required for ebook format' }, { status: 400 });
     }
 
-    // Stage 6: Upload Cover Image
-    console.log('📋 Stage 6: Uploading cover image...');
+    // Create book record
+    const bookResult = await query(`
+      INSERT INTO books (
+        title, author_id, category_id, price, isbn, description, language, 
+        pages, publication_date, publisher, format, stock_quantity, 
+        status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+      RETURNING id
+    `, [
+      title,
+      sanitizeInt(author_id),
+      sanitizeInt(category_id),
+      parseFloat(price),
+      isbn || null,
+      description || null,
+      language || 'en',
+      pages ? sanitizeInt(pages) : null,
+      publication_date || null,
+      publisher || null,
+      format,
+      stock_quantity ? sanitizeInt(stock_quantity) : 0,
+      'published'
+    ]);
+
+    const bookId = bookResult.rows[0].id;
+
+    // Upload cover image
+    let coverUrl = null;
     try {
-      const coverResult = await getFileUploadService().uploadBookFile(cover_image, bookId, 'cover');
+      const uploadDir = ensureUploadDir();
+      const fileName = `${bookId}_cover_${Date.now()}.${cover_image.name.split('.').pop()}`;
+      const filePath = join(uploadDir, fileName);
       
-      if (!coverResult.success) {
-        console.log('❌ Stage 6 FAILED: Cover image upload failed:', sanitizeForLog(coverResult.error));
-        // Clean up book record
-        await query('DELETE FROM books WHERE id = $1', [bookId]);
-        return NextResponse.json(
-          { error: `Cover image upload failed: ${coverResult.error}` },
-          { status: 500 }
-        );
-      }
-
-      // Update book with cover image URL
-      await query(`
-        UPDATE books 
-        SET cover_image_url = $2 
-        WHERE id = $1
-      `, [bookId, coverResult.filePath]);
-
-      console.log('✅ Stage 6 PASSED: Cover image uploaded successfully');
-    } catch (coverError) {
-      console.log('❌ Stage 6 FAILED: Cover image upload error:', sanitizeForLog(coverError));
-      // Clean up book record
+      const arrayBuffer = await cover_image.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      writeFileSync(filePath, buffer);
+      
+      coverUrl = `/uploads/covers/${fileName}`;
+    } catch (uploadError) {
       await query('DELETE FROM books WHERE id = $1', [bookId]);
-      return NextResponse.json(
-        { error: 'Failed to upload cover image' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to upload cover image' }, { status: 500 });
     }
 
-    // Stage 7: Upload E-book File (if applicable)
-    let ebookFileResult = null;
+    // Upload e-book file (preserve original structure)
+    let ebookUrl = null;
+    let extractedMetadata = {};
     if (ebook_file) {
-      console.log('📋 Stage 7: Uploading e-book file...');
       try {
-        ebookFileResult = await getFileUploadService().uploadBookFile(ebook_file, bookId, 'ebook');
+        const ebookDir = join(process.cwd(), 'storage', 'ebooks');
+        if (!existsSync(ebookDir)) {
+          mkdirSync(ebookDir, { recursive: true });
+        }
         
-        if (!ebookFileResult.success) {
-          console.log('❌ Stage 7 FAILED: E-book file upload failed:', sanitizeForLog(ebookFileResult.error));
-          // Clean up book record and files
-          await getFileUploadService().deleteBookFiles(bookId);
-          await query('DELETE FROM books WHERE id = $1', [bookId]);
-          return NextResponse.json(
-            { error: `E-book file upload failed: ${ebookFileResult.error}` },
-            { status: 500 }
-          );
-        }
-
-        // Update book with e-book file information
-        await query(`
-          UPDATE books 
-          SET 
-            ebook_file_url = $2,
-            file_format = $3,
-            file_size = $4,
-            file_hash = $5
-          WHERE id = $1
-        `, [
-          bookId,
-          ebookFileResult.filePath,
-          ebookFileResult.mimeType === 'application/epub+zip' ? 'epub' : 'html',
-          ebookFileResult.fileSize,
-          ebookFileResult.fileHash
-        ]);
-
-        // Create book_files entry for e-reader compatibility
-        const fileFormat = ebookFileResult.mimeType === 'application/epub+zip' ? 'epub' : 'html';
-        await query(`
-          INSERT INTO book_files (book_id, file_type, original_filename, stored_filename, file_path, file_size, mime_type, file_format, processing_status, file_hash)
-          VALUES ($1, 'ebook', $2, $3, $4, $5, $6, $7, 'completed', $8)
-          ON CONFLICT (book_id, file_type) DO UPDATE SET
-            stored_filename = EXCLUDED.stored_filename,
-            file_path = EXCLUDED.file_path,
-            file_size = EXCLUDED.file_size,
-            file_format = EXCLUDED.file_format,
-            processing_status = EXCLUDED.processing_status,
-            file_hash = EXCLUDED.file_hash
-        `, [
-          bookId,
-          ebook_file.name,
-          path.basename(ebookFileResult.filePath),
-          ebookFileResult.filePath,
-          ebookFileResult.fileSize,
-          ebookFileResult.mimeType,
-          fileFormat,
-          ebookFileResult.fileHash
-        ]);
-
-        // Preserve EPUB/HTML structure without conversion
-        if (fileFormat === 'epub') {
-          try {
-            const { preserveEpubStructure } = await import('@/utils/book-storage');
-            const buffer = Buffer.from(await ebook_file.arrayBuffer());
-            const structureResult = await preserveEpubStructure(bookId, buffer, ebook_file.name);
-            
-            if (structureResult.success) {
-              console.log(`✅ EPUB structure preserved for book ${bookId}`);
-              
-              // Update book_files with structure preservation data
-              await query(`
-                UPDATE book_files SET 
-                  preserve_structure = true,
-                  original_structure = $2,
-                  extraction_path = $3
-                WHERE book_id = $1 AND file_type = 'ebook'
-              `, [
-                bookId,
-                JSON.stringify(structureResult.structure || {}),
-                structureResult.extractionPath || null
-              ]);
-              
-              // Insert EPUB structure data
-              await query(`
-                INSERT INTO epub_structure (book_id, file_id, title, creator, language, spine_order, manifest, navigation, opf_path, ncx_path)
-                SELECT $1, bf.id, $2, $3, $4, $5, $6, $7, $8, $9
-                FROM book_files bf WHERE bf.book_id = $1 AND bf.file_type = 'ebook'
-                ON CONFLICT (book_id, file_id) DO UPDATE SET
-                  title = EXCLUDED.title,
-                  creator = EXCLUDED.creator,
-                  spine_order = EXCLUDED.spine_order,
-                  manifest = EXCLUDED.manifest,
-                  navigation = EXCLUDED.navigation,
-                  opf_path = EXCLUDED.opf_path
-              `, [
-                bookId,
-                structureResult.metadata?.title || title,
-                structureResult.metadata?.creator || null,
-                structureResult.metadata?.language || 'en',
-                JSON.stringify(structureResult.structure?.spine || []),
-                JSON.stringify(structureResult.structure?.manifest || {}),
-                JSON.stringify({}), // navigation placeholder
-                structureResult.structure?.opfPath || null,
-                null // ncxPath placeholder
-              ]);
-              
-              console.log(`✅ EPUB database records created for book ${bookId}`);
-            } else {
-              console.warn(`⚠️ EPUB structure preservation failed for book ${bookId}:`, structureResult.error);
-            }
-          } catch (epubError) {
-            console.error(`❌ EPUB structure preservation error for book ${bookId}:`, epubError);
-          }
-        } else if (fileFormat === 'html') {
-          try {
-            const { preserveHtmlStructure } = await import('@/utils/book-storage');
-            const buffer = Buffer.from(await ebook_file.arrayBuffer());
-            const structureResult = await preserveHtmlStructure(bookId, buffer, ebook_file.name);
-            
-            if (structureResult.success) {
-              // Update book_files with structure preservation data
-              await query(`
-                UPDATE book_files SET 
-                  preserve_structure = true,
-                  original_structure = $2
-                WHERE book_id = $1 AND file_type = 'ebook'
-              `, [
-                bookId,
-                JSON.stringify(structureResult.structure)
-              ]);
-              
-              // Insert HTML structure data
-              await query(`
-                INSERT INTO html_structure (book_id, file_id, title, author, language, chapter_structure, asset_files)
-                SELECT $1, bf.id, $2, $3, $4, $5, $6
-                FROM book_files bf WHERE bf.book_id = $1 AND bf.file_type = 'ebook'
-                ON CONFLICT (book_id, file_id) DO UPDATE SET
-                  title = EXCLUDED.title,
-                  author = EXCLUDED.author,
-                  chapter_structure = EXCLUDED.chapter_structure,
-                  asset_files = EXCLUDED.asset_files
-              `, [
-                bookId,
-                structureResult.metadata?.title || title,
-                structureResult.metadata?.author || null,
-                'en',
-                JSON.stringify(structureResult.structure?.chapters || {}),
-                JSON.stringify({}) // assets placeholder
-              ]);
-            }
-          } catch (htmlError) {
-            console.warn('HTML structure preservation failed:', htmlError);
-          }
-        }
-
-        console.log('✅ Stage 7 PASSED: E-book file uploaded successfully');
+        const ebookFileName = `${bookId}_${ebook_file.name}`;
+        const ebookFilePath = join(ebookDir, ebookFileName);
+        
+        const ebookBuffer = Buffer.from(await ebook_file.arrayBuffer());
+        writeFileSync(ebookFilePath, ebookBuffer);
+        
+        ebookUrl = `/api/ebooks/${bookId}/${ebookFileName}`;
+        
+        // Extract metadata without altering structure
+        extractedMetadata = await extractEbookMetadata(ebookBuffer, ebook_file.name);
+        
       } catch (ebookError) {
-        console.log('❌ Stage 7 FAILED: E-book file upload error:', sanitizeForLog(ebookError));
-        // Clean up book record and files
-        await getFileUploadService().deleteBookFiles(bookId);
         await query('DELETE FROM books WHERE id = $1', [bookId]);
-        return NextResponse.json(
-          { error: 'Failed to upload e-book file' },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to upload e-book file' }, { status: 500 });
       }
     }
 
-    // Stage 8: Generate Security Token
-    console.log('📋 Stage 8: Generating security token...');
-    try {
-      const securityToken = await getFileUploadService().generateAccessToken(bookId, parseInt(session.user.id));
-      console.log('✅ Stage 8 PASSED: Security token generated');
-    } catch (tokenError) {
-      console.log('⚠️ Stage 8 WARNING: Security token generation failed:', sanitizeForLog(tokenError));
-      // Don't fail the request for token generation failure
-    }
+    // Update book with file URLs and metadata
+    await query(`
+      UPDATE books SET 
+        cover_image_url = $2,
+        ebook_file_url = $3,
+        word_count = $4,
+        pages = COALESCE($5, pages)
+      WHERE id = $1
+    `, [
+      bookId, 
+      coverUrl, 
+      ebookUrl,
+      extractedMetadata.wordCount || 0,
+      extractedMetadata.pageCount || sanitizeInt(pages)
+    ]);
 
-    // Stage 9: Fetch Complete Book Data
-    console.log('📋 Stage 9: Fetching complete book data...');
-    try {
-      const bookData = await query(`
-        SELECT 
-          b.*,
-          a.name as author_name,
-          c.name as category_name,
-          b.word_count,
-          b.estimated_reading_time,
-          b.pages as page_count,
-          COALESCE(CASE WHEN b.chapters IS NOT NULL THEN jsonb_array_length(b.chapters) ELSE 0 END, 0) as chapter_count
-        FROM books b
-        LEFT JOIN authors a ON b.author_id = a.id
-        LEFT JOIN categories c ON b.category_id = c.id
-        WHERE b.id = $1
-      `, [bookId]);
+    // Get complete book data
+    const bookData = await query(`
+      SELECT b.*, a.name as author_name, c.name as category_name
+      FROM books b
+      LEFT JOIN authors a ON b.author_id = a.id
+      LEFT JOIN categories c ON b.category_id = c.id
+      WHERE b.id = $1
+    `, [bookId]);
 
-      if (bookData.rows.length === 0) {
-        throw new Error('Book not found after creation');
+    const book = bookData.rows[0];
+
+    return NextResponse.json({
+      success: true,
+      message: 'Book created successfully',
+      book: {
+        id: book.id,
+        title: book.title,
+        author: book.author_name,
+        category: book.category_name,
+        price: book.price,
+        format: book.format,
+        cover_image_url: book.cover_image_url,
+        created_at: book.created_at
       }
-
-      const book = bookData.rows[0];
-      console.log('✅ Stage 9 PASSED: Complete book data fetched');
-
-      // Stage 10: Success Response
-      console.log('📋 Stage 10: Preparing success response...');
-      const endTime = Date.now();
-      const totalTime = endTime - startTime;
-
-      console.log('🎉 Book creation completed successfully');
-      console.log(`⏱️ Total processing time: ${totalTime}ms`);
-
-      return NextResponse.json({
-        success: true,
-        message: 'Book created successfully',
-        book: {
-          id: book.id,
-          title: book.title,
-          author: book.author_name,
-          category: book.category_name,
-          price: book.price,
-          book_type: book.book_type,
-          format: book.format,
-          file_format: book.file_format,
-          parsing_status: book.parsing_status,
-          word_count: book.word_count,
-          estimated_reading_time: book.estimated_reading_time,
-          page_count: book.page_count,
-          chapter_count: book.chapter_count,
-          cover_image_url: book.cover_image_url,
-          ebook_file_url: book.ebook_file_url,
-          created_at: book.created_at
-        },
-        processingTime: `${totalTime}ms`,
-        fileInfo: {
-          cover_image: cover_image ? 'uploaded' : 'none',
-          ebook_file: ebook_file ? 'uploaded' : 'none'
-        },
-        parsingInfo: {
-          status: book.parsing_status,
-          wordCount: book.word_count,
-          estimatedReadingTime: book.estimated_reading_time,
-          pageCount: book.page_count,
-          chapterCount: book.chapter_count
-        }
-      });
-
-    } catch (fetchError) {
-      console.log('❌ Stage 9 FAILED: Error fetching book data:', sanitizeForLog(fetchError));
-      return NextResponse.json(
-        { error: 'Book created but failed to fetch complete data' },
-        { status: 500 }
-      );
-    }
+    });
 
   } catch (error) {
-    console.error('❌ UNEXPECTED ERROR in book creation:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
-  } catch (error) {
-    console.error('POST route error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Book creation error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export const GET = async (request: NextRequest) => {
   try {
-    console.log('📋 Admin Books GET: Starting request...');
-    
-    // Get session without strict permission checking for now
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      console.log('❌ Admin Books GET: No session found');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    console.log(`✅ Admin Books GET: User ${session.user.id} authenticated`);
-
-    // Test database connection and basic table access
-    try {
-      const testResult = await query('SELECT COUNT(*) as count FROM books');
-      console.log(`✅ Admin Books GET: Database connection test passed, found ${testResult.rows[0].count} books`);
-    } catch (dbError) {
-      console.error('❌ Admin Books GET: Database connection test failed:', dbError);
-      // Return empty result instead of error to allow frontend to load
-      return NextResponse.json({
-        success: true,
-        books: [],
-        pagination: { page: 1, limit: 20, total: 0, pages: 0 },
-        error: 'Database connection failed'
-      });
     }
 
     const { searchParams } = new URL(request.url);
     const page = sanitizeInt(searchParams.get('page'), 1);
     const limit = sanitizeInt(searchParams.get('limit'), 20);
     const search = searchParams.get('search') || '';
-    const category = searchParams.get('category') || '';
-    const author = searchParams.get('author') || '';
     const status = searchParams.get('status') || '';
-    const book_type = searchParams.get('book_type') || '';
 
     const offset = (page - 1) * limit;
 
-    // Build query with filters
     let whereConditions = ['1=1'];
     let queryParams = [];
     let paramIndex = 1;
@@ -548,33 +261,14 @@ export const GET = async (request: NextRequest) => {
       paramIndex++;
     }
 
-    if (category) {
-      whereConditions.push(`c.id = $${paramIndex}`);
-      queryParams.push(category);
-      paramIndex++;
-    }
-
-    if (author) {
-      whereConditions.push(`a.id = $${paramIndex}`);
-      queryParams.push(author);
-      paramIndex++;
-    }
-
     if (status) {
       whereConditions.push(`b.status = $${paramIndex}`);
       queryParams.push(status);
       paramIndex++;
     }
 
-    if (book_type) {
-      whereConditions.push(`b.book_type = $${paramIndex}`);
-      queryParams.push(book_type);
-      paramIndex++;
-    }
-
     const whereClause = whereConditions.join(' AND ');
 
-    // Get total count
     const countResult = await query(`
       SELECT COUNT(*) as total
       FROM books b
@@ -585,36 +279,13 @@ export const GET = async (request: NextRequest) => {
 
     const total = parseInt(countResult.rows[0].total);
 
-    // Get books with pagination - simplified query without problematic tables
     const booksResult = await query(`
       SELECT 
-        b.id,
-        b.title,
-        b.author_id,
-        b.category_id,
-        b.price,
-        b.isbn,
-        b.description,
-        b.language,
-        b.pages,
-        b.publication_date,
-        b.publisher,
-        COALESCE(b.book_type, 'ebook') as book_type,
-        COALESCE(b.file_format, 'unknown') as format,
-        COALESCE(b.processing_status, 'pending') as parsing_status,
-        b.cover_image_url,
-        b.ebook_file_url,
-        b.status,
-        b.created_at,
-        b.updated_at,
-        a.name as author_name,
-        c.name as category_name,
-        COALESCE(b.word_count, 0) as word_count,
-        COALESCE(b.estimated_reading_time, 0) as estimated_reading_time,
-        COALESCE(b.pages, 0) as page_count,
-        0 as chapter_count,
+        b.id, b.title, b.price, b.format, b.cover_image_url, b.status, b.created_at,
         COALESCE(b.stock_quantity, 0) as stock_quantity,
-        COALESCE(b.is_featured, false) as is_featured
+        COALESCE(b.is_featured, false) as is_featured,
+        a.name as author_name,
+        c.name as category_name
       FROM books b
       LEFT JOIN authors a ON b.author_id = a.id
       LEFT JOIN categories c ON b.category_id = c.id
@@ -623,32 +294,9 @@ export const GET = async (request: NextRequest) => {
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `, [...queryParams, limit, offset]);
 
-    const books = booksResult.rows.map(book => ({
-      id: book.id,
-      title: book.title || '',
-      author_name: book.author_name || 'Unknown',
-      category_name: book.category_name || 'Uncategorized',
-      price: book.price || 0,
-      book_type: book.book_type || 'ebook',
-      format: book.book_type || 'ebook', // Use book_type for format classification
-      file_format: book.format || 'unknown', // Keep file_format separate
-      parsing_status: book.parsing_status || 'pending',
-      word_count: book.word_count || 0,
-      estimated_reading_time: book.estimated_reading_time || 0,
-      page_count: book.page_count || 0,
-      chapter_count: book.chapter_count || 0,
-      cover_image_url: book.cover_image_url || null,
-      status: book.status || 'published',
-      stock_quantity: book.stock_quantity || 0,
-      is_featured: book.is_featured || false,
-      created_at: book.created_at
-    }));
-
-    console.log(`✅ Admin Books GET: Successfully fetched ${books.length} books out of ${total} total`);
-    
     return NextResponse.json({
       success: true,
-      books,
+      books: booksResult.rows,
       pagination: {
         page,
         limit,
@@ -658,114 +306,64 @@ export const GET = async (request: NextRequest) => {
     });
 
   } catch (error) {
-    console.error('❌ Admin Books GET: Error fetching books:', error);
-    console.error('❌ Admin Books GET: Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    });
-    
-    // Return more detailed error information for debugging
-    return NextResponse.json(
-      { 
-        error: 'Failed to fetch books',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        success: false
-      },
-      { status: 500 }
-    );
+    console.error('Error fetching books:', error);
+    return NextResponse.json({ error: 'Failed to fetch books' }, { status: 500 });
   }
 };
 
 export async function DELETE(request: NextRequest) {
-  console.log('🗑️ DELETE /api/admin/books - Starting request...');
-  
   try {
-    // Check authentication
-    console.log('🔐 Checking authentication...');
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      console.log('❌ No session found');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    console.log(`✅ User authenticated: ${session.user.id} (${session.user.role})`);
 
-    // Check if user is admin
     const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
     if (!isAdmin) {
-      console.log(`❌ User ${session.user.id} is not admin (role: ${session.user.role})`);
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-    console.log('✅ Admin permissions verified');
 
-    // Parse request URL
-    console.log('📋 Parsing request parameters...');
     const { searchParams } = new URL(request.url);
     const bookIds = searchParams.get('ids');
-    console.log(`📋 Raw book IDs parameter: ${bookIds}`);
 
     if (!bookIds) {
-      console.log('❌ No book IDs provided');
-      return NextResponse.json(
-        { error: 'Book IDs are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Book IDs are required' }, { status: 400 });
     }
 
     const bookIdArray = bookIds.split(',').map(id => sanitizeInt(id.trim())).filter(id => id > 0);
-    console.log(`📋 Parsed book IDs: [${bookIdArray.join(', ')}]`);
 
     if (bookIdArray.length === 0) {
-      console.log('❌ No valid book IDs after parsing');
-      return NextResponse.json(
-        { error: 'No valid book IDs provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No valid book IDs provided' }, { status: 400 });
     }
 
     let deletedCount = 0;
     const failedIds: number[] = [];
     const errors: string[] = [];
 
-    console.log(`🗑️ Starting deletion process for ${bookIdArray.length} books...`);
-
     for (const bookId of bookIdArray) {
-      console.log(`🗑️ Processing book ID: ${bookId}`);
       try {
-        // Delete book files first (with error handling)
-        try {
-          const fileService = getFileUploadService();
-          if (fileService && typeof fileService.deleteBookFiles === 'function') {
-            await fileService.deleteBookFiles(bookId);
-            console.log(`🗑️ Deleted files for book ${bookId}`);
-          } else {
-            console.log(`⚠️ File service not available for book ${bookId}`);
-          }
-        } catch (fileError) {
-          console.warn(`⚠️ Failed to delete files for book ${sanitizeForLog(bookId)}:`, sanitizeForLog(fileError));
-          // Continue with book deletion even if file deletion fails
-        }
-
-        // Delete book record using ModernBookService for proper cascade deletion
-        console.log(`🗑️ Deleting book record ${bookId} from database...`);
-        const ModernBookService = (await import('@/lib/services/ModernBookService')).default;
-        const deleteResult = await ModernBookService.deleteBook(bookId);
-
-        if (deleteResult.success) {
+        // Cascade delete from all related tables
+        await query('DELETE FROM cart_items WHERE book_id = $1', [bookId]);
+        await query('DELETE FROM order_items WHERE book_id = $1', [bookId]);
+        await query('DELETE FROM user_library WHERE book_id = $1', [bookId]);
+        await query('DELETE FROM book_reviews WHERE book_id = $1', [bookId]);
+        await query('DELETE FROM reading_progress WHERE book_id = $1', [bookId]);
+        
+        // Delete the book record itself
+        const deleteResult = await query('DELETE FROM books WHERE id = $1 RETURNING id', [bookId]);
+        
+        if (deleteResult.rows.length > 0) {
           deletedCount++;
-          console.log(`✅ Successfully deleted book ${sanitizeForLog(bookId)}`);
         } else {
-          console.log(`❌ Failed to delete book ${bookId}: ${deleteResult.error}`);
           failedIds.push(bookId);
-          errors.push(`Book ${sanitizeHtml(String(bookId))}: ${sanitizeHtml(deleteResult.error || 'Unknown error')}`);
+          errors.push(`Book ${bookId}: Not found`);
         }
       } catch (error) {
-        console.error(`❌ Error deleting book ${sanitizeForLog(bookId)}:`, sanitizeForLog(error));
+        console.error(`Error deleting book ${bookId}:`, error);
         failedIds.push(bookId);
-        errors.push(`Failed to delete book ${sanitizeHtml(String(bookId))}: ${sanitizeHtml(error instanceof Error ? error.message : 'Unknown error')}`);
+        errors.push(`Failed to delete book ${bookId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
-
-    console.log(`🎉 Deletion process completed. Deleted: ${deletedCount}, Failed: ${failedIds.length}`);
 
     return NextResponse.json({
       success: true,
@@ -777,14 +375,7 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ CRITICAL ERROR in DELETE /api/admin/books:', error);
-    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    return NextResponse.json(
-      { 
-        error: 'Failed to delete books',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    console.error('Error in DELETE /api/admin/books:', error);
+    return NextResponse.json({ error: 'Failed to delete books' }, { status: 500 });
   }
 }

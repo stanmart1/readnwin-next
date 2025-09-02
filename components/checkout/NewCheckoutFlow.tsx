@@ -97,10 +97,6 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Use custom hooks for data management
-  const { shippingMethods, paymentGateways, isLoading: dataLoading, error: dataError } = useCheckoutData();
-  const analytics = useCartAnalytics(cartItems, formData.shipping_method);
-  
   const [formData, setFormData] = useState<CheckoutFormData>({
     shipping: {
       first_name: session?.user?.firstName || '',
@@ -130,6 +126,10 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
       method: 'card'
     }
   });
+  
+  // Use custom hooks for data management
+  const { shippingMethods, paymentGateways, isLoading: dataLoading, error: dataError } = useCheckoutData();
+  const analytics = useCartAnalytics(cartItems, formData.shipping_method);
 
   // Analyze cart contents to determine checkout flow
   const analyzeCart = useCallback((selectedShippingMethod?: ShippingMethod) => {
@@ -225,42 +225,13 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
 
   // Initialize component
   useEffect(() => {
-    const cartAnalytics = analyzeCart(formData.shipping_method);
-    setAnalytics(cartAnalytics);
-    
-    if (cartAnalytics?.isEbookOnly) {
+    if (analytics?.isEbookOnly) {
       // For ebook-only checkout, skip shipping steps entirely - go directly to payment
       console.log('🔍 eBook-only cart detected - skipping shipping forms automatically');
       setCurrentStep(2); // Skip shipping, go to payment step
     }
     
-    loadCheckoutData();
-  }, [cartItems, analyzeCart]);
-
-  const loadCheckoutData = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Load shipping methods
-      const shippingResponse = await fetch('/api/admin/shipping-methods');
-      if (shippingResponse.ok) {
-        const shippingData = await shippingResponse.json();
-        setShippingMethods(shippingData.methods || []);
-      }
-
-      // Load payment gateways
-      const paymentResponse = await fetch('/api/payment-gateways');
-      if (paymentResponse.ok) {
-        const paymentData = await paymentResponse.json();
-        setPaymentGateways(paymentData.gateways || []);
-      }
-    } catch (error) {
-      console.error('Error loading checkout data:', sanitizeLogInput(error));
-      setError('Failed to load checkout options');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [analytics?.isEbookOnly]);
 
   const updateFormData = (section: keyof CheckoutFormData, data: any) => {
     setFormData(prev => {
@@ -269,13 +240,7 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
         [section]: { ...prev[section], ...data }
       };
       
-      // If shipping method changed, recalculate analytics
-      if (section === 'shipping_method') {
-        const newAnalytics = analyzeCart(data);
-        if (newAnalytics) {
-          setAnalytics(newAnalytics);
-        }
-      }
+      // Shipping method changes will be handled by the useCartAnalytics hook
       
       return newFormData;
     });

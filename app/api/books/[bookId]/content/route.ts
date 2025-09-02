@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { secureQuery } from '@/utils/secure-database';
-import { BookStorage } from '@/utils/book-storage';
-import { SecureEpubParser } from '@/lib/secure-epub-parser';
-import fs from 'fs/promises';
-import path from 'path';
+import { query } from '@/utils/database';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 
 export async function GET(
   request: NextRequest,
@@ -13,207 +11,143 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { bookId } = params;
     
-    // For public books, allow access even without authentication
-    let userId = session?.user?.id || null;
+    // Verify user has access to this book
+    const bookCheck = await query(`
+      SELECT b.id, b.title, b.ebook_file_url, b.format, ul.user_id as library_user,
+             COALESCE(a.name, 'Unknown Author') as author_name
+      FROM books b
+      LEFT JOIN user_library ul ON b.id = ul.book_id AND ul.user_id = $1
+      LEFT JOIN authors a ON b.author_id = a.id
+      WHERE b.id = $2 AND (ul.user_id IS NOT NULL OR $3 IN ('admin', 'super_admin'))
+    `, [parseInt(session.user.id), parseInt(bookId), session.user.role]);
 
-    const bookId = parseInt(params.bookId);
-    if (isNaN(bookId)) {
-      return NextResponse.json({ error: 'Invalid book ID' }, { status: 400 });
+    if (bookCheck.rows.length === 0) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    // Get book info with file info and structure preservation data
-    let bookResult;
-    try {
-      bookResult = await secureQuery(`
-        SELECT b.id, b.title, b.description, b.cover_image_url, b.created_at, b.updated_at, b.created_by, b.price, b.visibility,
-               bf.stored_filename, bf.file_format, bf.file_size, bf.original_filename, bf.preserve_structure, bf.extraction_path
-        FROM books b
-        LEFT JOIN book_files bf ON b.id = bf.book_id AND bf.file_type = 'ebook'
-        WHERE b.id = $1
-      `, [bookId]);
-    } catch (error) {
-      console.error('Database query error:', error);
-      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    const book = bookCheck.rows[0];
+    
+    if (!book.ebook_file_url) {
+      return NextResponse.json({ error: 'No e-book file available' }, { status: 404 });
     }
 
-    if (bookResult.rows.length === 0) {
-      return NextResponse.json({ error: 'Book not found' }, { status: 404 });
+    // Extract filename from URL (e.g., /api/ebooks/123/123_filename.epub -> 123_filename.epub)
+    const urlParts = book.ebook_file_url.split('/');
+    const filename = urlParts[urlParts.length - 1];
+    
+    // Read the original e-book file (filename already includes bookId prefix)
+    const filePath = join(process.cwd(), 'storage', 'ebooks', filename);
+    
+    if (!existsSync(filePath)) {
+      return NextResponse.json({ error: 'E-book file not found' }, { status: 404 });
     }
 
-    const book = bookResult.rows[0];
-
-    // Check access - allow public books, or check user permissions
-    if (userId) {
-      try {
-        const accessResult = await secureQuery(`
-          SELECT 1 FROM (
-            SELECT 1 FROM books WHERE id = $1 AND (created_by = $2 OR price = 0 OR visibility = 'public')
-            UNION
-            SELECT 1 FROM user_library WHERE user_id = $2 AND book_id = $1
-          ) AS access_check LIMIT 1
-        `, [bookId, userId]);
-
-        if (accessResult.rows.length === 0) {
-          return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-        }
-      } catch (error) {
-        console.error('Access check error:', error);
-        return NextResponse.json({ error: 'Access check failed' }, { status: 500 });
-      }
-    } else {
-      // No user session - only allow public books
-      try {
-        const publicCheck = await secureQuery(`
-          SELECT 1 FROM books WHERE id = $1 AND (price = 0 OR visibility = 'public')
-        `, [bookId]);
-        
-        if (publicCheck.rows.length === 0) {
-          return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-        }
-      } catch (error) {
-        console.error('Public access check error:', error);
-        return NextResponse.json({ error: 'Access check failed' }, { status: 500 });
-      }
-    }
-
-    let content = '';
+    const fileBuffer = readFileSync(filePath);
+    const fileContent = fileBuffer.toString('utf-8');
+    
+    // Determine content type and extract basic metadata
     let contentType = 'html';
-    let chapters: any[] = [];
-    let structure: any = null;
+    let content = fileContent;
+    let wordCount = 0;
     
-    // Handle structure-preserved books
-    if (book.preserve_structure && book.file_format === 'epub') {
+    if (filename.toLowerCase().endsWith('.epub')) {
+      contentType = 'epub';
+      // For EPUB, return structure info for the e-reader to handle
       try {
-        // Get EPUB structure from database
-        const epubResult = await secureQuery(`
-          SELECT spine_order, manifest, navigation, title, creator
-          FROM epub_structure WHERE book_id = $1
-        `, [bookId]);
+        const JSZip = (await import('jszip')).default;
+        const zip = await JSZip.loadAsync(fileBuffer);
         
-        if (epubResult.rows.length > 0) {
-          const epubData = epubResult.rows[0];
-          contentType = 'epub';
-          structure = {
-            type: 'epub',
-            spine: epubData.spine_order,
-            manifest: epubData.manifest,
-            navigation: epubData.navigation,
-            basePath: `/api/ebooks/${bookId}/`
-          };
+        // Extract basic structure
+        const containerFile = zip.file('META-INF/container.xml');
+        if (containerFile) {
+          const containerXml = await containerFile.async('text');
+          const opfMatch = containerXml.match(/full-path="([^"]+)"/i);
           
-          console.log(`✅ Serving EPUB structure for book ${bookId}`);
-          
-          // For EPUB, return structure info instead of converted content
-          return NextResponse.json({
-            id: book.id.toString(),
-            title: epubData.title || book.title,
-            author: epubData.creator || 'Unknown Author',
-            description: book.description || '',
-            contentType: 'epub',
-            structure: structure,
-            preservedFormat: true,
-            coverImage: book.cover_image_url,
-            createdAt: book.created_at,
-            updatedAt: book.updated_at
-          });
-        } else {
-          console.warn(`⚠️ No EPUB structure found for book ${bookId}`);
-        }
-      } catch (error) {
-        console.error(`❌ EPUB structure serving error for book ${bookId}:`, error);
-      }
-    } else if (book.preserve_structure && book.file_format === 'html') {
-      try {
-        // Get HTML structure from database
-        const htmlResult = await secureQuery(`
-          SELECT chapter_structure, asset_files, title, author
-          FROM html_structure WHERE book_id = $1
-        `, [bookId]);
-        
-        if (htmlResult.rows.length > 0) {
-          const htmlData = htmlResult.rows[0];
-          
-          // Read original HTML file
-          const htmlContent = await BookStorage.getBookFile(bookId.toString(), book.stored_filename);
-          if (htmlContent) {
-            content = htmlContent.toString('utf-8');
-            contentType = 'html';
-            structure = {
-              type: 'html',
-              chapters: htmlData.chapter_structure,
-              assets: htmlData.asset_files
-            };
-            chapters = htmlData.chapter_structure || [];
+          if (opfMatch) {
+            const opfFile = zip.file(opfMatch[1]);
+            if (opfFile) {
+              const opfXml = await opfFile.async('text');
+              
+              // Parse spine for chapter structure
+              const spineMatches = opfXml.match(/<itemref[^>]*idref="([^"]+)"/gi);
+              const spine = spineMatches?.map(match => {
+                const idMatch = match.match(/idref="([^"]+)"/i);
+                return idMatch ? idMatch[1] : null;
+              }).filter(Boolean) || [];
+              
+              // Parse manifest for file references
+              const manifestMatches = opfXml.match(/<item[^>]*id="([^"]+)"[^>]*href="([^"]+)"[^>]*media-type="([^"]+)"/gi);
+              const manifest: Record<string, any> = {};
+              
+              manifestMatches?.forEach(match => {
+                const idMatch = match.match(/id="([^"]+)"/i);
+                const hrefMatch = match.match(/href="([^"]+)"/i);
+                const typeMatch = match.match(/media-type="([^"]+)"/i);
+                
+                if (idMatch && hrefMatch && typeMatch) {
+                  manifest[idMatch[1]] = {
+                    href: hrefMatch[1],
+                    mediaType: typeMatch[1]
+                  };
+                }
+              });
+              
+              return NextResponse.json({
+                title: book.title,
+                author: book.author_name,
+                contentType: 'epub',
+                preservedFormat: true,
+                structure: {
+                  spine,
+                  manifest,
+                  opfPath: opfMatch[1]
+                },
+                // Provide the base URL for accessing individual files
+                baseUrl: `/api/ebooks/${bookId}/`,
+                wordCount: spine.length * 500 // Rough estimate
+              });
+            }
           }
         }
-      } catch (error) {
-        console.error('HTML structure serving error:', error);
+      } catch (epubError) {
+        console.error('EPUB parsing error:', epubError);
+        // Fall back to basic response
       }
-    } else if (book.file_format === 'epub' && book.stored_filename) {
-      // Fallback for non-preserved EPUB files
-      try {
-        const processedContent = await BookStorage.getBookFile(bookId.toString(), 'content.html');
-        if (processedContent) {
-          content = processedContent.toString('utf-8');
-          contentType = 'epub';
-        }
-      } catch (error) {
-        console.error('EPUB fallback error:', error);
-      }
-    }
-    
-    // Fallback for books without preserved structure
-    if (!content) {
-      try {
-        const fileContent = await BookStorage.getBookFile(bookId.toString(), 'content.html');
-        
-        if (fileContent) {
-          content = fileContent.toString('utf-8');
-          
-          // Extract chapter structure from HTML
-          const chapterMatches = content.match(/<h[1-3][^>]*>([^<]+)<\/h[1-3]>/gi);
-          if (chapterMatches && chapterMatches.length > 1) {
-            chapters = chapterMatches.map((match, index) => {
-              const title = match.replace(/<[^>]*>/g, '').trim();
-              return {
-                id: `chapter-${index + 1}`,
-                title: title,
-                order: index + 1
-              };
-            });
-            structure = { type: 'html', chapters: chapters };
-          }
-        } else {
-          await BookStorage.createDefaultContent(bookId, book.title);
-          const defaultContent = await BookStorage.getBookFile(bookId.toString(), 'content.html');
-          content = defaultContent ? defaultContent.toString('utf-8') : `<h1>${book.title}</h1><p>Content not available</p>`;
-        }
-      } catch (storageError) {
-        console.error('Storage error:', storageError);
-        content = `<h1>${book.title}</h1><p>This is a sample book content. The e-reader is working correctly.</p>`;
-      }
+    } else if (filename.toLowerCase().endsWith('.html') || filename.toLowerCase().endsWith('.htm')) {
+      // For HTML, extract basic info and return content
+      const titleMatch = content.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const words = content.replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(w => w.length > 0);
+      wordCount = words.length;
+      
+      return NextResponse.json({
+        title: titleMatch?.[1] || book.title,
+        author: book.author_name,
+        contentType: 'html',
+        preservedFormat: false,
+        content: content,
+        wordCount: wordCount,
+        chapters: [{
+          id: 'chapter-1',
+          title: book.title,
+          order: 1
+        }]
+      });
     }
 
-    // Calculate word count
-    const wordCount = content.replace(/<[^>]*>/g, '').split(/\s+/).filter(word => word.length > 0).length;
-
-    // Return JSON format expected by EReader store
+    // Default response for unsupported formats
     return NextResponse.json({
-      id: book.id.toString(),
-      title: book.title || 'Untitled Book',
-      author: 'Unknown Author', // Will need to join with authors table later
-      description: book.description || '',
-      content: content,
+      title: book.title,
+      author: book.author_name,
       contentType: contentType,
-      wordCount: wordCount,
-      filePath: 'content.html',
-      coverImage: book.cover_image_url,
-      createdAt: book.created_at || new Date().toISOString(),
-      updatedAt: book.updated_at || new Date().toISOString(),
-      structure: structure,
-      chapters: chapters,
-      originalFormat: book.file_format || 'html'
+      preservedFormat: false,
+      content: content,
+      wordCount: wordCount
     });
 
   } catch (error) {

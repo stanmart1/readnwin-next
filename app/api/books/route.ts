@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import ModernBookService from '@/lib/services/ModernBookService';
 import StorageService from '@/lib/services/StorageService';
-import { sanitizeForLog, sanitizeHtml, sanitizeInt, safeJsonParse } from '@/utils/security';
+import { sanitizeApiResponse, safeLog } from '@/utils/security';
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       search: searchParams.get('search') || undefined,
       category_id: searchParams.get('category_id') ? parseInt(searchParams.get('category_id')!) : undefined,
       author_id: searchParams.get('author_id') ? parseInt(searchParams.get('author_id')!) : undefined,
-      book_type: searchParams.get('book_type') || undefined,
+      format: searchParams.get('format') || undefined,
       status: isAdminRequest ? (searchParams.get('status') || undefined) : 'published',
       is_featured: searchParams.get('is_featured') === 'true' ? true : undefined,
       is_bestseller: searchParams.get('is_bestseller') === 'true' ? true : undefined,
@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
     if (filters.page < 1) filters.page = 1;
     if (filters.limit < 1 || filters.limit > 100) filters.limit = 20;
 
-    console.log('Fetching books with filters:', sanitizeForLog(JSON.stringify(filters)));
-    console.log('Is admin request:', isAdminRequest);
+    safeLog.info('Fetching books with filters:', filters);
+    safeLog.info('Is admin request:', isAdminRequest);
 
     const result = await ModernBookService.getBooks(filters);
 
@@ -57,12 +57,11 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching books:', error);
+    safeLog.error('Error fetching books:', error);
     return NextResponse.json(
       { 
         success: false, 
-        error: 'Failed to fetch books',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Failed to fetch books'
       },
       { status: 500 }
     );
@@ -88,32 +87,32 @@ export async function POST(request: NextRequest) {
     const bookData = {
       title: formData.get('title') as string,
       subtitle: formData.get('subtitle') as string || undefined,
-      author_id: sanitizeInt(formData.get('author_id') as string),
-      category_id: sanitizeInt(formData.get('category_id') as string),
+      author_id: parseInt(formData.get('author_id') as string),
+      category_id: parseInt(formData.get('category_id') as string),
       isbn: formData.get('isbn') as string || undefined,
       description: formData.get('description') as string || undefined,
       short_description: formData.get('short_description') as string || undefined,
       
-      book_type: formData.get('book_type') as 'physical' | 'ebook' | 'hybrid' || 'ebook',
+      format: formData.get('format') as 'physical' | 'ebook' | 'hybrid' || 'ebook',
       primary_format: formData.get('primary_format') as 'epub' | 'html' | 'pdf' | 'hardcover' | 'paperback' || undefined,
       
-      price: sanitizeInt(formData.get('price') as string),
-      original_price: formData.get('original_price') ? sanitizeInt(formData.get('original_price') as string) : undefined,
-      cost_price: formData.get('cost_price') ? sanitizeInt(formData.get('cost_price') as string) : undefined,
+      price: parseInt(formData.get('price') as string),
+      original_price: formData.get('original_price') ? parseInt(formData.get('original_price') as string) : undefined,
+      cost_price: formData.get('cost_price') ? parseInt(formData.get('cost_price') as string) : undefined,
       currency: formData.get('currency') as string || 'NGN',
       
-      weight_grams: formData.get('weight_grams') ? sanitizeInt(formData.get('weight_grams') as string) : undefined,
-      dimensions: formData.get('dimensions') ? safeJsonParse(formData.get('dimensions') as string) : undefined,
+      weight_grams: formData.get('weight_grams') ? parseInt(formData.get('weight_grams') as string) : undefined,
+      dimensions: formData.get('dimensions') ? JSON.parse(formData.get('dimensions') as string) : undefined,
       shipping_class: formData.get('shipping_class') as string || undefined,
-      stock_quantity: sanitizeInt(formData.get('stock_quantity') as string),
-      low_stock_threshold: sanitizeInt(formData.get('low_stock_threshold') as string, 5),
+      stock_quantity: parseInt(formData.get('stock_quantity') as string),
+      low_stock_threshold: parseInt(formData.get('low_stock_threshold') as string) || 5,
       inventory_tracking: formData.get('inventory_tracking') === 'true',
       
-      download_limit: sanitizeInt(formData.get('download_limit') as string, -1),
+      download_limit: parseInt(formData.get('download_limit') as string) || -1,
       drm_protected: formData.get('drm_protected') === 'true',
       
       language: formData.get('language') as string || 'en',
-      pages: formData.get('pages') ? sanitizeInt(formData.get('pages') as string) : undefined,
+      pages: formData.get('pages') ? parseInt(formData.get('pages') as string) : undefined,
       publication_date: formData.get('publication_date') as string || undefined,
       publisher: formData.get('publisher') as string || undefined,
       edition: formData.get('edition') as string || undefined,
@@ -133,7 +132,7 @@ export async function POST(request: NextRequest) {
       ebook_file: formData.get('ebook_file') as File || undefined,
       sample_content: formData.get('sample_content') as File || undefined,
       
-      created_by: sanitizeInt(session.user.id as string),
+      created_by: parseInt(session.user.id as string),
     };
 
     // Validate required fields
@@ -149,7 +148,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate book type and files
-    if (bookData.book_type === 'ebook' && !bookData.ebook_file) {
+    if (bookData.format === 'ebook' && !bookData.ebook_file) {
       return NextResponse.json(
         { 
           success: false, 
@@ -159,7 +158,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Creating book:', sanitizeForLog(bookData.title));
+    safeLog.info('Creating book:', bookData.title);
 
     const result = await ModernBookService.createBook(bookData);
 
@@ -180,12 +179,11 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
 
   } catch (error) {
-    console.error('Error creating book:', error);
+    safeLog.error('Error creating book:', error);
     return NextResponse.json(
       { 
         success: false, 
-        error: 'Failed to create book',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Failed to create book'
       },
       { status: 500 }
     );
@@ -224,7 +222,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    console.log('Bulk deleting books:', sanitizeForLog(bookIds.join(',')));
+    safeLog.info('Bulk deleting books:', bookIds);
 
     let deletedCount = 0;
     const errors: string[] = [];
@@ -246,10 +244,10 @@ export async function DELETE(request: NextRequest) {
         if (result.value.success) {
           deletedCount++;
         } else {
-          errors.push(`Book ${result.value.bookId}: ${sanitizeHtml(result.value.error || 'Unknown error')}`);
+          errors.push(`Book ${result.value.bookId}: ${result.value.error || 'Unknown error'}`);
         }
       } else {
-        errors.push(`Delete operation failed: ${sanitizeHtml(result.reason)}`);
+        errors.push(`Delete operation failed: ${result.reason}`);
       }
     });
 
@@ -262,12 +260,11 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error in bulk delete:', error);
+    safeLog.error('Error in bulk delete:', error);
     return NextResponse.json(
       { 
         success: false, 
-        error: 'Failed to delete books',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Failed to delete books'
       },
       { status: 500 }
     );

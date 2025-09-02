@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { CartItem, CartAnalytics, Book } from '@/types/ecommerce';
 
 interface GuestCartContextType {
@@ -40,7 +41,20 @@ const GuestCartContext = createContext<GuestCartContextType | undefined>(undefin
 const GUEST_CART_KEY = 'readnwin_guest_cart';
 
 export function GuestCartProvider({ children }: { children: ReactNode }) {
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const { data: session } = useSession();
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    // Initialize cart from localStorage immediately for guest users
+    if (typeof window !== 'undefined' && !session) {
+      try {
+        const storedCart = localStorage.getItem(GUEST_CART_KEY);
+        return storedCart ? JSON.parse(storedCart) : [];
+      } catch (error) {
+        console.error('Error loading initial cart:', error);
+        return [];
+      }
+    }
+    return [];
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<CartAnalytics>({
@@ -56,10 +70,48 @@ export function GuestCartProvider({ children }: { children: ReactNode }) {
     isMixedCart: false
   });
 
-  // Load cart from localStorage on mount
+  // Load cart when session changes
   useEffect(() => {
-    loadCartFromStorage();
-  }, []);
+    console.log('🔄 Session changed, user ID:', session?.user?.id);
+    if (session?.user?.id) {
+      // Transfer guest cart if exists, then load authenticated cart
+      const guestCart = localStorage.getItem(GUEST_CART_KEY);
+      console.log('📦 Guest cart in localStorage:', guestCart);
+      if (guestCart) {
+        try {
+          const guestItems = JSON.parse(guestCart);
+          console.log('📦 Parsed guest items:', guestItems.length, 'items');
+          if (guestItems.length > 0) {
+            console.log('🔄 Transferring guest cart to user...');
+            // Keep showing guest items during transfer to prevent cart from appearing empty
+            setCartItems(guestItems);
+            transferCartToUser(parseInt(session.user.id)).then(async (success) => {
+              console.log('🔄 Transfer result:', success);
+              if (success) {
+                console.log('✅ Transfer successful, cart items are now in database');
+                // Keep current cart items visible - checkout will handle validation
+              } else {
+                console.log('⚠️ Transfer failed, keeping guest cart visible');
+              }
+            });
+          } else {
+            console.log('🔄 No guest items, loading authenticated cart directly...');
+            loadAuthenticatedCart();
+          }
+        } catch (error) {
+          console.error('❌ Error parsing guest cart:', error);
+          loadAuthenticatedCart();
+        }
+      } else {
+        console.log('🔄 No guest cart, loading authenticated cart...');
+        loadAuthenticatedCart();
+      }
+    } else {
+      console.log('🔄 No user session, loading guest cart from localStorage...');
+      // Load guest cart from localStorage
+      loadCartFromStorage();
+    }
+  }, [session?.user?.id]);
 
   // Update analytics when cart items change
   useEffect(() => {
@@ -102,109 +154,163 @@ export function GuestCartProvider({ children }: { children: ReactNode }) {
       return total + (price * item.quantity);
     }, 0);
     
-    const totalSavings = cartItems.reduce((total, item) => {
-      const book = item.book;
-      if (book?.original_price && book.original_price > book.price) {
-        return total + ((book.original_price - book.price) * item.quantity);
-      }
-      return total;
-    }, 0);
-
     const ebookCount = cartItems.reduce((total, item) => {
-      if (item.book?.format === 'ebook' || item.book?.format === 'both') {
+      if (item.book?.format === 'ebook') {
         return total + item.quantity;
       }
       return total;
     }, 0);
 
     const physicalCount = cartItems.reduce((total, item) => {
-      if (item.book?.format === 'physical' || item.book?.format === 'both') {
+      if (item.book?.format === 'physical') {
         return total + item.quantity;
       }
       return total;
     }, 0);
 
-    const isEbookOnly = ebookCount > 0 && physicalCount === 0;
-    const isPhysicalOnly = physicalCount > 0 && ebookCount === 0;
-    const isMixedCart = ebookCount > 0 && physicalCount > 0;
-
     setAnalytics({
       totalItems,
       totalValue,
-      totalSavings,
+      totalSavings: 0, // Calculated in checkout
       itemCount: cartItems.length,
       averageItemValue: totalItems > 0 ? totalValue / totalItems : 0,
       ebookCount,
       physicalCount,
-      isEbookOnly,
-      isPhysicalOnly,
-      isMixedCart
+      isEbookOnly: ebookCount > 0 && physicalCount === 0,
+      isPhysicalOnly: physicalCount > 0 && ebookCount === 0,
+      isMixedCart: ebookCount > 0 && physicalCount > 0
     });
   };
 
   const addToCart = async (book: Book, quantity: number = 1) => {
-    console.log('🛒 Adding to guest cart:', { book: book.title, quantity });
+    console.log('🛒 Adding to cart:', { book: book.title, quantity, isAuthenticated: !!session });
     setIsLoading(true);
     setError(null);
 
     try {
-      setCartItems(prev => {
-        console.log('📦 Current cart items:', prev);
-        const existingItem = prev.find(item => item.book_id === book.id);
-        let newItems: CartItem[];
-
-        if (existingItem) {
-          console.log('🔄 Updating existing item quantity');
-          newItems = prev.map(item => 
-            item.book_id === book.id 
-              ? { ...item, quantity: item.quantity + quantity }
-              : item
-          );
+      if (session?.user?.id) {
+        // For authenticated users, use API
+        const response = await fetch('/api/cart/secure', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bookId: book.id, quantity })
+        });
+        
+        if (response.ok) {
+          // Reload cart from API
+          await loadAuthenticatedCart();
         } else {
-          console.log('🆕 Adding new item to cart');
-          const newItem: CartItem = {
-            id: Date.now(), // Temporary ID for guest cart
-            user_id: 0, // Guest user ID (will be updated when transferred to real user)
-            book_id: book.id,
-            quantity,
-            added_at: new Date().toISOString(),
-            book: {
-              id: book.id,
-              title: book.title,
-              author_name: book.author_name || 'Unknown Author',
-              price: book.price,
-              original_price: book.original_price,
-              cover_image_url: book.cover_image_url,
-              category_name: book.category_name,
-              format: book.format,
-              // Add required fields with default values
-              author_id: book.author_id,
-              category_id: book.category_id,
-              language: book.language,
-              stock_quantity: book.stock_quantity,
-              low_stock_threshold: book.low_stock_threshold,
-              is_featured: book.is_featured,
-              is_bestseller: book.is_bestseller,
-              is_new_release: book.is_new_release,
-              status: book.status,
-              view_count: book.view_count,
-              created_at: book.created_at,
-              updated_at: book.updated_at
-            }
-          };
-          console.log('🆕 New cart item created:', newItem);
-          newItems = [...prev, newItem];
+          throw new Error('Failed to add to cart');
         }
+      } else {
+        // For guest users, use localStorage
+        setCartItems(prev => {
+          console.log('📦 Current cart items:', prev);
+          const existingItem = prev.find(item => item.book_id === book.id);
+          let newItems: CartItem[];
 
-        console.log('📦 New cart items:', newItems);
-        saveCartToStorage(newItems);
-        return newItems;
-      });
+          if (existingItem) {
+            console.log('🔄 Updating existing item quantity');
+            newItems = prev.map(item => 
+              item.book_id === book.id 
+                ? { ...item, quantity: item.quantity + quantity }
+                : item
+            );
+          } else {
+            console.log('🆕 Adding new item to cart');
+            const newItem: CartItem = {
+              id: Date.now(),
+              user_id: 0,
+              book_id: book.id,
+              quantity,
+              added_at: new Date().toISOString(),
+              book: {
+                id: book.id,
+                title: book.title,
+                author_name: book.author_name || 'Unknown Author',
+                price: book.price,
+                original_price: book.original_price,
+                cover_image_url: book.cover_image_url,
+                category_name: book.category_name,
+                format: book.format,
+                author_id: book.author_id,
+                category_id: book.category_id,
+                language: book.language,
+                stock_quantity: book.stock_quantity,
+                low_stock_threshold: book.low_stock_threshold,
+                is_featured: book.is_featured,
+                is_bestseller: book.is_bestseller,
+                is_new_release: book.is_new_release,
+                status: book.status,
+                view_count: book.view_count,
+                created_at: book.created_at,
+                updated_at: book.updated_at
+              }
+            };
+            console.log('🆕 New cart item created:', newItem);
+            newItems = [...prev, newItem];
+          }
+
+          console.log('📦 New cart items:', newItems);
+          saveCartToStorage(newItems);
+          return newItems;
+        });
+      }
     } catch (err) {
       console.error('❌ Error adding to cart:', err);
       setError('Failed to add item to cart');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadAuthenticatedCart = async (retryCount = 0) => {
+    if (!session?.user?.id) return;
+    
+    try {
+      console.log('🔄 Loading authenticated cart for user:', session.user.id, retryCount > 0 ? `(retry ${retryCount})` : '');
+      const response = await fetch('/api/cart/secure', {
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Authenticated cart loaded:', data);
+        setCartItems(data.items || []);
+        setError(null);
+      } else {
+        console.warn('❌ Failed to load authenticated cart:', response.status, response.statusText);
+        
+        // Retry once if it's a 500 error and we haven't retried yet
+        if (response.status === 500 && retryCount === 0) {
+          console.log('🔄 Retrying authenticated cart load...');
+          setTimeout(() => loadAuthenticatedCart(1), 1000);
+          return;
+        }
+        
+        // If we have items from a recent transfer, keep showing them
+        if (cartItems.length === 0) {
+          setCartItems([]);
+        }
+        setError('Failed to load cart');
+      }
+    } catch (error) {
+      console.error('❌ Error loading authenticated cart:', error);
+      
+      // Retry once if we haven't retried yet
+      if (retryCount === 0) {
+        console.log('🔄 Retrying authenticated cart load after error...');
+        setTimeout(() => loadAuthenticatedCart(1), 1000);
+        return;
+      }
+      
+      // If we have items from a recent transfer, keep showing them
+      if (cartItems.length === 0) {
+        setCartItems([]);
+      }
+      setError('Failed to load cart');
     }
   };
 
@@ -269,10 +375,13 @@ export function GuestCartProvider({ children }: { children: ReactNode }) {
   };
 
   const transferCartToUser = async (userId: number): Promise<boolean> => {
-    if (cartItems.length === 0) return true;
+    if (cartItems.length === 0) {
+      console.log('🔄 No items to transfer');
+      return true;
+    }
 
     try {
-      console.log('🔄 Transferring guest cart to user:', userId);
+      console.log('🔄 Transferring guest cart to user:', userId, 'with', cartItems.length, 'items');
       const response = await fetch('/api/cart/transfer-guest', {
         method: 'POST',
         headers: {
@@ -290,8 +399,13 @@ export function GuestCartProvider({ children }: { children: ReactNode }) {
       
       if (response.ok && result.success) {
         console.log('✅ Cart transfer successful:', result.message);
+        // Add a small delay before clearing guest cart to ensure server processing is complete
+        await new Promise(resolve => setTimeout(resolve, 500));
         // Clear guest cart after successful transfer
-        await clearCart();
+        localStorage.removeItem(GUEST_CART_KEY);
+        console.log('🧹 Guest cart cleared from localStorage');
+        // Clear local cart items to reflect the transfer
+        setCartItems([]);
         return true;
       } else {
         console.error('❌ Cart transfer failed:', result.error);
@@ -328,8 +442,13 @@ export function GuestCartProvider({ children }: { children: ReactNode }) {
   }, [analytics.totalSavings]);
 
   const getTotalItems = useCallback(() => {
-    return analytics.totalItems;
-  }, [analytics.totalItems]);
+    try {
+      return analytics?.totalItems || 0;
+    } catch (error) {
+      console.error('Error getting guest cart total items:', error);
+      return 0;
+    }
+  }, [analytics?.totalItems]);
 
   const refreshCart = useCallback(async () => {
     loadCartFromStorage();
@@ -364,7 +483,36 @@ export function GuestCartProvider({ children }: { children: ReactNode }) {
 export function useGuestCart() {
   const context = useContext(GuestCartContext);
   if (context === undefined) {
-    throw new Error('useGuestCart must be used within a GuestCartProvider');
+    console.warn('useGuestCart called outside GuestCartProvider, returning fallback');
+    return {
+      cartItems: [],
+      isLoading: false,
+      error: null,
+      analytics: {
+        totalItems: 0,
+        totalValue: 0,
+        totalSavings: 0,
+        itemCount: 0,
+        averageItemValue: 0,
+        ebookCount: 0,
+        physicalCount: 0,
+        isEbookOnly: true,
+        isPhysicalOnly: false,
+        isMixedCart: false
+      },
+      isEbookOnly: () => true,
+      isPhysicalOnly: () => false,
+      isMixedCart: () => false,
+      addToCart: async () => {},
+      updateQuantity: async () => {},
+      removeFromCart: async () => {},
+      clearCart: async () => {},
+      getSubtotal: () => 0,
+      getTotalSavings: () => 0,
+      getTotalItems: () => 0,
+      refreshCart: async () => {},
+      transferCartToUser: async () => true
+    };
   }
   return context;
 } 

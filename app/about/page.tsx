@@ -105,15 +105,11 @@ export default function AboutPage() {
       }
     });
 
-    // Check for updates more frequently (every 10 seconds)
-    const interval = setInterval(() => {
-      fetchContent();
-    }, 10000);
+    // Removed aggressive auto-refresh that was causing navigation issues
 
     return () => {
       window.removeEventListener('about-content-updated', handleContentUpdate);
       window.removeEventListener('storage', handleContentUpdate);
-      clearInterval(interval);
     };
   }, []);
 

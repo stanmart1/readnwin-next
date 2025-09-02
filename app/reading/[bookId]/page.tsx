@@ -8,7 +8,7 @@ import ModernEReader from '../components/ModernEReader';
 interface BookInfo {
   id: number;
   title: string;
-  book_type: 'physical' | 'ebook' | 'hybrid';
+  format: 'physical' | 'ebook' | 'hybrid';
 }
 
 export default function ReadingPage() {
@@ -35,7 +35,7 @@ export default function ReadingPage() {
           const book = data.book;
           
           // Check if it's a physical book
-          if (book.book_type === 'physical' || book.format === 'physical') {
+          if (book.format === 'physical') {
             setError('Physical books cannot be read digitally. You can leave a review for this book instead.');
             return;
           }

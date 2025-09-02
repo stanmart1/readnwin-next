@@ -1,60 +1,28 @@
-import type { Metadata } from 'next'
-import './globals.css'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import Providers from './components/Providers'
-import Head from './head'
-import FontLoader from './components/FontLoader'
-import PreloadDisabler from './components/PreloadDisabler'
-// import { NavigationLoader } from '../components/ui/NavigationLoader'
-import { ErrorBoundary } from '../components/ui/ErrorBoundary'
-import FlutterwaveScriptLoader from '../components/FlutterwaveScriptLoader'
-import ErrorSuppressor from '../components/ErrorSuppressor'
-import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration'
-import { initializeSecurityPatches } from '@/utils/apply-security-patches'
-import '@/utils/errorSuppression'
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { Providers } from './providers';
+import '../utils/console-suppressions';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'ReadnWin - Your Digital Library',
-  description: 'Discover, read, and manage your digital book collection with ReadnWin.',
-  icons: {
-    icon: [
-      { url: '/favicon.png', type: 'image/png' },
-    ],
-    shortcut: '/favicon.png',
-    apple: '/favicon.png',
-  },
-  manifest: '/site.webmanifest',
-}
+  title: 'ReadnWin - Digital Bookstore',
+  description: 'Discover, read, and enjoy books in digital and physical formats',
+};
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  // Initialize security patches early
-  await initializeSecurityPatches()
-  
-  const session = await getServerSession(authOptions)
-
   return (
     <html lang="en">
-      <head>
-        <Head />
-      </head>
-      <body className="font-sans">
-        <PreloadDisabler />
-        <FontLoader />
-        <Providers session={session}>
-          <ErrorBoundary>
-            {/* <NavigationLoader /> */}
-            <ErrorSuppressor />
-            <ServiceWorkerRegistration />
-            <FlutterwaveScriptLoader />
-            {children}
-          </ErrorBoundary>
+      <body className={inter.className}>
+        <Providers>
+          {children}
         </Providers>
       </body>
     </html>
-  )
+  );
 }

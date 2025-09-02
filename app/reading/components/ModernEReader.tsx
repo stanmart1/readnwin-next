@@ -161,8 +161,8 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
         const manifestItem = manifest[spineItem];
         
         if (manifestItem && manifestItem.mediaType === 'application/xhtml+xml') {
-          // Load chapter content from extracted EPUB
-          const chapterResponse = await fetch(`/api/ebooks/${bookId}/${manifestItem.href}`);
+          // Load chapter content from preserved EPUB structure
+          const chapterResponse = await fetch(`/api/ebooks/${bookId}/extracted/${manifestItem.href}`);
           if (chapterResponse.ok) {
             const chapterContent = await chapterResponse.text();
             

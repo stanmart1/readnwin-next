@@ -6,8 +6,9 @@ import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import { formatNumber } from '@/utils/dateUtils';
-import { useCart } from '@/contexts/CartContextNew';
+import { useGuestCart } from '@/contexts/GuestCartContext';
 import ReviewForm from '@/components/ReviewForm';
+import { sanitizeHtml } from '@/utils/security';
 
 
 interface BookDetails {
@@ -49,7 +50,7 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
   const [reviews, setReviews] = useState<any[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const { data: session } = useSession();
-  const { addToCart } = useCart();
+  const { addToCart } = useGuestCart();
 
   // Load reviews for the book
   const loadReviews = useCallback(async () => {
@@ -143,7 +144,7 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
     if (!book) return;
 
     try {
-      await addToCart(book.id, quantity);
+      await addToCart(book, quantity);
       // Show success message or update cart count
       alert('Item added to cart successfully!');
     } catch (error) {
@@ -276,8 +277,8 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
             {/* Book Info */}
             <div className="lg:col-span-2">
               <div className="mb-6">
-                <h1 className="text-5xl font-bold text-gray-900 mb-3 leading-tight">{book.title}</h1>
-                <p className="text-2xl text-gray-600 mb-6">by <span className="font-semibold text-blue-600">{book.author_name}</span></p>
+                <h1 className="text-5xl font-bold text-gray-900 mb-3 leading-tight">{sanitizeHtml(book.title)}</h1>
+                <p className="text-2xl text-gray-600 mb-6">by <span className="font-semibold text-blue-600">{sanitizeHtml(book.author_name)}</span></p>
                 
                 {/* Rating */}
                 <div className="flex items-center space-x-4 mb-6">
@@ -344,7 +345,7 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-xl border border-blue-100">
                     <span className="text-gray-500 text-sm font-medium">Category</span>
-                    <p className="font-semibold text-gray-900 text-lg">{book.category_name}</p>
+                    <p className="font-semibold text-gray-900 text-lg">{sanitizeHtml(book.category_name)}</p>
                   </div>
                   <div className="bg-gradient-to-r from-green-50 to-teal-50 p-4 rounded-xl border border-green-100">
                     <span className="text-gray-500 text-sm font-medium">Pages</span>
@@ -361,7 +362,7 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                   </div>
                   <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-xl border border-yellow-100">
                     <span className="text-gray-500 text-sm font-medium">Language</span>
-                    <p className="font-semibold text-gray-900 text-lg">{book.language}</p>
+                    <p className="font-semibold text-gray-900 text-lg">{sanitizeHtml(book.language)}</p>
                   </div>
                 </div>
               </div>

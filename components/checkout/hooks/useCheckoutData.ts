@@ -13,7 +13,7 @@ export function useCheckoutData() {
       setError(null);
       
       const [shippingResponse, paymentResponse] = await Promise.all([
-        fetch('/api/admin/shipping-methods'),
+        fetch('/api/admin/shipping/methods'),
         fetch('/api/payment-gateways')
       ]);
 

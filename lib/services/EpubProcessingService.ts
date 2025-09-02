@@ -3,6 +3,7 @@ import { DOMParser } from '@xmldom/xmldom';
 import StorageService from './StorageService';
 import path from 'path';
 import fs from 'fs/promises';
+import { sanitizePath, safeLog } from '@/utils/security';
 
 export interface EpubMetadata {
   title: string;
@@ -72,7 +73,7 @@ export class EpubProcessingService {
     error?: string;
   }> {
     try {
-      console.log(`Processing EPUB file: ${filePath}`);
+      safeLog.info(`Processing EPUB file: ${filePath}`);
 
       // Verify file exists on persistent volume
       const fileInfo = await StorageService.getFileInfo(filePath);
@@ -86,19 +87,19 @@ export class EpubProcessingService {
 
       // Extract metadata
       const metadata = await this.extractMetadata(zip);
-      console.log('Extracted metadata:', metadata);
+      safeLog.info('Extracted metadata:', metadata);
 
       // Extract table of contents
       const tableOfContents = await this.extractTableOfContents(zip);
-      console.log('Extracted TOC with', tableOfContents.chapters.length, 'chapters');
+      safeLog.info('Extracted TOC with', tableOfContents.chapters.length, 'chapters');
 
       // Extract chapters
       const chapters = await this.extractChapters(zip, tableOfContents);
-      console.log('Extracted', chapters.length, 'chapters');
+      safeLog.info('Extracted', chapters.length, 'chapters');
 
       // Extract assets (images, CSS, fonts)
       const assets = await this.extractAssets(zip, bookId);
-      console.log('Extracted', assets.length, 'assets');
+      safeLog.info('Extracted', assets.length, 'assets');
 
       // Find cover image
       const coverImage = await this.findCoverImage(zip, assets);
@@ -356,11 +357,12 @@ export class EpubProcessingService {
       try {
         const data = await file.async('nodebuffer');
         
-        // Store asset on persistent volume
+        // Store asset on persistent volume with path sanitization
+        const sanitizedFilename = sanitizePath(path.basename(relativePath));
         const assetPath = StorageService.generateSecureFilePath(
           'asset',
           bookId,
-          path.basename(relativePath),
+          sanitizedFilename,
           this.getAssetSubType(ext)
         );
 
@@ -378,7 +380,7 @@ export class EpubProcessingService {
           });
         }
       } catch (error) {
-        console.error(`Error processing asset ${relativePath}:`, error);
+        safeLog.error(`Error processing asset ${relativePath}:`, error);
       }
     }
 

@@ -6,6 +6,7 @@ import { ecommerceService } from '@/utils/ecommerce-service-new';
 import { secureQuery } from '@/utils/secure-database';
 import { validateInput, sanitizeInput, validateId } from '@/utils/security-middleware';
 import { sendEmail, getOrderConfirmationEmailTemplate } from '@/utils/email';
+import { sanitizeApiResponse, safeLog } from '@/utils/security';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,28 +25,28 @@ export async function GET(request: NextRequest) {
     });
     
     if (!validation.isValid) {
-      console.log('❌ Invalid parameters:', validation.errors);
+      safeLog.error('❌ Invalid parameters:', validation.errors);
       return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/payment/failed?error=invalid_params`);
     }
 
-    console.log('🔍 Payment verification request:', { status, tx_ref, transaction_id });
+    safeLog.info('🔍 Payment verification request:', { status, tx_ref, transaction_id });
 
     if (!tx_ref || !transaction_id) {
-      console.log('❌ Missing required parameters');
+      safeLog.error('❌ Missing required parameters');
       return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/payment/failed?error=missing_params`);
     }
 
     // Get session to verify user
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      console.log('❌ No session found');
+      safeLog.error('❌ No session found');
       return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/login?redirect=/payment/verify-enhanced`);
     }
 
     const userId = parseInt(session.user.id);
 
     if (status === 'cancelled') {
-      console.log('❌ Payment was cancelled by user');
+      safeLog.info('❌ Payment was cancelled by user');
       
       // Find the order by transaction reference
       const orderResult = await secureQuery(`
@@ -63,14 +64,14 @@ export async function GET(request: NextRequest) {
           WHERE id = $1
         `, [order.id]);
 
-        console.log(`✅ Order ${order.order_number} marked as cancelled`);
+        safeLog.info(`✅ Order ${order.order_number} marked as cancelled`);
       }
 
       return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/payment/cancelled?order=${tx_ref}`);
     }
 
     if (status === 'successful') {
-      console.log('✅ Payment reported as successful, verifying...');
+      safeLog.info('✅ Payment reported as successful, verifying...');
 
       try {
         // Get Flutterwave gateway configuration
@@ -88,14 +89,14 @@ export async function GET(request: NextRequest) {
 
         // Verify the payment with Flutterwave
         const verification = await flutterwaveService.verifyPayment(transaction_id);
-        console.log('🔍 Payment verification result:', verification.status);
+        safeLog.info('🔍 Payment verification result:', verification.status);
 
         if (verification.status === 'successful') {
           // Find the order
           const orderResult = await secureQuery(`
             SELECT o.*, 
-                   COUNT(CASE WHEN b.book_type IN ('ebook', 'hybrid') THEN 1 END) as ebook_count,
-                   COUNT(CASE WHEN b.book_type IN ('physical', 'hybrid') THEN 1 END) as physical_count
+                   COUNT(CASE WHEN b.format IN ('ebook', 'hybrid') THEN 1 END) as ebook_count,
+                   COUNT(CASE WHEN b.format IN ('physical', 'hybrid') THEN 1 END) as physical_count
             FROM orders o
             LEFT JOIN order_items oi ON o.id = oi.order_id
             LEFT JOIN books b ON oi.book_id = b.id
@@ -108,11 +109,11 @@ export async function GET(request: NextRequest) {
           }
 
           const order = orderResult.rows[0];
-          console.log(`🔍 Found order ${order.order_number} for verification`);
+          safeLog.info(`🔍 Found order ${order.order_number} for verification`);
 
           // Check if order is already processed
           if (order.payment_status === 'paid') {
-            console.log('ℹ️ Order already processed, redirecting to confirmation');
+            safeLog.info('ℹ️ Order already processed, redirecting to confirmation');
             return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/order-confirmation-enhanced/${order.id}?status=success`);
           }
 
@@ -130,37 +131,37 @@ export async function GET(request: NextRequest) {
             WHERE transaction_id = $1
           `, [transaction_id]);
 
-          console.log(`✅ Order ${order.order_number} payment confirmed`);
+          safeLog.info(`✅ Order ${order.order_number} payment confirmed`);
 
           // Sync books to user library using the sync service
           try {
             const { LibrarySyncService } = await import('@/utils/library-sync-service');
             await LibrarySyncService.syncOrderToLibrary(order.id, userId);
           } catch (libraryError) {
-            console.error('❌ Error syncing books to library:', libraryError);
+            safeLog.error('❌ Error syncing books to library:', libraryError);
             // Don't fail the entire process for library issues
           }
 
           // Clear user's cart after successful payment verification
           try {
             await ecommerceService.clearCartAfterPaymentSuccess(userId, order.id);
-            console.log('✅ Cart cleared after confirmed payment success');
+            safeLog.info('✅ Cart cleared after confirmed payment success');
           } catch (cartError) {
-            console.error('❌ Error clearing cart after payment success:', cartError);
+            safeLog.error('❌ Error clearing cart after payment success:', cartError);
             // Don't fail for cart clearing issues
           }
 
           // Send confirmation email
           try {
             const orderItemsResult = await secureQuery(`
-              SELECT oi.*, b.title, COALESCE(a.name, 'Unknown Author') as author_name, b.book_type as format
+              SELECT oi.*, b.title, COALESCE(a.name, 'Unknown Author') as author_name, b.format
               FROM order_items oi
               JOIN books b ON oi.book_id = b.id
               LEFT JOIN authors a ON b.author_id = a.id
               WHERE oi.order_id = $1
             `, [order.id]);
 
-            const emailTemplate = getOrderConfirmationEmailTemplate({
+            const emailTemplate = getOrderConfirmationEmailTemplate(sanitizeApiResponse({
               orderNumber: order.order_number,
               orderTotal: `₦${order.total_amount.toLocaleString()}`,
               items: orderItemsResult.rows.map(item => ({
@@ -174,7 +175,7 @@ export async function GET(request: NextRequest) {
               paymentMethod: 'Flutterwave',
               isDigital: parseInt(order.ebook_count) > 0 && parseInt(order.physical_count) === 0,
               isMixed: parseInt(order.ebook_count) > 0 && parseInt(order.physical_count) > 0
-            }, `${order.shipping_address?.first_name || ''} ${order.shipping_address?.last_name || ''}`.trim() || 'Customer');
+            }), `${order.shipping_address?.first_name || ''} ${order.shipping_address?.last_name || ''}`.trim() || 'Customer');
 
             await sendEmail(
               order.shipping_address?.email || session.user.email,
@@ -182,9 +183,9 @@ export async function GET(request: NextRequest) {
               emailTemplate.html
             );
 
-            console.log('✅ Confirmation email sent');
+            safeLog.info('✅ Confirmation email sent');
           } catch (emailError) {
-            console.error('❌ Error sending confirmation email:', emailError);
+            safeLog.error('❌ Error sending confirmation email:', emailError);
             // Don't fail for email issues
           }
 
@@ -193,7 +194,7 @@ export async function GET(request: NextRequest) {
 
         } else {
           // Payment verification failed
-          console.log('❌ Payment verification failed');
+          safeLog.error('❌ Payment verification failed');
           
           // Update order status to failed
           const orderResult = await secureQuery(`
@@ -212,17 +213,17 @@ export async function GET(request: NextRequest) {
         }
 
       } catch (verificationError) {
-        console.error('❌ Payment verification error:', verificationError);
+        safeLog.error('❌ Payment verification error:', verificationError);
         return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/payment/failed?order=${tx_ref}&reason=verification_error`);
       }
     }
 
     // Unknown status
-    console.log('❌ Unknown payment status:', status);
+    safeLog.error('❌ Unknown payment status:', status);
     return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/payment/failed?order=${tx_ref}&reason=unknown_status`);
 
   } catch (error) {
-    console.error('❌ Payment verification error:', error);
+    safeLog.error('❌ Payment verification error:', error);
     return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/payment/failed?reason=server_error`);
   }
 }
@@ -231,7 +232,7 @@ export async function POST(request: NextRequest) {
   try {
     // Handle webhook from Flutterwave
     const body = await request.json();
-    console.log('🔍 Payment webhook received:', body);
+    safeLog.info('🔍 Payment webhook received:', body);
 
     // Verify webhook signature if needed
     // Implementation depends on Flutterwave webhook setup
@@ -241,12 +242,12 @@ export async function POST(request: NextRequest) {
     if (status === 'successful') {
       // Process the successful payment
       // This is a backup in case the redirect verification fails
-      console.log('✅ Webhook confirmed successful payment for:', tx_ref);
+      safeLog.info('✅ Webhook confirmed successful payment for:', tx_ref);
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('❌ Webhook processing error:', error);
+    safeLog.error('❌ Webhook processing error:', error);
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 } 

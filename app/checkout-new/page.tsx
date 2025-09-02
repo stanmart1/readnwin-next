@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle, AlertCircle, CreditCard, Banknote, Globe } from 'lucide-react';
-import { useCart } from '@/contexts/CartContextNew';
 import { useGuestCart } from '@/contexts/GuestCartContext';
 import { useFlutterwaveInline } from '@/hooks/useFlutterwaveInline';
 import Header from '@/components/Header';
@@ -30,32 +29,15 @@ export default function CheckoutPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   
-  // Use appropriate cart context based on authentication status
-  const { 
-    cartItems: authCartItems, 
-    isLoading: authCartLoading,
-    isEbookOnly: authIsEbookOnly,
-    isPhysicalOnly: authIsPhysicalOnly,
-    isMixedCart: authIsMixedCart,
-    analytics: authAnalytics
-  } = useCart();
-
+  // Use GuestCartContext which handles both guest and authenticated users
   const {
-    cartItems: guestCartItems,
-    isLoading: guestCartLoading,
-    isEbookOnly: guestIsEbookOnly,
-    isPhysicalOnly: guestIsPhysicalOnly,
-    isMixedCart: guestIsMixedCart,
-    analytics: guestAnalytics
+    cartItems,
+    isLoading: cartLoading,
+    isEbookOnly,
+    isPhysicalOnly,
+    isMixedCart,
+    analytics
   } = useGuestCart();
-  
-  // Use appropriate cart data based on session status
-  const cartItems = session ? authCartItems : guestCartItems;
-  const cartLoading = session ? authCartLoading : guestCartLoading;
-  const isEbookOnly = session ? authIsEbookOnly : guestIsEbookOnly;
-  const isPhysicalOnly = session ? authIsPhysicalOnly : guestIsPhysicalOnly;
-  const isMixedCart = session ? authIsMixedCart : guestIsMixedCart;
-  const analytics = session ? authAnalytics : guestAnalytics;
   
   const [isLoading, setIsLoading] = useState(false);
   const [checkoutSummary, setCheckoutSummary] = useState<{
@@ -84,10 +66,14 @@ export default function CheckoutPage() {
 
   // Load checkout data
   useEffect(() => {
-    if (cartItems.length > 0) {
-      loadCheckoutData();
+    if (cartItems.length > 0 && !cartLoading) {
+      // Add a small delay to ensure cart transfer is complete
+      const timer = setTimeout(() => {
+        loadCheckoutData();
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [cartItems]);
+  }, [cartItems, cartLoading]);
 
   // Add beforeunload event listener to warn users when leaving with unsaved data
   useEffect(() => {

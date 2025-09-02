@@ -397,6 +397,8 @@ export default function BooksPage() {
                 isAvailable={book.status === 'published'}
                 genre={book.category_name}
                 format={book.format as 'ebook' | 'physical' | 'both'}
+                hideReadButton={true}
+                hideWishlistButton={true}
               />
             ))}
           </div>

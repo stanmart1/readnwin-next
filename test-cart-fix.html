@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Guest Cart Test</title>
+</head>
+<body>
+    <h1>Guest Cart localStorage Test</h1>
+    
+    <button onclick="addTestItem()">Add Test Item</button>
+    <button onclick="checkCart()">Check Cart</button>
+    <button onclick="clearCart()">Clear Cart</button>
+    
+    <div id="output"></div>
+    
+    <script>
+        const GUEST_CART_KEY = 'readnwin_guest_cart';
+        
+        function addTestItem() {
+            const testItem = {
+                id: Date.now(),
+                user_id: 0,
+                book_id: 1,
+                quantity: 1,
+                added_at: new Date().toISOString(),
+                book: {
+                    id: 1,
+                    title: 'Test Book',
+                    author_name: 'Test Author',
+                    price: 1000,
+                    cover_image_url: '/test.jpg'
+                }
+            };
+            
+            let cart = [];
+            try {
+                const stored = localStorage.getItem(GUEST_CART_KEY);
+                cart = stored ? JSON.parse(stored) : [];
+            } catch (e) {
+                console.error('Error loading cart:', e);
+            }
+            
+            cart.push(testItem);
+            localStorage.setItem(GUEST_CART_KEY, JSON.stringify(cart));
+            
+            document.getElementById('output').innerHTML = `Added item. Cart now has ${cart.length} items.`;
+        }
+        
+        function checkCart() {
+            try {
+                const stored = localStorage.getItem(GUEST_CART_KEY);
+                const cart = stored ? JSON.parse(stored) : [];
+                document.getElementById('output').innerHTML = `Cart has ${cart.length} items: ${JSON.stringify(cart, null, 2)}`;
+            } catch (e) {
+                document.getElementById('output').innerHTML = `Error: ${e.message}`;
+            }
+        }
+        
+        function clearCart() {
+            localStorage.removeItem(GUEST_CART_KEY);
+            document.getElementById('output').innerHTML = 'Cart cleared.';
+        }
+    </script>
+</body>
+</html>

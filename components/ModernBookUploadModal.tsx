@@ -27,6 +27,8 @@ interface BookFormData {
   format: string;
   stock_quantity: string;
   track_inventory: boolean;
+  is_featured: boolean;
+  status: string;
   cover_image: File | null;
   ebook_file: File | null;
 }
@@ -53,9 +55,11 @@ export default function ModernBookUploadModal({
     pages: '',
     publication_date: '',
     publisher: '',
-    format: 'ebook',
+    format: '',
     stock_quantity: '0',
     track_inventory: true,
+    is_featured: false,
+    status: 'active',
     cover_image: null,
     ebook_file: null
   });
@@ -143,6 +147,7 @@ export default function ModernBookUploadModal({
       if (!formData.author_id) newErrors.author_id = 'Author is required';
       if (!formData.category_id) newErrors.category_id = 'Category is required';
       if (!formData.price || parseFloat(formData.price) <= 0) newErrors.price = 'Valid price is required';
+      if (!formData.format) newErrors.format = 'Book type is required';
     }
 
     if (step === 2) {
@@ -189,9 +194,6 @@ export default function ModernBookUploadModal({
       if (formData.ebook_file) {
         submitData.append('ebook_file', formData.ebook_file);
       }
-
-      // Set book type based on format
-      submitData.append('book_type', formData.format);
 
       console.log('📤 Submitting book data...');
       setUploadProgress(25);
@@ -272,9 +274,11 @@ export default function ModernBookUploadModal({
       pages: '',
       publication_date: '',
       publisher: '',
-      format: 'ebook',
+      format: '',
       stock_quantity: '0',
       track_inventory: true,
+      is_featured: false,
+      status: 'active',
       cover_image: null,
       ebook_file: null
     });
@@ -433,7 +437,7 @@ export default function ModernBookUploadModal({
                 {/* Format */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-800 mb-2">
-                    Book Type
+                    Book Type *
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
@@ -442,6 +446,8 @@ export default function ModernBookUploadModal({
                       className={`p-3 rounded-xl border-2 transition-all text-center ${
                         formData.format === 'ebook'
                           ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : errors.format
+                          ? 'border-red-400 hover:border-red-300 text-gray-600'
                           : 'border-gray-200 hover:border-gray-300 text-gray-600'
                       }`}
                     >
@@ -454,6 +460,8 @@ export default function ModernBookUploadModal({
                       className={`p-3 rounded-xl border-2 transition-all text-center ${
                         formData.format === 'physical'
                           ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : errors.format
+                          ? 'border-red-400 hover:border-red-300 text-gray-600'
                           : 'border-gray-200 hover:border-gray-300 text-gray-600'
                       }`}
                     >
@@ -461,6 +469,7 @@ export default function ModernBookUploadModal({
                       <span className="text-sm font-medium">Physical Book</span>
                     </button>
                   </div>
+                  {errors.format && <p className="text-red-500 text-sm mt-1 flex items-center"><i className="ri-error-warning-line mr-1"></i>{errors.format}</p>}
                 </div>
 
                 {/* ISBN */}
@@ -475,6 +484,39 @@ export default function ModernBookUploadModal({
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="978-0-000-00000-0"
                   />
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Status
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('status', 'active')}
+                      className={`p-3 rounded-xl border-2 transition-all text-center ${
+                        formData.status === 'active'
+                          ? 'border-green-500 bg-green-50 text-green-700'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                      }`}
+                    >
+                      <i className="ri-check-line text-xl mb-1 block"></i>
+                      <span className="text-sm font-medium">Active</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('status', 'draft')}
+                      className={`p-3 rounded-xl border-2 transition-all text-center ${
+                        formData.status === 'draft'
+                          ? 'border-orange-500 bg-orange-50 text-orange-700'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                      }`}
+                    >
+                      <i className="ri-draft-line text-xl mb-1 block"></i>
+                      <span className="text-sm font-medium">Draft</span>
+                    </button>
+                  </div>
                 </div>
 
 
@@ -494,6 +536,40 @@ export default function ModernBookUploadModal({
                     />
                   </div>
                 )}
+
+                {/* Featured Book Toggle */}
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                        <i className="ri-star-line text-purple-600"></i>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-800">
+                          Featured Book
+                        </label>
+                        <p className="text-xs text-gray-600">
+                          Featured books appear prominently on the homepage
+                        </p>
+                      </div>
+                    </div>
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_featured}
+                        onChange={(e) => handleInputChange('is_featured', e.target.checked)}
+                        className="sr-only"
+                      />
+                      <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        formData.is_featured ? 'bg-purple-600' : 'bg-gray-300'
+                      }`}>
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          formData.is_featured ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                      </div>
+                    </label>
+                  </div>
+                </div>
 
                 {/* Inventory Management (for physical books) */}
                 {formData.format === 'physical' && (
@@ -554,6 +630,32 @@ export default function ModernBookUploadModal({
                   placeholder="Enter book description..."
                 />
               </div>
+
+              {/* Status Summary */}
+              {(formData.is_featured || formData.status === 'draft') && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="flex items-start space-x-3">
+                    <i className="ri-information-line text-blue-600 mt-0.5"></i>
+                    <div className="text-sm">
+                      <p className="font-medium text-blue-800 mb-1">Book Settings Summary:</p>
+                      <ul className="text-blue-700 space-y-1">
+                        {formData.status === 'draft' && (
+                          <li className="flex items-center space-x-2">
+                            <i className="ri-draft-line text-orange-600"></i>
+                            <span>This book will be saved as a <strong>draft</strong> and won't be visible to customers</span>
+                          </li>
+                        )}
+                        {formData.is_featured && (
+                          <li className="flex items-center space-x-2">
+                            <i className="ri-star-line text-purple-600"></i>
+                            <span>This book will be <strong>featured</strong> on the homepage</span>
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -4,8 +4,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { useCart } from '@/contexts/CartContextNew';
 import { useGuestCart } from '@/contexts/GuestCartContext';
+import { useSecureCart } from '@/contexts/SecureCartContext';
 import { Book } from '@/types/ecommerce';
 
 interface BookCardProps {
@@ -25,6 +25,7 @@ interface BookCardProps {
   isWishlisted?: boolean;
   genre?: string;
   hideReadButton?: boolean;
+  hideWishlistButton?: boolean;
   format?: 'ebook' | 'physical' | 'both';
   category_name?: string;
   author_id?: number;
@@ -58,6 +59,7 @@ export default function BookCard({
   isWishlisted = false,
   genre,
   hideReadButton = false,
+  hideWishlistButton = false,
   format = 'ebook',
   category_name,
   author_id = 0,
@@ -83,8 +85,8 @@ export default function BookCard({
   const [isHovered, setIsHovered] = useState(false);
   const [wishlistStatus, setWishlistStatus] = useState(isWishlisted);
   const { data: session } = useSession();
-  const { addToCart } = useCart();
   const { addToCart: addToGuestCart } = useGuestCart();
+  const { addItem: addToSecureCart, refreshCart } = useSecureCart();
 
   const getImageSrc = () => {
     return displayCover || '/api/images/covers/placeholder';
@@ -100,47 +102,44 @@ export default function BookCard({
   };
 
   const handleAddToCart = async () => {
-    if (!session) {
-      // Use guest cart for unauthenticated users
-      const bookData: Book = {
-        id: typeof id === 'string' ? parseInt(id) : id,
-        title,
-        author_name: displayAuthor,
-        price,
-        original_price: displayOriginalPrice,
-        cover_image_url: displayCover,
-        category_name,
-        format,
-        author_id,
-        category_id,
-        language,
-        stock_quantity,
-        low_stock_threshold,
-        is_featured,
-        is_bestseller,
-        is_new_release,
-        status,
-        view_count,
-        created_at,
-        updated_at
-      };
-      
-      try {
+    try {
+      if (!session) {
+        // For guest users, add to guest cart
+        const bookData: Book = {
+          id: typeof id === 'string' ? parseInt(id) : id,
+          title,
+          author_name: displayAuthor,
+          price,
+          original_price: displayOriginalPrice,
+          cover_image_url: displayCover,
+          category_name,
+          format: format || 'ebook',
+          author_id,
+          category_id,
+          language,
+          stock_quantity,
+          low_stock_threshold,
+          is_featured,
+          is_bestseller,
+          is_new_release,
+          status: status || 'published',
+          view_count,
+          created_at,
+          updated_at
+        };
+        
         await addToGuestCart(bookData, 1);
-        // Show success message
         alert('Item added to cart successfully!');
-      } catch (error) {
-        alert('Failed to add item to cart');
-      }
-    } else {
-      // Use authenticated cart for logged-in users
-      try {
-        await addToCart(typeof id === 'string' ? parseInt(id) : id, 1);
-        // Show success message
+      } else {
+        // For authenticated users, use the secure cart context
+        const bookId = typeof id === 'string' ? parseInt(id) : id;
+        await addToSecureCart(bookId, 1);
+        await refreshCart(); // Ensure cart is refreshed
         alert('Item added to cart successfully!');
-      } catch (error) {
-        alert('Failed to add item to cart');
       }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      alert('Failed to add item to cart');
     }
   };
 
@@ -256,15 +255,17 @@ export default function BookCard({
                 </div>
               </button>
             )}
-            <button 
-              onClick={handleWishlist}
-              className="p-3 bg-white rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
-              title={session ? (wishlistStatus ? 'Remove from Wishlist' : 'Add to Wishlist') : 'Login to Wishlist'}
-            >
-              <div className="w-6 h-6 flex items-center justify-center">
-                <i className={`ri-heart-${wishlistStatus ? 'fill text-red-500' : 'line text-gray-600'} text-lg`}></i>
-              </div>
-            </button>
+            {!hideWishlistButton && (
+              <button 
+                onClick={handleWishlist}
+                className="p-3 bg-white rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                title={session ? (wishlistStatus ? 'Remove from Wishlist' : 'Add to Wishlist') : 'Login to Wishlist'}
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <i className={`ri-heart-${wishlistStatus ? 'fill text-red-500' : 'line text-gray-600'} text-lg`}></i>
+                </div>
+              </button>
+            )}
             <button 
               onClick={handleAddToCart}
               className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors cursor-pointer"

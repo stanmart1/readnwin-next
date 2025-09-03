@@ -237,32 +237,76 @@ class ImageStorageService {
   }
 
   private async updateCacheStats(type: 'hit' | 'miss'): Promise<void> {
-    const field = type === 'hit' ? 'cache_hits' : 'cache_misses';
-    await query(`
-      UPDATE cache_statistics 
-      SET ${field} = ${field} + 1, total_requests = total_requests + 1, updated_at = NOW()
-    `);
+    try {
+      const field = type === 'hit' ? 'cache_hits' : 'cache_misses';
+      
+      // Ensure table exists and has data
+      await query(`
+        INSERT INTO cache_statistics (cache_hits, cache_misses, total_requests, cache_size_bytes)
+        SELECT 0, 0, 0, 0
+        WHERE NOT EXISTS (SELECT 1 FROM cache_statistics)
+      `);
+      
+      await query(`
+        UPDATE cache_statistics 
+        SET ${field} = ${field} + 1, total_requests = total_requests + 1, updated_at = NOW()
+      `);
+    } catch (error) {
+      console.error('Error updating cache stats:', error);
+      // Don't throw error, just log it to avoid breaking image serving
+    }
   }
 
   async clearCache(): Promise<{ cleared: number; sizeMB: number }> {
-    const sizeResult = await query(`
-      SELECT COALESCE(SUM(cache_size), 0) as total_size FROM image_cache
-    `);
-    
-    const countResult = await query(`DELETE FROM image_cache RETURNING id`);
-    
-    const sizeMB = Math.round(sizeResult.rows[0].total_size / (1024 * 1024) * 100) / 100;
-    
-    await query(`
-      UPDATE cache_statistics 
-      SET cache_hits = 0, cache_misses = 0, total_requests = 0, 
-          cache_size_bytes = 0, last_cleared = NOW(), updated_at = NOW()
-    `);
+    try {
+      // Create image_cache table if it doesn't exist
+      await query(`
+        CREATE TABLE IF NOT EXISTS image_cache (
+          id SERIAL PRIMARY KEY,
+          image_id INTEGER,
+          cache_key VARCHAR(255) UNIQUE NOT NULL,
+          cached_data BYTEA NOT NULL,
+          content_type VARCHAR(100) NOT NULL,
+          cache_size INTEGER NOT NULL,
+          access_count INTEGER DEFAULT 0,
+          last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
-    return {
-      cleared: countResult.rows.length,
-      sizeMB
-    };
+      const sizeResult = await query(`
+        SELECT COALESCE(SUM(cache_size), 0) as total_size FROM image_cache
+      `);
+      
+      const countResult = await query(`DELETE FROM image_cache RETURNING id`);
+      
+      const sizeMB = Math.round(sizeResult.rows[0].total_size / (1024 * 1024) * 100) / 100;
+      
+      // Ensure cache_statistics table exists and has data
+      await query(`
+        INSERT INTO cache_statistics (cache_hits, cache_misses, total_requests, cache_size_bytes)
+        SELECT 0, 0, 0, 0
+        WHERE NOT EXISTS (SELECT 1 FROM cache_statistics)
+      `);
+      
+      await query(`
+        UPDATE cache_statistics 
+        SET cache_hits = 0, cache_misses = 0, total_requests = 0, 
+            cache_size_bytes = 0, last_cleared = NOW(), updated_at = NOW()
+      `);
+
+      return {
+        cleared: countResult.rows.length,
+        sizeMB
+      };
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      return {
+        cleared: 0,
+        sizeMB: 0
+      };
+    }
   }
 
   private async cleanupCache(): Promise<void> {
@@ -290,22 +334,69 @@ class ImageStorageService {
   }
 
   async getCacheStats(): Promise<any> {
-    const result = await query(`
-      SELECT 
-        cache_hits,
-        cache_misses,
-        total_requests,
-        CASE WHEN total_requests > 0 THEN ROUND((cache_hits::float / total_requests * 100), 2) ELSE 0 END as hit_rate,
-        cache_size_bytes,
-        ROUND(cache_size_bytes / (1024.0 * 1024.0), 2) as cache_size_mb,
-        last_cleared,
-        (SELECT COUNT(*) FROM image_cache) as cached_items,
-        (SELECT COUNT(*) FROM images) as total_images
-      FROM cache_statistics
-      LIMIT 1
-    `);
+    try {
+      // First ensure cache_statistics table exists and has data
+      await query(`
+        CREATE TABLE IF NOT EXISTS cache_statistics (
+          id SERIAL PRIMARY KEY,
+          cache_hits INTEGER DEFAULT 0,
+          cache_misses INTEGER DEFAULT 0,
+          total_requests INTEGER DEFAULT 0,
+          cache_size_bytes BIGINT DEFAULT 0,
+          last_cleared TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
-    return result.rows[0] || {};
+      // Insert initial record if none exists
+      await query(`
+        INSERT INTO cache_statistics (cache_hits, cache_misses, total_requests, cache_size_bytes)
+        SELECT 0, 0, 0, 0
+        WHERE NOT EXISTS (SELECT 1 FROM cache_statistics)
+      `);
+
+      const result = await query(`
+        SELECT 
+          cache_hits,
+          cache_misses,
+          total_requests,
+          CASE WHEN total_requests > 0 THEN ROUND((cache_hits::float / total_requests * 100), 2) ELSE 0 END as hit_rate,
+          cache_size_bytes,
+          ROUND(cache_size_bytes / (1024.0 * 1024.0), 2) as cache_size_mb,
+          last_cleared,
+          (SELECT COUNT(*) FROM image_cache WHERE image_cache.id IS NOT NULL) as cached_items,
+          (SELECT COUNT(*) FROM images WHERE images.id IS NOT NULL) as total_images
+        FROM cache_statistics
+        LIMIT 1
+      `);
+
+      return result.rows[0] || {
+        cache_hits: 0,
+        cache_misses: 0,
+        total_requests: 0,
+        hit_rate: 0,
+        cache_size_bytes: 0,
+        cache_size_mb: 0,
+        last_cleared: null,
+        cached_items: 0,
+        total_images: 0
+      };
+    } catch (error) {
+      console.error('Error getting cache stats:', error);
+      // Return default stats if there's an error
+      return {
+        cache_hits: 0,
+        cache_misses: 0,
+        total_requests: 0,
+        hit_rate: 0,
+        cache_size_bytes: 0,
+        cache_size_mb: 0,
+        last_cleared: null,
+        cached_items: 0,
+        total_images: 0
+      };
+    }
   }
 
   async deleteImage(imageId: number): Promise<boolean> {

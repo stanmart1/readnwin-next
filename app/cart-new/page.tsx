@@ -238,9 +238,16 @@ export default function CartPage() {
                           {/* Book Cover */}
                           <div className="flex-shrink-0">
                             <img
-                              src={item.book?.cover_image_url || '/placeholder-book.png'}
+                              src={item.book?.cover_image_url?.startsWith('/api/images/secure/') 
+                                ? item.book.cover_image_url 
+                                : item.book?.cover_image_url?.startsWith('/api/images/covers/') 
+                                  ? item.book.cover_image_url 
+                                  : `/api/images/covers/${item.book?.cover_image_url?.split('/').pop() || 'placeholder.jpg'}`}
                               alt={item.book?.title}
                               className="w-12 h-16 sm:w-16 sm:h-20 cart-item-image rounded"
+                              onError={(e) => {
+                                e.currentTarget.src = '/placeholder-book.jpg';
+                              }}
                             />
                           </div>
 

@@ -77,33 +77,18 @@ export default function BookManagementEnhanced() {
     setError
   } = bookManagement;
   
-  // Loading states
-  
   const { isLoading: skeletonLoading } = useSkeletonLoading();
   
-  // State management
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [authors, setAuthors] = useState<Author[]>([]);
-  const [selectedBooks, setSelectedBooks] = useState<number[]>([]);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [bookToDelete, setBookToDelete] = useState<number | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [users, setUsers] = useState<any[]>([]);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [assignLoading, setAssignLoading] = useState(false);
-  const [selectedFormat, setSelectedFormat] = useState<'both' | 'ebook' | 'physical'>('both');
-  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showBatchUpdateModal, setShowBatchUpdateModal] = useState(false);
-  const [selectedBookForAction, setSelectedBookForAction] = useState<Book | null>(null);
-  const [showBookAssignModal, setShowBookAssignModal] = useState(false);
-  const [batchUpdateData, setBatchUpdateData] = useState({
-    status: '',
-    category_id: '',
-    price_adjustment: { value: '', type: 'percentage' as 'percentage' | 'fixed' }
+  // Consolidated state management
+  const [data, setData] = useState({ categories: [] as Category[], authors: [] as Author[], users: [] as any[] });
+  const [selection, setSelection] = useState({ books: [] as number[], user: null as any, bookForAction: null as Book | null });
+  const [modals, setModals] = useState({ deleteConfirm: false, assign: false, analytics: false, edit: false, details: false, batchUpdate: false, bookAssign: false });
+  const [loading, setLoadingStates] = useState({ delete: false, assign: false });
+  const [forms, setForms] = useState({ 
+    userSearch: '', 
+    selectedFormat: 'both' as 'both' | 'ebook' | 'physical',
+    bookToDelete: null as number | null,
+    batchUpdate: { status: '', category_id: '', price_adjustment: { value: '', type: 'percentage' as 'percentage' | 'fixed' } }
   });
 
   // Load authors and categories on mount
@@ -113,10 +98,10 @@ export default function BookManagementEnhanced() {
   
   // Load users when assign modal opens
   useEffect(() => {
-    if (showAssignModal) {
+    if (modals.assign) {
       loadUsers();
     }
-  }, [showAssignModal]);
+  }, [modals.assign]);
 
   // Reload data when modal closes
   const handleModalClose = () => {
@@ -134,12 +119,12 @@ export default function BookManagementEnhanced() {
       
       if (authorsResponse.ok) {
         const authorsResult = await authorsResponse.json();
-        setAuthors(authorsResult.authors || []);
+        setData(prev => ({ ...prev, authors: authorsResult.authors || [] }));
       }
       
       if (categoriesResponse.ok) {
         const categoriesResult = await categoriesResponse.json();
-        setCategories(categoriesResult.categories || []);
+        setData(prev => ({ ...prev, categories: categoriesResult.categories || [] }));
       }
     } catch (error) {
       console.error('Failed to load authors/categories:', error);
@@ -151,7 +136,7 @@ export default function BookManagementEnhanced() {
       const response = await fetch('/api/admin/users');
       if (response.ok) {
         const result = await response.json();
-        setUsers(result.users || []);
+        setData(prev => ({ ...prev, users: result.users || [] }));
       }
     } catch (error) {
       console.error('Failed to load users:', error);
@@ -159,37 +144,37 @@ export default function BookManagementEnhanced() {
   };
 
   const handleAssignBook = async () => {
-    if (!selectedUser || !selectedBookForAction) return;
+    if (!selection.user || !selection.bookForAction) return;
     
-    setAssignLoading(true);
+    setLoadingStates(prev => ({ ...prev, assign: true }));
     try {
       const assignments = [];
       
       // Determine which formats to assign based on selection and book availability
-      const bookFormat = selectedBookForAction.format;
+      const bookFormat = selection.bookForAction.format;
       
-      if (selectedFormat === 'both') {
+      if (forms.selectedFormat === 'both') {
         // Assign both formats if book supports both, otherwise assign the book's format
         if (bookFormat === 'both') {
-          assignments.push({ format: 'ebook', book_id: selectedBookForAction.id });
-          assignments.push({ format: 'physical', book_id: selectedBookForAction.id });
+          assignments.push({ format: 'ebook', book_id: selection.bookForAction.id });
+          assignments.push({ format: 'physical', book_id: selection.bookForAction.id });
         } else {
-          assignments.push({ format: bookFormat, book_id: selectedBookForAction.id });
+          assignments.push({ format: bookFormat, book_id: selection.bookForAction.id });
         }
-      } else if (selectedFormat === 'ebook') {
+      } else if (forms.selectedFormat === 'ebook') {
         if (bookFormat === 'ebook' || bookFormat === 'both') {
-          assignments.push({ format: 'ebook', book_id: selectedBookForAction.id });
+          assignments.push({ format: 'ebook', book_id: selection.bookForAction.id });
         } else {
           toast.error('This book is not available as an ebook');
-          setAssignLoading(false);
+          setLoadingStates(prev => ({ ...prev, assign: false }));
           return;
         }
-      } else if (selectedFormat === 'physical') {
+      } else if (forms.selectedFormat === 'physical') {
         if (bookFormat === 'physical' || bookFormat === 'both') {
-          assignments.push({ format: 'physical', book_id: selectedBookForAction.id });
+          assignments.push({ format: 'physical', book_id: selection.bookForAction.id });
         } else {
           toast.error('This book is not available as a physical book');
-          setAssignLoading(false);
+          setLoadingStates(prev => ({ ...prev, assign: false }));
           return;
         }
       }
@@ -202,7 +187,7 @@ export default function BookManagementEnhanced() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            user_id: selectedUser.id,
+            user_id: selection.user.id,
             book_id: assignment.book_id,
             format: assignment.format
           }),
@@ -223,7 +208,7 @@ export default function BookManagementEnhanced() {
       
       if (successful.length > 0) {
         const formats = successful.map(r => r.format === 'physical' ? 'Physical book' : 'Ebook').join(' and ');
-        toast.success(`${formats} "${selectedBookForAction.title}" assigned to ${selectedUser.name} successfully!`);
+        toast.success(`${formats} "${selection.bookForAction.title}" assigned to ${selection.user.name} successfully!`);
       }
       
       if (failed.length > 0) {
@@ -234,40 +219,38 @@ export default function BookManagementEnhanced() {
       }
       
       if (successful.length > 0) {
-        setShowAssignModal(false);
-        setSelectedUser(null);
-        setUserSearchQuery('');
-        setSelectedFormat('both');
+        setModals(prev => ({ ...prev, assign: false }));
+        setSelection(prev => ({ ...prev, user: null }));
+        setForms(prev => ({ ...prev, userSearch: '', selectedFormat: 'both' }));
       }
     } catch (error) {
       console.error('Error assigning book:', error);
       toast.error('Failed to assign book');
     } finally {
-      setAssignLoading(false);
+      setLoadingStates(prev => ({ ...prev, assign: false }));
     }
   };
 
   const handleDeleteBook = async (bookId: number) => {
-    setBookToDelete(bookId);
-    setShowDeleteConfirm(true);
+    setForms(prev => ({ ...prev, bookToDelete: bookId }));
+    setModals(prev => ({ ...prev, deleteConfirm: true }));
   };
 
   const confirmDeleteBook = async () => {
-    if (!bookToDelete || deleteLoading) return;
+    if (!forms.bookToDelete || loading.delete) return;
     
-    setDeleteLoading(true);
-    const success = await deleteBooks([bookToDelete]);
+    setLoadingStates(prev => ({ ...prev, delete: true }));
+    const success = await deleteBooks([forms.bookToDelete]);
     if (success) {
-      setShowDeleteConfirm(false);
-      setBookToDelete(null);
-      // Clear from selected books if it was selected
-      setSelectedBooks(prev => prev.filter(id => id !== bookToDelete));
+      setModals(prev => ({ ...prev, deleteConfirm: false }));
+      setForms(prev => ({ ...prev, bookToDelete: null }));
+      setSelection(prev => ({ ...prev, books: prev.books.filter(id => id !== forms.bookToDelete) }));
     }
-    setDeleteLoading(false);
+    setLoadingStates(prev => ({ ...prev, delete: false }));
   };
 
   const handleBulkDelete = async () => {
-    if (selectedBooks.length === 0) {
+    if (selection.books.length === 0) {
       toast.error('Please select books to delete');
       return;
     }

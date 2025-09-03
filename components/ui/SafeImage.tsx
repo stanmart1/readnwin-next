@@ -32,7 +32,12 @@ export default function SafeImage({
   const getImageSrc = (originalSrc?: string | null) => {
     if (!originalSrc || originalSrc === 'placeholder') return fallbackSrc;
     
-    // If already using API route, return as is
+    // If already using secure API route, return as is
+    if (originalSrc.startsWith('/api/images/secure/')) {
+      return originalSrc;
+    }
+    
+    // If already using covers API route, return as is
     if (originalSrc.startsWith('/api/images/covers/')) {
       return originalSrc;
     }
@@ -86,7 +91,7 @@ export default function SafeImage({
     setRetryCount(newRetryCount);
     
     // First retry: try API route if not already using it
-    if (newRetryCount === 1 && !src.startsWith('/api/images/covers/')) {
+    if (newRetryCount === 1 && !src.startsWith('/api/images/covers/') && !src.startsWith('/api/images/secure/')) {
       const filename = src.split('/').pop();
       if (filename && filename !== 'placeholder') {
         setImgSrc(`/api/images/covers/${filename}`);

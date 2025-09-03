@@ -91,7 +91,12 @@ export default function BookCard({
   const getImageSrc = () => {
     if (!displayCover) return '/placeholder-book.jpg';
     
-    // Extract filename and use relative API path to avoid ad blocker issues
+    // If already using secure API route, return as is
+    if (displayCover.startsWith('/api/images/secure/')) {
+      return displayCover;
+    }
+    
+    // Extract filename and use covers API path for legacy support
     const filename = displayCover.split('/').pop();
     if (!filename || filename === 'placeholder') return '/placeholder-book.jpg';
     return `/api/images/covers/${filename}`;

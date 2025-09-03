@@ -107,6 +107,11 @@ export default function EmailTemplateManagement() {
       if (filters.search) params.append("search", filters.search);
 
       const response = await fetch(`/api/admin/email-templates?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
       const data = await response.json();
 
       if (data.success) {
@@ -125,6 +130,11 @@ export default function EmailTemplateManagement() {
   const fetchCategories = async () => {
     try {
       const response = await fetch("/api/admin/email-templates/categories");
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
       const data = await response.json();
       if (data.success) {
         setCategories(data.categories);
@@ -137,6 +147,11 @@ export default function EmailTemplateManagement() {
   const fetchEmailFunctions = async () => {
     try {
       const response = await fetch("/api/admin/email-templates/functions");
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
       const data = await response.json();
       if (data.success) {
         setEmailFunctions(data.functions);
@@ -149,6 +164,11 @@ export default function EmailTemplateManagement() {
   const fetchAssignments = async () => {
     try {
       const response = await fetch("/api/admin/email-templates/assignments");
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
       const data = await response.json();
       if (data.success) {
         setAssignments(data.assignments);
@@ -161,6 +181,11 @@ export default function EmailTemplateManagement() {
   const fetchStats = async () => {
     try {
       const response = await fetch("/api/admin/email-templates/stats");
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
       const data = await response.json();
       if (data.success) {
         setStats(data.stats);
@@ -206,8 +231,9 @@ export default function EmailTemplateManagement() {
     if (!selectedTemplate?.id) return;
 
     try {
+      const encodedId = encodeURIComponent(selectedTemplate.id.toString());
       const response = await fetch(
-        `/api/admin/email-templates/${selectedTemplate.id}`,
+        `/api/admin/email-templates/${encodedId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -233,7 +259,8 @@ export default function EmailTemplateManagement() {
     if (!confirm("Are you sure you want to delete this template?")) return;
 
     try {
-      const response = await fetch(`/api/admin/email-templates/${templateId}`, {
+      const encodedId = encodeURIComponent(templateId.toString());
+      const response = await fetch(`/api/admin/email-templates/${encodedId}`, {
         method: "DELETE",
       });
 
@@ -315,8 +342,12 @@ export default function EmailTemplateManagement() {
     templateId: number,
   ) => {
     try {
+      const params = new URLSearchParams({
+        function_id: functionId.toString(),
+        template_id: templateId.toString()
+      });
       const response = await fetch(
-        `/api/admin/email-templates/assignments?function_id=${functionId}&template_id=${templateId}`,
+        `/api/admin/email-templates/assignments?${params}`,
         {
           method: "DELETE",
         },
@@ -340,8 +371,9 @@ export default function EmailTemplateManagement() {
     priority: number,
   ) => {
     try {
+      const encodedId = encodeURIComponent(assignmentId.toString());
       const response = await fetch(
-        `/api/admin/email-templates/assignments/${assignmentId}`,
+        `/api/admin/email-templates/assignments/${encodedId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -364,8 +396,9 @@ export default function EmailTemplateManagement() {
 
   const handleToggleAssignmentStatus = async (assignmentId: number) => {
     try {
+      const encodedId = encodeURIComponent(assignmentId.toString());
       const response = await fetch(
-        `/api/admin/email-templates/assignments/${assignmentId}`,
+        `/api/admin/email-templates/assignments/${encodedId}`,
         {
           method: "PATCH",
         },
@@ -396,13 +429,15 @@ export default function EmailTemplateManagement() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">
-              Loading email templates...
-            </span>
+      <div className="min-h-screen bg-gray-50">
+        <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-6 lg:py-8">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-8 md:p-12">
+            <div className="flex flex-col items-center justify-center py-8 sm:py-12">
+              <div className="animate-spin rounded-full h-8 sm:h-10 md:h-12 w-8 sm:w-10 md:w-12 border-b-2 border-blue-600"></div>
+              <span className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-600 text-center">
+                Loading email templates...
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -410,210 +445,293 @@ export default function EmailTemplateManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex">
-            <i className="ri-error-warning-line text-red-400 text-xl"></i>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
+    <div className="min-h-screen bg-gray-50">
+      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-6 lg:py-8">
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <i className="ri-error-warning-line text-red-400 text-lg sm:text-xl flex-shrink-0 mt-0.5"></i>
+              <div>
+                <h3 className="text-sm font-medium text-red-800">Error</h3>
+                <p className="text-sm text-red-700 mt-1 break-words">{error}</p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              Email Templates
-            </h2>
-            <p className="text-gray-600 mt-1">
-              Manage email templates for the application
-            </p>
-          </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105"
-          >
-            <i className="ri-add-line mr-2"></i>
-            Create Template
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
-              <i className="ri-mail-line text-white text-xl"></i>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-600">Total Templates</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
-              <i className="ri-check-line text-white text-xl"></i>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-600">Active Templates</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.active}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
-              <i className="ri-folder-line text-white text-xl"></i>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-600">Categories</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {categories.length}
+        {/* Header */}
+        <div className="mb-4 sm:mb-6 md:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 leading-tight break-words">
+                Email Templates
+              </h1>
+              <p className="mt-2 text-sm sm:text-base text-gray-600 leading-relaxed break-words">
+                Manage email templates for the application
               </p>
             </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center">
-              <i className="ri-settings-line text-white text-xl"></i>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-600">Management</p>
-              <p className="text-2xl font-bold text-gray-900">Ready</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Category
-            </label>
-            <select
-              value={filters.category}
-              onChange={(e) =>
-                setFilters({ ...filters, category: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg sm:rounded-full hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 font-medium flex items-center justify-center gap-2"
             >
-              <option value="">All Categories</option>
-              {categories.map((category) => (
-                <option key={category.name} value={category.name}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Status
-            </label>
-            <select
-              value={filters.isActive}
-              onChange={(e) =>
-                setFilters({ ...filters, isActive: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Status</option>
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Search
-            </label>
-            <input
-              type="text"
-              value={filters.search}
-              onChange={(e) =>
-                setFilters({ ...filters, search: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Search templates..."
-            />
+              <i className="ri-add-line"></i>
+              <span>Create Template</span>
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Templates List */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Template
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Last Updated
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {templates.map((template) => (
-                <tr
-                  key={template.id}
-                  className="hover:bg-gray-50 transition-colors duration-200"
-                >
-                  <td className="px-6 py-4">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {template.name}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {template.slug}
-                      </div>
-                      {template.description && (
-                        <div className="text-xs text-gray-400 mt-1">
-                          {template.description}
+        {/* Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-4 sm:mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 md:p-6">
+            <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+              <div className="w-8 sm:w-10 md:w-12 h-8 sm:h-10 md:h-12 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i className="ri-mail-line text-white text-sm sm:text-base md:text-xl"></i>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 truncate">Total Templates</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{stats.total}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 md:p-6">
+            <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+              <div className="w-8 sm:w-10 md:w-12 h-8 sm:h-10 md:h-12 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i className="ri-check-line text-white text-sm sm:text-base md:text-xl"></i>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 truncate">Active Templates</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{stats.active}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 md:p-6">
+            <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+              <div className="w-8 sm:w-10 md:w-12 h-8 sm:h-10 md:h-12 bg-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i className="ri-folder-line text-white text-sm sm:text-base md:text-xl"></i>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 truncate">Categories</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">
+                  {categories.length}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 md:p-6">
+            <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+              <div className="w-8 sm:w-10 md:w-12 h-8 sm:h-10 md:h-12 bg-yellow-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i className="ri-settings-line text-white text-sm sm:text-base md:text-xl"></i>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 truncate">Management</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Ready</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 md:p-6 mb-4 sm:mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                Category
+              </label>
+              <select
+                value={filters.category}
+                onChange={(e) =>
+                  setFilters({ ...filters, category: e.target.value })
+                }
+                className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">All Categories</option>
+                {categories.map((category) => (
+                  <option key={category.name} value={category.name}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                Status
+              </label>
+              <select
+                value={filters.isActive}
+                onChange={(e) =>
+                  setFilters({ ...filters, isActive: e.target.value })
+                }
+                className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">All Status</option>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </div>
+            <div className="sm:col-span-2 lg:col-span-1">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                Search
+              </label>
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) =>
+                  setFilters({ ...filters, search: e.target.value })
+                }
+                className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Search templates..."
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Templates List */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Template
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Category
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Last Updated
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {templates.map((template) => (
+                    <tr
+                      key={template.id}
+                      className="hover:bg-gray-50 transition-colors duration-200"
+                    >
+                      <td className="px-4 lg:px-6 py-4">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900 truncate">
+                            {template.name}
+                          </div>
+                          <div className="text-sm text-gray-500 truncate">
+                            {template.slug}
+                          </div>
+                          {template.description && (
+                            <div className="text-xs text-gray-400 mt-1 truncate">
+                              {template.description}
+                            </div>
+                          )}
                         </div>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        <div className="flex items-center">
+                          <div
+                            className="w-6 h-6 lg:w-8 lg:h-8 rounded-full flex items-center justify-center mr-2 flex-shrink-0"
+                            style={{
+                              backgroundColor: getCategoryColor(template.category),
+                            }}
+                          >
+                            <i
+                              className={`${getCategoryIcon(template.category)} text-white text-xs lg:text-sm`}
+                            ></i>
+                          </div>
+                          <span className="text-sm text-gray-900 capitalize truncate">
+                            {template.category}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            template.is_active
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {template.is_active ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4 text-sm text-gray-500">
+                        {template.updated_at
+                          ? new Date(template.updated_at).toLocaleDateString()
+                          : "Never"}
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        <div className="flex space-x-1 lg:space-x-2">
+                          <button
+                            onClick={() => handlePreviewTemplate(template)}
+                            className="text-blue-600 hover:text-blue-800 p-1 rounded transition-colors"
+                            title="Preview template"
+                          >
+                            <i className="ri-eye-line text-sm"></i>
+                          </button>
+                          <button
+                            onClick={() => handleEditTemplate(template)}
+                            className="text-green-600 hover:text-green-800 p-1 rounded transition-colors"
+                            title="Edit template"
+                          >
+                            <i className="ri-edit-line text-sm"></i>
+                          </button>
+                          <button
+                            onClick={() => handleAssignTemplate(template)}
+                            className="text-purple-600 hover:text-purple-800 p-1 rounded transition-colors"
+                            title="Assign to functions"
+                          >
+                            <i className="ri-link text-sm"></i>
+                          </button>
+                          <button
+                            onClick={() => handleTestMail(template)}
+                            className="text-orange-600 hover:text-orange-800 p-1 rounded transition-colors"
+                            title="Send test email"
+                          >
+                            <i className="ri-send-plane-line text-sm"></i>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTemplate(template.id!)}
+                            className="text-red-600 hover:text-red-800 p-1 rounded transition-colors"
+                            title="Delete template"
+                          >
+                            <i className="ri-delete-bin-line text-sm"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden">
+            <div className="divide-y divide-gray-200">
+              {templates.map((template) => (
+                <div key={template.id} className="p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-gray-900 truncate">
+                        {template.name}
+                      </h3>
+                      <p className="text-xs text-gray-500 truncate mt-1">
+                        {template.slug}
+                      </p>
+                      {template.description && (
+                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">
+                          {template.description}
+                        </p>
                       )}
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center mr-2"
-                        style={{
-                          backgroundColor: getCategoryColor(template.category),
-                        }}
-                      >
-                        <i
-                          className={`${getCategoryIcon(template.category)} text-white text-sm`}
-                        ></i>
-                      </div>
-                      <span className="text-sm text-gray-900 capitalize">
-                        {template.category}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
                     <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full flex-shrink-0 ${
                         template.is_active
                           ? "bg-green-100 text-green-800"
                           : "bg-red-100 text-red-800"
@@ -621,70 +739,91 @@ export default function EmailTemplateManagement() {
                     >
                       {template.is_active ? "Active" : "Inactive"}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {template.updated_at
-                      ? new Date(template.updated_at).toLocaleDateString()
-                      : "Never"}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex space-x-2">
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{
+                          backgroundColor: getCategoryColor(template.category),
+                        }}
+                      >
+                        <i
+                          className={`${getCategoryIcon(template.category)} text-white text-xs`}
+                        ></i>
+                      </div>
+                      <span className="text-xs text-gray-600 capitalize truncate">
+                        {template.category}
+                      </span>
+                      <span className="text-xs text-gray-400">•</span>
+                      <span className="text-xs text-gray-400">
+                        {template.updated_at
+                          ? new Date(template.updated_at).toLocaleDateString()
+                          : "Never"}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={() => handlePreviewTemplate(template)}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                        title="Preview template"
+                        className="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                        title="Preview"
                       >
-                        <i className="ri-eye-line"></i>
+                        <i className="ri-eye-line text-sm"></i>
                       </button>
                       <button
                         onClick={() => handleEditTemplate(template)}
-                        className="text-green-600 hover:text-green-800 text-sm font-medium"
-                        title="Edit template"
+                        className="text-green-600 hover:text-green-800 p-2 rounded-lg hover:bg-green-50 transition-colors"
+                        title="Edit"
                       >
-                        <i className="ri-edit-line"></i>
+                        <i className="ri-edit-line text-sm"></i>
                       </button>
                       <button
                         onClick={() => handleAssignTemplate(template)}
-                        className="text-purple-600 hover:text-purple-800 text-sm font-medium"
-                        title="Assign to functions"
+                        className="text-purple-600 hover:text-purple-800 p-2 rounded-lg hover:bg-purple-50 transition-colors"
+                        title="Assign"
                       >
-                        <i className="ri-link"></i>
+                        <i className="ri-link text-sm"></i>
                       </button>
                       <button
                         onClick={() => handleTestMail(template)}
-                        className="text-orange-600 hover:text-orange-800 text-sm font-medium"
-                        title="Send test email"
+                        className="text-orange-600 hover:text-orange-800 p-2 rounded-lg hover:bg-orange-50 transition-colors"
+                        title="Test"
                       >
-                        <i className="ri-send-plane-line"></i>
+                        <i className="ri-send-plane-line text-sm"></i>
                       </button>
                       <button
                         onClick={() => handleDeleteTemplate(template.id!)}
-                        className="text-red-600 hover:text-red-800 text-sm font-medium"
-                        title="Delete template"
+                        className="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                        title="Delete"
                       >
-                        <i className="ri-delete-bin-line"></i>
+                        <i className="ri-delete-bin-line text-sm"></i>
                       </button>
                     </div>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {templates.length === 0 && (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
-          <i className="ri-mail-line text-4xl text-gray-400 mb-4"></i>
-          <p className="text-gray-600">No email templates found</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Create Your First Template
-          </button>
-        </div>
-      )}
+        {templates.length === 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
+            <i className="ri-mail-line text-3xl sm:text-4xl text-gray-400 mb-4 block"></i>
+            <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No email templates found</h3>
+            <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
+              Get started by creating your first email template to manage communications.
+            </p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 font-medium inline-flex items-center gap-2"
+            >
+              <i className="ri-add-line"></i>
+              Create Your First Template
+            </button>
+          </div>
+        )}
 
       {/* Create Template Modal */}
       {showCreateModal && (
@@ -732,13 +871,14 @@ export default function EmailTemplateManagement() {
         />
       )}
 
-      {/* Test Mail Modal */}
-      {showTestMailModal && selectedTemplate && (
-        <TestMailModal
-          template={selectedTemplate}
-          onClose={() => setShowTestMailModal(false)}
-        />
-      )}
+        {/* Test Mail Modal */}
+        {showTestMailModal && selectedTemplate && (
+          <TestMailModal
+            template={selectedTemplate}
+            onClose={() => setShowTestMailModal(false)}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -760,23 +900,23 @@ function TemplateModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-xs xs:max-w-sm sm:max-w-2xl md:max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="p-3 xs:p-4 sm:p-6">
+          <div className="flex items-start xs:items-center justify-between mb-4 xs:mb-6">
+            <h2 className="text-base xs:text-lg sm:text-xl font-semibold text-gray-900 leading-tight break-words pr-2">{title}</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-400 hover:text-gray-600 flex-shrink-0 p-1"
             >
-              <i className="ri-close-line text-2xl"></i>
+              <i className="ri-close-line text-lg xs:text-xl sm:text-2xl"></i>
             </button>
           </div>
 
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4 xs:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 xs:gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">
                   Template Name
                 </label>
                 <input
@@ -785,13 +925,13 @@ function TemplateModal({
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter template name"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">
                   Slug
                 </label>
                 <input
@@ -800,14 +940,14 @@ function TemplateModal({
                   onChange={(e) =>
                     setFormData({ ...formData, slug: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="template-slug"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">
                 Subject
               </label>
               <input
@@ -816,13 +956,13 @@ function TemplateModal({
                 onChange={(e) =>
                   setFormData({ ...formData, subject: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Email subject line"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">
                 Description
               </label>
               <textarea
@@ -830,15 +970,15 @@ function TemplateModal({
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={3}
                 placeholder="Template description"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 xs:gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">
                   Category
                 </label>
                 <select
@@ -846,7 +986,7 @@ function TemplateModal({
                   onChange={(e) =>
                     setFormData({ ...formData, category: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   {categories.map((category) => (
                     <option key={category.name} value={category.name}>
@@ -856,7 +996,7 @@ function TemplateModal({
                 </select>
               </div>
 
-              <div className="flex items-center">
+              <div className="flex items-center pt-4 sm:pt-6">
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -866,13 +1006,13 @@ function TemplateModal({
                     }
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Active</span>
+                  <span className="ml-2 text-xs xs:text-sm text-gray-700">Active</span>
                 </label>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">
                 HTML Content
               </label>
               <EmailTemplateEditor
@@ -891,7 +1031,7 @@ function TemplateModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">
                 Text Content (Optional)
               </label>
               <textarea
@@ -899,23 +1039,23 @@ function TemplateModal({
                 onChange={(e) =>
                   setFormData({ ...formData, text_content: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={5}
                 placeholder="Plain text version of the email..."
               />
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end space-x-3">
+          <div className="mt-4 xs:mt-6 flex flex-col xs:flex-row justify-end gap-2 xs:gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs xs:text-sm font-medium"
             >
               Cancel
             </button>
             <button
               onClick={onSubmit}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs xs:text-sm font-medium"
             >
               Save Template
             </button>
@@ -951,7 +1091,18 @@ function PreviewModal({
     let content = template.html_content;
     Object.entries(previewData).forEach(([key, value]) => {
       const variable = `{{${key}}}`;
-      content = content.replace(new RegExp(variable, "g"), value);
+      // Escape HTML entities in the replacement value to prevent XSS
+      const escapedValue = value.replace(/[&<>"']/g, (match) => {
+        const escapeMap: { [key: string]: string } = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#x27;'
+        };
+        return escapeMap[match];
+      });
+      content = content.replace(new RegExp(variable, "g"), escapedValue);
     });
     return content;
   };
@@ -1328,10 +1479,10 @@ function AssignmentsModal({
                         return func ? (
                           <div className="text-sm text-blue-800">
                             <p>
-                              <strong>Description:</strong> {func.description}
+                              <strong>Description:</strong> <span className="break-words">{func.description}</span>
                             </p>
                             <p>
-                              <strong>Category:</strong> {func.category}
+                              <strong>Category:</strong> <span className="break-words">{func.category}</span>
                             </p>
                             <p>
                               <strong>Required Variables:</strong>
@@ -1339,7 +1490,7 @@ function AssignmentsModal({
                             <ul className="list-disc list-inside ml-2">
                               {func.required_variables.map(
                                 (variable, index) => (
-                                  <li key={index}>{variable}</li>
+                                  <li key={index} className="break-words">{variable}</li>
                                 ),
                               )}
                             </ul>
@@ -1393,6 +1544,13 @@ function TestMailModal({
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(testEmail)) {
+      setMessage('Please enter a valid email address');
+      return;
+    }
+
     setSending(true);
     try {
       const response = await fetch('/api/admin/email-templates/test', {
@@ -1418,44 +1576,44 @@ function TestMailModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-xs xs:max-w-sm sm:max-w-md w-full mx-2 xs:mx-4">
+        <div className="p-3 xs:p-4 sm:p-6">
+          <div className="flex items-start xs:items-center justify-between mb-3 xs:mb-4">
+            <h2 className="text-sm xs:text-base sm:text-lg font-semibold text-gray-900 leading-tight break-words pr-2">
               Send Test Email
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-400 hover:text-gray-600 flex-shrink-0 p-1"
             >
-              <i className="ri-close-line text-xl"></i>
+              <i className="ri-close-line text-lg xs:text-xl"></i>
             </button>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3 xs:space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1">
                 Template: {template.name}
               </label>
-              <p className="text-sm text-gray-500">{template.subject}</p>
+              <p className="text-xs xs:text-sm text-gray-500 break-words">{template.subject}</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">
                 Test Email Address
               </label>
               <input
                 type="email"
                 value={testEmail}
                 onChange={(e) => setTestEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter email address"
               />
             </div>
 
             {message && (
-              <div className={`p-3 rounded-md text-sm ${
+              <div className={`p-2 xs:p-3 rounded-lg text-xs xs:text-sm break-words ${
                 message.includes('success') 
                   ? 'bg-green-100 text-green-800' 
                   : 'bg-red-100 text-red-800'
@@ -1465,17 +1623,17 @@ function TestMailModal({
             )}
           </div>
 
-          <div className="mt-6 flex justify-end space-x-3">
+          <div className="mt-4 xs:mt-6 flex flex-col xs:flex-row justify-end gap-2 xs:gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs xs:text-sm font-medium"
             >
               Cancel
             </button>
             <button
               onClick={handleSendTest}
               disabled={sending || !testEmail}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+              className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-xs xs:text-sm font-medium"
             >
               {sending ? 'Sending...' : 'Send Test Email'}
             </button>

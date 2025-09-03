@@ -10,7 +10,7 @@ export async function GET(
     
     const result = await query(`
       SELECT image_data, mime_type FROM images 
-      WHERE filename = $1 AND category = 'work' AND is_active = true
+      WHERE filename = $1 AND category = 'works' AND is_active = true
     `, [filename]);
     
     if (result.rows.length === 0) {

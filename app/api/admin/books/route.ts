@@ -3,18 +3,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 import { sanitizeInt } from '@/utils/security';
-import { writeFileSync, mkdirSync, existsSync } from 'fs';
-import { join } from 'path';
+import { imageStorageService } from '@/utils/image-storage-service';
 
 export const dynamic = 'force-dynamic';
 
-function ensureUploadDir() {
-  const uploadDir = join(process.cwd(), 'public', 'uploads', 'covers');
-  if (!existsSync(uploadDir)) {
-    mkdirSync(uploadDir, { recursive: true });
-  }
-  return uploadDir;
-}
+
 
 // Extract metadata without altering book structure
 async function extractEbookMetadata(buffer: Buffer, filename: string) {
@@ -144,47 +137,41 @@ export async function POST(request: NextRequest) {
 
     const bookId = bookResult.rows[0].id;
 
-    // Upload cover image
+    // Upload cover image to database
     let coverUrl = null;
     try {
-      const uploadDir = ensureUploadDir();
-      const fileName = `${bookId}_cover_${Date.now()}.${cover_image.name.split('.').pop()}`;
-      const filePath = join(uploadDir, fileName);
+      const buffer = Buffer.from(await cover_image.arrayBuffer());
+      const timestamp = Date.now();
+      const filename = `${bookId}_cover_${timestamp}.${cover_image.name.split('.').pop()}`;
       
-      const arrayBuffer = await cover_image.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      writeFileSync(filePath, buffer);
+      const imageId = await imageStorageService.uploadImage({
+        filename,
+        originalFilename: cover_image.name,
+        mimeType: cover_image.type,
+        buffer,
+        category: 'cover',
+        entityType: 'book',
+        entityId: bookId,
+        uploadedBy: parseInt(session.user.id)
+      });
       
-      coverUrl = `/uploads/covers/${fileName}`;
+      coverUrl = `/api/images/covers/${filename}`;
     } catch (uploadError) {
       await query('DELETE FROM books WHERE id = $1', [bookId]);
       return NextResponse.json({ error: 'Failed to upload cover image' }, { status: 500 });
     }
 
-    // Upload e-book file (preserve original structure)
+    // Handle e-book file if provided
     let ebookUrl = null;
     let extractedMetadata = {};
     if (ebook_file) {
       try {
-        const ebookDir = join(process.cwd(), 'storage', 'ebooks');
-        if (!existsSync(ebookDir)) {
-          mkdirSync(ebookDir, { recursive: true });
-        }
-        
-        const ebookFileName = `${bookId}_${ebook_file.name}`;
-        const ebookFilePath = join(ebookDir, ebookFileName);
-        
         const ebookBuffer = Buffer.from(await ebook_file.arrayBuffer());
-        writeFileSync(ebookFilePath, ebookBuffer);
-        
-        ebookUrl = `/api/ebooks/${bookId}/${ebookFileName}`;
-        
-        // Extract metadata without altering structure
         extractedMetadata = await extractEbookMetadata(ebookBuffer, ebook_file.name);
-        
+        ebookUrl = `/api/ebooks/${bookId}/${ebook_file.name}`;
       } catch (ebookError) {
         await query('DELETE FROM books WHERE id = $1', [bookId]);
-        return NextResponse.json({ error: 'Failed to upload e-book file' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to process e-book file' }, { status: 500 });
       }
     }
 

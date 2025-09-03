@@ -8,6 +8,11 @@ export async function GET(
   try {
     const { filename } = params;
     
+    // Handle placeholder requests by returning a 404 to trigger fallback
+    if (filename === 'placeholder' || filename.includes('placeholder')) {
+      return new NextResponse('Placeholder not available', { status: 404 });
+    }
+    
     const result = await query(`
       SELECT image_data, mime_type FROM images 
       WHERE filename = $1 AND category = 'cover' AND is_active = true

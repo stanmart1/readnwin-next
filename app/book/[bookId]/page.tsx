@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
+import SafeImage from '@/components/ui/SafeImage';
 import { formatNumber } from '@/utils/dateUtils';
 import { useGuestCart } from '@/contexts/GuestCartContext';
 import ReviewForm from '@/components/ReviewForm';
@@ -231,12 +232,10 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
             {/* Book Cover */}
             <div className="lg:col-span-1">
               <div className="relative group">
-                <img 
-                  src={book.cover_image_url?.startsWith('/api/images/covers/') ? book.cover_image_url : `/api/images/covers/${book.cover_image_url?.split('/').pop() || 'placeholder.jpg'}`}
-                  onError={(e) => {
-                    e.currentTarget.src = '/placeholder-book.jpg';
-                  }} 
+                <SafeImage 
+                  src={book.cover_image_url}
                   alt={book.title}
+                  bookTitle={book.title}
                   className="w-full rounded-2xl shadow-2xl transition-transform duration-300 group-hover:scale-105"
                 />
                 {book.stock_quantity <= 0 && (
@@ -547,12 +546,10 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                     >
                       <div className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
                         <div className="relative">
-                          <img 
-                            src={relatedBook.cover_image_url?.startsWith('/api/images/covers/') ? relatedBook.cover_image_url : `/api/images/covers/${relatedBook.cover_image_url?.split('/').pop() || 'placeholder.jpg'}`}
-                            onError={(e) => {
-                              e.currentTarget.src = '/placeholder-book.jpg';
-                            }} 
+                          <SafeImage 
+                            src={relatedBook.cover_image_url}
                             alt={relatedBook.title}
+                            bookTitle={relatedBook.title}
                             className="w-full h-56 object-cover object-top"
                           />
                           {/* Hover overlay */}

@@ -89,10 +89,11 @@ export default function BookCard({
   const { addItem: addToSecureCart, refreshCart } = useSecureCart();
 
   const getImageSrc = () => {
-    if (!displayCover) return '/api/images/covers/placeholder';
+    if (!displayCover) return '/placeholder-book.jpg';
     
     // Extract filename and use relative API path to avoid ad blocker issues
-    const filename = displayCover.split('/').pop() || 'placeholder';
+    const filename = displayCover.split('/').pop();
+    if (!filename || filename === 'placeholder') return '/placeholder-book.jpg';
     return `/api/images/covers/${filename}`;
   };
 
@@ -195,7 +196,7 @@ export default function BookCard({
             alt={title}
             className="w-full h-72 object-cover object-top"
             onError={(e) => {
-              e.currentTarget.src = '/api/images/covers/placeholder';
+              e.currentTarget.src = '/placeholder-book.jpg';
             }}
           />
           

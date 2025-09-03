@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSecureCart } from '@/contexts/SecureCartContext';
+import SafeImage from '@/components/ui/SafeImage';
 import Header from '@/components/Header';
 
 export default function SecureCartPage() {
@@ -191,9 +192,10 @@ export default function SecureCartPage() {
                     <div key={item.id} className="flex items-center space-x-4 p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
                       {/* Book Cover */}
                       <div className="flex-shrink-0">
-                        <img
-                          src={item.book?.cover_image_url || '/placeholder-book.png'}
+                        <SafeImage
+                          src={item.book?.cover_image_url}
                           alt={item.book?.title}
+                          bookTitle={item.book?.title}
                           className="w-16 h-20 object-cover rounded"
                         />
                       </div>

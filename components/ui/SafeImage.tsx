@@ -30,7 +30,7 @@ export default function SafeImage({
   ...props
 }: SafeImageProps) {
   const getImageSrc = (originalSrc?: string | null) => {
-    if (!originalSrc) return fallbackSrc;
+    if (!originalSrc || originalSrc === 'placeholder') return fallbackSrc;
     
     // If already using API route, return as is
     if (originalSrc.startsWith('/api/images/covers/')) {
@@ -40,7 +40,14 @@ export default function SafeImage({
     // Handle legacy paths - convert to API route
     if (originalSrc.includes('/uploads/covers/') || originalSrc.includes('covers/')) {
       const filename = originalSrc.split('/').pop();
-      return `/api/images/covers/${filename}`;
+      if (filename && filename !== 'placeholder') {
+        return `/api/images/covers/${filename}`;
+      }
+    }
+    
+    // If it's a placeholder or invalid, use fallback
+    if (originalSrc === 'placeholder' || originalSrc.includes('placeholder')) {
+      return fallbackSrc;
     }
     
     return originalSrc;
@@ -61,8 +68,16 @@ export default function SafeImage({
 
   const handleError = async () => {
     // Prevent infinite loops by checking if we're already using fallback
-    if (imgSrc === fallbackSrc || retryCount >= 2) {
+    if (imgSrc === fallbackSrc || hasError || retryCount >= 2) {
       setHasError(true);
+      onError?.();
+      return;
+    }
+
+    // Don't retry if the source is placeholder or invalid
+    if (!src || src === 'placeholder' || src.includes('placeholder')) {
+      setHasError(true);
+      setImgSrc(fallbackSrc);
       onError?.();
       return;
     }
@@ -71,9 +86,9 @@ export default function SafeImage({
     setRetryCount(newRetryCount);
     
     // First retry: try API route if not already using it
-    if (newRetryCount === 1 && src && !src.startsWith('/api/images/covers/')) {
+    if (newRetryCount === 1 && !src.startsWith('/api/images/covers/')) {
       const filename = src.split('/').pop();
-      if (filename) {
+      if (filename && filename !== 'placeholder') {
         setImgSrc(`/api/images/covers/${filename}`);
         return;
       }
@@ -83,7 +98,7 @@ export default function SafeImage({
     if (newRetryCount === 2 && bookTitle) {
       try {
         const publicCover = await fetchBookCover(bookTitle);
-        if (publicCover) {
+        if (publicCover && publicCover !== src) {
           setImgSrc(publicCover);
           return;
         }

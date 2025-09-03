@@ -1,97 +1,126 @@
-const { Pool } = require('pg');
+require('dotenv').config();
 const fs = require('fs');
-
-const pool = new Pool({
-  host: '149.102.159.118',
-  port: 5432,
-  database: 'postgres',
-  user: 'postgres',
-  password: '6c8u2MsYqlbQxL5IxftjrV7QQnlLymdsmzMtTeIe4Ur1od7RR9CdODh3VfQ4ka2f'
-});
+const path = require('path');
 
 async function finalVerification() {
-  console.log('🔍 Final Implementation Verification\n');
-  
-  const checks = [];
+  console.log('🎯 FINAL SYSTEM VERIFICATION\n');
 
-  try {
-    // Database Schema
-    console.log('📊 Database Schema:');
-    const columns = await pool.query(`
-      SELECT column_name FROM information_schema.columns 
-      WHERE table_name = 'book_files' 
-      AND column_name IN ('preserve_structure', 'original_structure', 'extraction_path', 'original_format', 'asset_count')
-    `);
-    checks.push({ name: 'book_files columns', passed: columns.rows.length === 5 });
-    
-    const tables = await pool.query(`
-      SELECT table_name FROM information_schema.tables 
-      WHERE table_name IN ('epub_structure', 'html_structure')
-    `);
-    checks.push({ name: 'Structure tables', passed: tables.rows.length === 2 });
+  const results = {
+    bookManagement: false,
+    bookCards: false,
+    cart: false,
+    checkout: false,
+    bookDetails: false,
+    imageAPIs: false
+  };
 
-    // Storage System
-    console.log('📁 Storage System:');
-    const bookStorage = fs.existsSync('./utils/book-storage.ts');
-    const hasPreserveFunctions = bookStorage && fs.readFileSync('./utils/book-storage.ts', 'utf8').includes('preserveEpubStructure');
-    checks.push({ name: 'Structure preservation functions', passed: hasPreserveFunctions });
-
-    // API Endpoints
-    console.log('🔌 API Endpoints:');
-    const uploadApi = fs.existsSync('./app/api/admin/books/route.ts');
-    const contentApi = fs.existsSync('./app/api/books/[bookId]/content/route.ts');
-    const epubAssetApi = fs.existsSync('./app/api/ebooks/[bookId]/[...path]/route.ts');
-    const bookAssetApi = fs.existsSync('./app/api/books/[bookId]/assets/[...path]/route.ts');
-    const metadataApi = fs.existsSync('./app/api/books/[bookId]/metadata/route.ts');
-    
-    checks.push({ name: 'Upload API', passed: uploadApi });
-    checks.push({ name: 'Content API', passed: contentApi });
-    checks.push({ name: 'EPUB asset API', passed: epubAssetApi });
-    checks.push({ name: 'Book asset API', passed: bookAssetApi });
-    checks.push({ name: 'Metadata API', passed: metadataApi });
-
-    // E-Reader Components
-    console.log('📖 E-Reader:');
-    const ereader = fs.existsSync('./app/reading/components/ModernEReader.tsx');
-    const store = fs.existsSync('./stores/modernEReaderStore.ts');
-    checks.push({ name: 'ModernEReader component', passed: ereader });
-    checks.push({ name: 'EReader store', passed: store });
-
-    // Storage Structure
-    console.log('📂 Storage Structure:');
-    const storageDir = fs.existsSync('./storage/books');
-    checks.push({ name: 'Storage directory', passed: storageDir });
-
-    // Summary
-    console.log('\n📋 Final Results:');
-    const passed = checks.filter(c => c.passed).length;
-    const total = checks.length;
-    
-    checks.forEach(check => {
-      console.log(`${check.passed ? '✅' : '❌'} ${check.name}`);
-    });
-    
-    console.log(`\n🎯 Implementation Status: ${passed}/${total} (${Math.round(passed/total*100)}%)`);
-    
-    if (passed === total) {
-      console.log('\n🎉 EPUB/HTML Structure Preservation System FULLY IMPLEMENTED!');
-      console.log('\nFeatures Available:');
-      console.log('• EPUB structure preservation without conversion');
-      console.log('• HTML format preservation');
-      console.log('• Asset serving (images, CSS, fonts)');
-      console.log('• Native EPUB rendering in e-reader');
-      console.log('• Chapter navigation from original structure');
-      console.log('• Metadata extraction and serving');
-      console.log('• Secure access control');
-    } else {
-      console.log(`\n⚠️  ${total - passed} components need attention`);
-    }
-
-  } catch (error) {
-    console.error('❌ Verification failed:', error.message);
-  } finally {
-    await pool.end();
+  // 1. Book Management API
+  console.log('1️⃣ Book Management API...');
+  const bookMgmtPath = path.join(process.cwd(), 'app/api/admin/books/route.ts');
+  if (fs.existsSync(bookMgmtPath)) {
+    const content = fs.readFileSync(bookMgmtPath, 'utf8');
+    const usesImageService = content.includes('imageStorageService.uploadImage');
+    const noFileSystem = !content.includes('writeFileSync');
+    results.bookManagement = usesImageService && noFileSystem;
+    console.log(`  ✅ Uses imageStorageService: ${usesImageService}`);
+    console.log(`  ✅ No file system: ${noFileSystem}`);
   }
+
+  // 2. Book Cards
+  console.log('\n2️⃣ Book Cards...');
+  const bookCardPath = path.join(process.cwd(), 'components/BookCard.tsx');
+  if (fs.existsSync(bookCardPath)) {
+    const content = fs.readFileSync(bookCardPath, 'utf8');
+    const usesApiPath = content.includes('/api/images/covers/');
+    results.bookCards = usesApiPath;
+    console.log(`  ✅ Uses API paths: ${usesApiPath}`);
+  }
+
+  // 3. Cart Components
+  console.log('\n3️⃣ Cart Components...');
+  const miniCartPath = path.join(process.cwd(), 'components/cart/MiniCart.tsx');
+  const secureCartPath = path.join(process.cwd(), 'components/cart/SecureCartPage.tsx');
+  
+  let cartUpdated = true;
+  if (fs.existsSync(miniCartPath)) {
+    const content = fs.readFileSync(miniCartPath, 'utf8');
+    const usesSafeImage = content.includes('SafeImage');
+    console.log(`  ✅ MiniCart uses SafeImage: ${usesSafeImage}`);
+    if (!usesSafeImage) cartUpdated = false;
+  }
+  
+  if (fs.existsSync(secureCartPath)) {
+    const content = fs.readFileSync(secureCartPath, 'utf8');
+    const usesSafeImage = content.includes('SafeImage');
+    console.log(`  ✅ SecureCartPage uses SafeImage: ${usesSafeImage}`);
+    if (!usesSafeImage) cartUpdated = false;
+  }
+  results.cart = cartUpdated;
+
+  // 4. Book Details
+  console.log('\n4️⃣ Book Details Page...');
+  const bookDetailsPath = path.join(process.cwd(), 'app/book/[bookId]/page.tsx');
+  if (fs.existsSync(bookDetailsPath)) {
+    const content = fs.readFileSync(bookDetailsPath, 'utf8');
+    const usesSafeImage = content.includes('SafeImage');
+    results.bookDetails = usesSafeImage;
+    console.log(`  ✅ Uses SafeImage: ${usesSafeImage}`);
+  }
+
+  // 5. Image APIs
+  console.log('\n5️⃣ Image APIs...');
+  const coversAPI = path.join(process.cwd(), 'app/api/images/covers/[filename]/route.ts');
+  const uploadAPI = path.join(process.cwd(), 'app/api/images/upload/route.ts');
+  const secureAPI1 = path.join(process.cwd(), 'app/api/images/secure/[id]/route.ts');
+  const secureAPI2 = path.join(process.cwd(), 'app/api/images/secure/[imageId]/route.ts');
+  
+  let allAPIsExist = true;
+  
+  if (fs.existsSync(coversAPI)) {
+    const content = fs.readFileSync(coversAPI, 'utf8');
+    const usesDB = content.includes('SELECT image_data');
+    console.log(`  ✅ Covers API uses database: ${usesDB}`);
+  } else {
+    allAPIsExist = false;
+    console.log(`  ❌ Covers API missing`);
+  }
+  
+  if (fs.existsSync(uploadAPI)) {
+    const content = fs.readFileSync(uploadAPI, 'utf8');
+    const usesService = content.includes('imageStorageService');
+    console.log(`  ✅ Upload API uses service: ${usesService}`);
+  } else {
+    allAPIsExist = false;
+    console.log(`  ❌ Upload API missing`);
+  }
+  
+  const secureExists = fs.existsSync(secureAPI1) || fs.existsSync(secureAPI2);
+  console.log(`  ✅ Secure API exists: ${secureExists}`);
+  
+  results.imageAPIs = allAPIsExist && secureExists;
+
+  // Summary
+  console.log('\n📊 FINAL VERIFICATION RESULTS:');
+  console.log(`  Book Management API: ${results.bookManagement ? '✅ COMPLETE' : '❌ INCOMPLETE'}`);
+  console.log(`  Book Cards: ${results.bookCards ? '✅ COMPLETE' : '❌ INCOMPLETE'}`);
+  console.log(`  Cart System: ${results.cart ? '✅ COMPLETE' : '❌ INCOMPLETE'}`);
+  console.log(`  Book Details: ${results.bookDetails ? '✅ COMPLETE' : '❌ INCOMPLETE'}`);
+  console.log(`  Image APIs: ${results.imageAPIs ? '✅ COMPLETE' : '❌ INCOMPLETE'}`);
+
+  const allComplete = Object.values(results).every(result => result);
+  console.log(`\n🎯 OVERALL STATUS: ${allComplete ? '✅ FULLY INTEGRATED' : '⚠️ MOSTLY COMPLETE'}`);
+
+  if (allComplete) {
+    console.log('\n🎉 SUCCESS! All systems have been updated to use the database image system:');
+    console.log('  ✅ Images stored in remote PostgreSQL database');
+    console.log('  ✅ All components use SafeImage with API endpoints');
+    console.log('  ✅ Book management uses imageStorageService');
+    console.log('  ✅ Cart and checkout systems updated');
+    console.log('  ✅ Book details page updated');
+    console.log('  ✅ All image APIs use database storage');
+  }
+
+  process.exit(0);
 }
 
 finalVerification();

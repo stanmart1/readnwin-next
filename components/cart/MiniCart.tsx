@@ -4,6 +4,7 @@ import { Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { X, ShoppingBag, Trash2 } from 'lucide-react';
 import { useSecureCart } from '@/contexts/SecureCartContext';
+import SafeImage from '@/components/ui/SafeImage';
 import Link from 'next/link';
 
 interface MiniCartProps {
@@ -72,9 +73,10 @@ export default function MiniCart({ isOpen, onClose }: MiniCartProps) {
                               {items.slice(0, 5).map((item) => (
                                 <li key={item.id} className="flex py-6">
                                   <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-md border border-gray-200">
-                                    <img
+                                    <SafeImage
                                       src={item.book.cover_image_url}
                                       alt={item.book.title}
+                                      bookTitle={item.book.title}
                                       className="h-full w-full object-cover object-center"
                                     />
                                   </div>

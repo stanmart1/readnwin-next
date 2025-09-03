@@ -110,14 +110,14 @@ async function testResendGateway(config: EmailGatewayConfig, testEmail: string) 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `${safeFromName} <${safeFromEmail}>`,
+        from: `${config.fromName} <${config.fromEmail}>`,
         to: [testEmail],
         subject: 'Email Gateway Test - Resend',
         html: `
           <h2>Email Gateway Test Successful!</h2>
           <p>This is a test email from your Resend email gateway configuration.</p>
           <p><strong>Gateway:</strong> Resend</p>
-          <p><strong>From:</strong> ${safeFromName} &lt;${safeFromEmail}&gt;</p>
+          <p><strong>From:</strong> ${config.fromName} &lt;${config.fromEmail}&gt;</p>
           <p><strong>Test Time:</strong> ${new Date().toISOString()}</p>
           <p>If you received this email, your Resend gateway is working correctly.</p>
         `,
@@ -169,12 +169,12 @@ async function testSmtpGateway(config: EmailGatewayConfig, testEmail: string) {
       return { success: false, error: 'SMTP configuration incomplete' };
     }
 
-    const transporter = nodemailer.createTransporter(smtpConfig);
+    const transporter = nodemailer.createTransport(smtpConfig);
     
     await transporter.verify();
     
     const info = await transporter.sendMail({
-      from: `${safeFromName} <${safeFromEmail}>`,
+      from: `${config.fromName} <${config.fromEmail}>`,
       to: testEmail,
       subject: 'Email Gateway Test - SMTP',
       html: `
@@ -182,7 +182,7 @@ async function testSmtpGateway(config: EmailGatewayConfig, testEmail: string) {
         <p>This is a test email from your SMTP email gateway configuration.</p>
         <p><strong>Gateway:</strong> SMTP</p>
         <p><strong>Host:</strong> ${smtpConfig.host}:${smtpConfig.port}</p>
-        <p><strong>From:</strong> ${safeFromName} &lt;${safeFromEmail}&gt;</p>
+        <p><strong>From:</strong> ${config.fromName} &lt;${config.fromEmail}&gt;</p>
         <p><strong>Test Time:</strong> ${new Date().toISOString()}</p>
         <p>If you received this email, your SMTP gateway is working correctly.</p>
       `,

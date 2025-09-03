@@ -255,27 +255,27 @@ export default function BookManagementEnhanced() {
       return;
     }
     
-    if (!confirm(`Are you sure you want to delete ${selectedBooks.length} selected books? This action cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete ${selection.books.length} selected books? This action cannot be undone.`)) {
       return;
     }
     
-    const success = await deleteBooks(selectedBooks);
+    const success = await deleteBooks(selection.books);
     if (success) {
-      setSelectedBooks([]);
+      setSelection(prev => ({ ...prev, books: [] }));
     }
   };
 
   const handleBatchUpdate = async () => {
-    if (selectedBooks.length === 0) {
+    if (selection.books.length === 0) {
       toast.error('Please select books to update');
       return;
     }
 
-    const success = await batchUpdateBooks(selectedBooks, batchUpdateData);
+    const success = await batchUpdateBooks(selection.books, forms.batchUpdate);
     if (success) {
-      setSelectedBooks([]);
-      setShowBatchUpdateModal(false);
-      setBatchUpdateData({ status: '', category_id: '', price_adjustment: { value: '', type: 'percentage' } });
+      setSelection(prev => ({ ...prev, books: [] }));
+      setModals(prev => ({ ...prev, batchUpdate: false }));
+      setForms(prev => ({ ...prev, batchUpdate: { status: '', category_id: '', price_adjustment: { value: '', type: 'percentage' } } }));
     }
   };
 
@@ -295,19 +295,19 @@ export default function BookManagementEnhanced() {
         }
         break;
       case 'edit':
-        setSelectedBookForAction(book);
-        setShowEditModal(true);
+        setSelection(prev => ({ ...prev, bookForAction: book }));
+        setModals(prev => ({ ...prev, edit: true }));
         break;
       case 'view':
-        setSelectedBookForAction(book);
-        setShowDetailsModal(true);
+        setSelection(prev => ({ ...prev, bookForAction: book }));
+        setModals(prev => ({ ...prev, details: true }));
         break;
       case 'delete':
         handleDeleteBook(book.id);
         break;
       case 'assign':
-        setSelectedBookForAction(book);
-        setShowBookAssignModal(true);
+        setSelection(prev => ({ ...prev, bookForAction: book }));
+        setModals(prev => ({ ...prev, bookAssign: true }));
         break;
     }
   };
@@ -406,28 +406,28 @@ export default function BookManagementEnhanced() {
                 <div className="w-full">
                   <BookFilters
                     filters={filters}
-                    categories={categories}
+                    categories={data.categories}
                     onFiltersChange={setFilters}
                   />
                 </div>
 
                 {/* Action Buttons Row */}
                 <div className="flex flex-col gap-3">
-                  {selectedBooks.length > 0 && (
+                  {selection.books.length > 0 && (
                     <div className="flex flex-col sm:flex-row gap-3">
                       <button
-                        onClick={() => setShowBatchUpdateModal(true)}
+                        onClick={() => setModals(prev => ({ ...prev, batchUpdate: true }))}
                         className="w-full sm:w-auto px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                       >
                         <i className="ri-edit-2-line"></i>
-                        <span className="truncate">Update ({selectedBooks.length})</span>
+                        <span className="truncate">Update ({selection.books.length})</span>
                       </button>
                       <button
                         onClick={handleBulkDelete}
                         className="w-full sm:w-auto px-4 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
                       >
                         <i className="ri-delete-bin-line"></i>
-                        <span className="truncate">Delete ({selectedBooks.length})</span>
+                        <span className="truncate">Delete ({selection.books.length})</span>
                       </button>
                     </div>
                   )}
@@ -480,8 +480,8 @@ export default function BookManagementEnhanced() {
                 <>
                   <BookTable
                     books={books}
-                    selectedBooks={selectedBooks}
-                    onSelectionChange={setSelectedBooks}
+                    selectedBooks={selection.books}
+                    onSelectionChange={(books) => setSelection(prev => ({ ...prev, books }))}
                     onBookAction={handleBookAction}
                   />
 
@@ -534,15 +534,15 @@ export default function BookManagementEnhanced() {
             isOpen={showAddModal}
             onClose={handleModalClose}
             onSuccess={handleModalClose}
-            categories={categories}
-            authors={authors}
+            categories={data.categories}
+            authors={data.authors}
           />
         )}
 
         {/* Delete Confirmation Modal */}
         <Modal 
-          isOpen={showDeleteConfirm} 
-          onClose={() => setShowDeleteConfirm(false)}
+          isOpen={modals.deleteConfirm} 
+          onClose={() => setModals(prev => ({ ...prev, deleteConfirm: false }))}
           className="max-w-sm xs:max-w-md w-full mx-2 xs:mx-3 sm:mx-4"
         >
           <div className="p-3 xs:p-4 sm:p-6">
@@ -557,7 +557,7 @@ export default function BookManagementEnhanced() {
             </p>
             <div className="flex flex-col xs:flex-row justify-end gap-2 xs:gap-3">
               <button
-                onClick={() => setShowDeleteConfirm(false)}
+                onClick={() => setModals(prev => ({ ...prev, deleteConfirm: false }))}
                 className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs xs:text-sm font-medium"
               >
                 Cancel
@@ -575,11 +575,11 @@ export default function BookManagementEnhanced() {
 
         {/* Assign to User Modal */}
         <Modal 
-          isOpen={showAssignModal} 
+          isOpen={modals.assign} 
           onClose={() => {
-            setShowAssignModal(false);
-            setSelectedUser(null);
-            setUserSearchQuery('');
+            setModals(prev => ({ ...prev, assign: false }));
+            setSelection(prev => ({ ...prev, user: null }));
+            setForms(prev => ({ ...prev, userSearch: '' }));
           }}
           className="max-w-sm xs:max-w-md sm:max-w-lg w-full mx-2 xs:mx-3 sm:mx-4"
           showCloseIcon={true}
@@ -592,24 +592,24 @@ export default function BookManagementEnhanced() {
               </div>
               <h3 className="text-sm xs:text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">Assign Book to User Library</h3>
             </div>
-            {selectedBookForAction && (
+            {selection.bookForAction && (
               <div className="mb-3 xs:mb-4 p-2 xs:p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-2 xs:gap-3 mb-2">
                   <img
-                    src={selectedBookForAction.cover_image_url || '/placeholder-book.jpg'}
-                    alt={selectedBookForAction.title}
+                    src={selection.bookForAction.cover_image_url || '/placeholder-book.jpg'}
+                    alt={selection.bookForAction.title}
                     className="w-10 xs:w-12 h-12 xs:h-15 object-cover rounded"
                   />
                   <div className="flex-1">
-                    <p className="text-xs xs:text-sm font-medium text-gray-900 leading-tight break-words">{selectedBookForAction.title}</p>
-                    <p className="text-xs text-gray-600 break-words">by {selectedBookForAction.author_name}</p>
+                    <p className="text-xs xs:text-sm font-medium text-gray-900 leading-tight break-words">{selection.bookForAction.title}</p>
+                    <p className="text-xs text-gray-600 break-words">by {selection.bookForAction.author_name}</p>
                     <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${
-                      selectedBookForAction.format === 'physical' ? 'bg-orange-100 text-orange-800' : 
-                      selectedBookForAction.format === 'both' ? 'bg-purple-100 text-purple-800' : 
+                      selection.bookForAction.format === 'physical' ? 'bg-orange-100 text-orange-800' : 
+                      selection.bookForAction.format === 'both' ? 'bg-purple-100 text-purple-800' : 
                       'bg-blue-100 text-blue-800'
                     }`}>
-                      {selectedBookForAction.format === 'physical' ? 'Physical Book' : 
-                       selectedBookForAction.format === 'both' ? 'Both Formats' : 'Ebook'}
+                      {selection.bookForAction.format === 'physical' ? 'Physical Book' : 
+                       selection.bookForAction.format === 'both' ? 'Both Formats' : 'Ebook'}
                     </span>
                   </div>
                 </div>
@@ -620,9 +620,9 @@ export default function BookManagementEnhanced() {
               <div className="flex gap-2 mb-3">
                 <button
                   type="button"
-                  onClick={() => setSelectedFormat('both')}
+                  onClick={() => setForms(prev => ({ ...prev, selectedFormat: 'both' }))}
                   className={`flex-1 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium rounded-lg border transition-colors ${
-                    selectedFormat === 'both'
+                    forms.selectedFormat === 'both'
                       ? 'bg-blue-600 text-white border-blue-600'
                       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                   }`}
@@ -631,9 +631,9 @@ export default function BookManagementEnhanced() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedFormat('ebook')}
+                  onClick={() => setForms(prev => ({ ...prev, selectedFormat: 'ebook' }))}
                   className={`flex-1 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium rounded-lg border transition-colors ${
-                    selectedFormat === 'ebook'
+                    forms.selectedFormat === 'ebook'
                       ? 'bg-blue-600 text-white border-blue-600'
                       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                   }`}
@@ -642,9 +642,9 @@ export default function BookManagementEnhanced() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedFormat('physical')}
+                  onClick={() => setForms(prev => ({ ...prev, selectedFormat: 'physical' }))}
                   className={`flex-1 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm font-medium rounded-lg border transition-colors ${
-                    selectedFormat === 'physical'
+                    forms.selectedFormat === 'physical'
                       ? 'bg-blue-600 text-white border-blue-600'
                       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                   }`}
@@ -658,24 +658,24 @@ export default function BookManagementEnhanced() {
               <input
                 type="text"
                 placeholder="Search users..."
-                value={userSearchQuery}
-                onChange={(e) => setUserSearchQuery(e.target.value)}
+                value={forms.userSearch}
+                onChange={(e) => setForms(prev => ({ ...prev, userSearch: e.target.value }))}
                 className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              {userSearchQuery && (
+              {forms.userSearch && (
                 <div className="mt-1 xs:mt-2 max-h-32 xs:max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
-                  {users
+                  {data.users
                     .filter(user => 
-                      user.name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-                      user.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
+                      user.name?.toLowerCase().includes(forms.userSearch.toLowerCase()) ||
+                      user.email?.toLowerCase().includes(forms.userSearch.toLowerCase())
                     )
                     .slice(0, 5)
                     .map(user => (
                       <button
                         key={user.id}
                         onClick={() => {
-                          setSelectedUser(user);
-                          setUserSearchQuery(`${user.name} (${user.email})`);
+                          setSelection(prev => ({ ...prev, user }));
+                          setForms(prev => ({ ...prev, userSearch: `${user.name} (${user.email})` }));
                         }}
                         className="w-full text-left px-2 xs:px-3 py-1.5 xs:py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                       >
@@ -690,10 +690,9 @@ export default function BookManagementEnhanced() {
             <div className="flex flex-col xs:flex-row justify-end gap-2 xs:gap-3">
               <button
                 onClick={() => {
-                  setShowAssignModal(false);
-                  setSelectedUser(null);
-                  setUserSearchQuery('');
-                  setSelectedFormat('both');
+                  setModals(prev => ({ ...prev, assign: false }));
+                  setSelection(prev => ({ ...prev, user: null }));
+                  setForms(prev => ({ ...prev, userSearch: '', selectedFormat: 'both' }));
                 }}
                 className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs xs:text-sm font-medium"
               >
@@ -701,15 +700,15 @@ export default function BookManagementEnhanced() {
               </button>
               <button
                 onClick={handleAssignBook}
-                disabled={!selectedUser || assignLoading}
+                disabled={!selection.user || loadingStates.assign}
                 className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs xs:text-sm font-medium flex items-center justify-center gap-1 xs:gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {assignLoading ? (
+                {loadingStates.assign ? (
                   <i className="ri-loader-4-line animate-spin text-sm xs:text-base"></i>
                 ) : (
                   <i className="ri-user-add-line text-sm xs:text-base"></i>
                 )}
-                <span className="truncate">{assignLoading ? 'Assigning...' : `Assign ${selectedFormat === 'both' ? 'Both Formats' : selectedFormat === 'ebook' ? 'Ebook' : 'Physical Book'}`}</span>
+                <span className="truncate">{loadingStates.assign ? 'Assigning...' : `Assign ${forms.selectedFormat === 'both' ? 'Both Formats' : forms.selectedFormat === 'ebook' ? 'Ebook' : 'Physical Book'}`}</span>
               </button>
             </div>
           </div>
@@ -717,8 +716,8 @@ export default function BookManagementEnhanced() {
 
         {/* Reading Analytics Modal */}
         <Modal 
-          isOpen={showAnalyticsModal} 
-          onClose={() => setShowAnalyticsModal(false)}
+          isOpen={modals.analytics} 
+          onClose={() => setModals(prev => ({ ...prev, analytics: false }))}
           className="max-w-xs xs:max-w-sm sm:max-w-2xl md:max-w-4xl w-full mx-2 xs:mx-3 sm:mx-4"
         >
           <div className="p-3 xs:p-4 sm:p-6">
@@ -728,18 +727,18 @@ export default function BookManagementEnhanced() {
               </div>
               <h3 className="text-sm xs:text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">Reading Analytics</h3>
             </div>
-            {selectedBookForAction && (
+            {selection.bookForAction && (
               <div className="mb-4 xs:mb-5 sm:mb-6">
                 <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2 xs:gap-3 sm:gap-4 p-2 xs:p-3 sm:p-4 bg-gray-50 rounded-lg">
                   <img
-                    src={selectedBookForAction.cover_image_url || '/placeholder-book.jpg'}
-                    alt={selectedBookForAction.title}
+                    src={selection.bookForAction.cover_image_url || '/placeholder-book.jpg'}
+                    alt={selection.bookForAction.title}
                     className="w-12 xs:w-14 sm:w-16 h-15 xs:h-17 sm:h-20 object-cover rounded mx-auto xs:mx-0"
                   />
                   <div className="text-center xs:text-left w-full">
-                    <h4 className="text-xs xs:text-sm sm:text-base font-medium text-gray-900 leading-tight break-words">{selectedBookForAction.title}</h4>
-                    <p className="text-xs sm:text-sm text-gray-600 break-words">by {selectedBookForAction.author_name}</p>
-                    <p className="text-xs text-gray-500 break-words">{selectedBookForAction.category_name}</p>
+                    <h4 className="text-xs xs:text-sm sm:text-base font-medium text-gray-900 leading-tight break-words">{selection.bookForAction.title}</h4>
+                    <p className="text-xs sm:text-sm text-gray-600 break-words">by {selection.bookForAction.author_name}</p>
+                    <p className="text-xs text-gray-500 break-words">{selection.bookForAction.category_name}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2 xs:gap-3 sm:gap-4 mt-3 xs:mt-4 sm:mt-6">
@@ -769,7 +768,7 @@ export default function BookManagementEnhanced() {
             )}
             <div className="flex justify-end">
               <button
-                onClick={() => setShowAnalyticsModal(false)}
+                onClick={() => setModals(prev => ({ ...prev, analytics: false }))}
                 className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs xs:text-sm font-medium"
               >
                 Close
@@ -780,11 +779,11 @@ export default function BookManagementEnhanced() {
 
         {/* Edit Book Modal */}
         <BookEditModal
-          isOpen={showEditModal}
-          onClose={() => setShowEditModal(false)}
-          book={selectedBookForAction}
-          categories={categories}
-          authors={authors}
+          isOpen={modals.edit}
+          onClose={() => setModals(prev => ({ ...prev, edit: false }))}
+          book={selection.bookForAction}
+          categories={data.categories}
+          authors={data.authors}
           onSuccess={() => {
             // Refresh the books list
             window.location.reload();
@@ -793,8 +792,8 @@ export default function BookManagementEnhanced() {
 
         {/* Book Details Modal */}
         <Modal 
-          isOpen={showDetailsModal} 
-          onClose={() => setShowDetailsModal(false)}
+          isOpen={modals.details} 
+          onClose={() => setModals(prev => ({ ...prev, details: false }))}
           className="max-w-4xl w-full mx-4"
         >
           <div className="p-6">
@@ -804,7 +803,7 @@ export default function BookManagementEnhanced() {
               </div>
               <h2 className="text-xl font-semibold text-gray-900">Book Details</h2>
             </div>
-            {selectedBookForAction && (
+            {selection.bookForAction && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Cover Image Section */}
                 <div className="lg:col-span-1">
@@ -813,8 +812,8 @@ export default function BookManagementEnhanced() {
                   </label>
                   <div className="relative">
                     <img
-                      src={selectedBookForAction.cover_image_url || '/placeholder-book.jpg'}
-                      alt={selectedBookForAction.title}
+                      src={selection.bookForAction.cover_image_url || '/placeholder-book.jpg'}
+                      alt={selection.bookForAction.title}
                       className="w-full h-64 object-cover rounded-lg border shadow-md"
                     />
                   </div>
@@ -827,22 +826,22 @@ export default function BookManagementEnhanced() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Title
                       </label>
-                      <p className="text-base font-semibold text-gray-900">{selectedBookForAction.title}</p>
+                      <p className="text-base font-semibold text-gray-900">{selection.bookForAction.title}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Author
                       </label>
-                      <p className="text-base text-gray-900">{selectedBookForAction.author_name}</p>
+                      <p className="text-base text-gray-900">{selection.bookForAction.author_name}</p>
                     </div>
                   </div>
 
-                  {(selectedBookForAction as any).description && (
+                  {(selection.bookForAction as any).description && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Description
                       </label>
-                      <p className="text-sm text-gray-700 leading-relaxed">{(selectedBookForAction as any).description}</p>
+                      <p className="text-sm text-gray-700 leading-relaxed">{(selection.bookForAction as any).description}</p>
                     </div>
                   )}
 
@@ -851,24 +850,24 @@ export default function BookManagementEnhanced() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Price
                       </label>
-                      <p className="text-lg font-semibold text-green-600">₦{selectedBookForAction.price.toLocaleString()}</p>
+                      <p className="text-lg font-semibold text-green-600">₦{selection.bookForAction.price.toLocaleString()}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Stock Quantity
                       </label>
-                      <p className="text-base text-gray-900">{selectedBookForAction.stock_quantity}</p>
+                      <p className="text-base text-gray-900">{selection.bookForAction.stock_quantity}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Status
                       </label>
                       <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${
-                        selectedBookForAction.status === 'published' ? 'bg-green-100 text-green-800' :
-                        selectedBookForAction.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                        selection.bookForAction.status === 'published' ? 'bg-green-100 text-green-800' :
+                        selection.bookForAction.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
-                        {selectedBookForAction.status}
+                        {selection.bookForAction.status}
                       </span>
                     </div>
                   </div>
@@ -878,61 +877,61 @@ export default function BookManagementEnhanced() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Category
                       </label>
-                      <p className="text-base text-gray-900">{selectedBookForAction.category_name}</p>
+                      <p className="text-base text-gray-900">{selection.bookForAction.category_name}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Format
                       </label>
-                      <p className="text-base text-gray-900 capitalize">{selectedBookForAction.format}</p>
+                      <p className="text-base text-gray-900 capitalize">{selection.bookForAction.format}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(selectedBookForAction as any).isbn && (
+                    {(selection.bookForAction as any).isbn && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           ISBN
                         </label>
-                        <p className="text-base text-gray-900">{(selectedBookForAction as any).isbn}</p>
+                        <p className="text-base text-gray-900">{(selection.bookForAction as any).isbn}</p>
                       </div>
                     )}
-                    {(selectedBookForAction as any).pages && (
+                    {(selection.bookForAction as any).pages && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Pages
                         </label>
-                        <p className="text-base text-gray-900">{(selectedBookForAction as any).pages}</p>
+                        <p className="text-base text-gray-900">{(selection.bookForAction as any).pages}</p>
                       </div>
                     )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(selectedBookForAction as any).language && (
+                    {(selection.bookForAction as any).language && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Language
                         </label>
-                        <p className="text-base text-gray-900">{(selectedBookForAction as any).language}</p>
+                        <p className="text-base text-gray-900">{(selection.bookForAction as any).language}</p>
                       </div>
                     )}
-                    {(selectedBookForAction as any).publisher && (
+                    {(selection.bookForAction as any).publisher && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Publisher
                         </label>
-                        <p className="text-base text-gray-900">{(selectedBookForAction as any).publisher}</p>
+                        <p className="text-base text-gray-900">{(selection.bookForAction as any).publisher}</p>
                       </div>
                     )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(selectedBookForAction as any).publication_date && (
+                    {(selection.bookForAction as any).publication_date && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Publication Date
                         </label>
-                        <p className="text-base text-gray-900">{new Date((selectedBookForAction as any).publication_date).toLocaleDateString()}</p>
+                        <p className="text-base text-gray-900">{new Date((selection.bookForAction as any).publication_date).toLocaleDateString()}</p>
                       </div>
                     )}
                     <div>
@@ -940,10 +939,10 @@ export default function BookManagementEnhanced() {
                         Featured
                       </label>
                       <span className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-full ${
-                        selectedBookForAction.is_featured ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                        selection.bookForAction.is_featured ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
                       }`}>
-                        <i className={`ri-${selectedBookForAction.is_featured ? 'star' : 'star-line'} mr-1`}></i>
-                        {selectedBookForAction.is_featured ? 'Featured' : 'Not Featured'}
+                        <i className={`ri-${selection.bookForAction.is_featured ? 'star' : 'star-line'} mr-1`}></i>
+                        {selection.bookForAction.is_featured ? 'Featured' : 'Not Featured'}
                       </span>
                     </div>
                   </div>
@@ -952,22 +951,21 @@ export default function BookManagementEnhanced() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Created
                     </label>
-                    <p className="text-base text-gray-900">{new Date(selectedBookForAction.created_at).toLocaleDateString()}</p>
+                    <p className="text-base text-gray-900">{new Date(selection.bookForAction.created_at).toLocaleDateString()}</p>
                   </div>
                 </div>
               </div>
             )}
             <div className="flex justify-end gap-3 pt-6 border-t mt-6">
               <button
-                onClick={() => setShowDetailsModal(false)}
+                onClick={() => setModals(prev => ({ ...prev, details: false }))}
                 className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Close
               </button>
               <button
                 onClick={() => {
-                  setShowDetailsModal(false);
-                  setShowEditModal(true);
+                  setModals(prev => ({ ...prev, details: false, edit: true }));
                 }}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
               >
@@ -980,21 +978,21 @@ export default function BookManagementEnhanced() {
 
         {/* Book Assignment Modal */}
         <Modal
-          isOpen={showBookAssignModal && selectedBookForAction !== null}
+          isOpen={modals.bookAssign && selection.bookForAction !== null}
           onClose={() => {
-            setShowBookAssignModal(false);
-            setSelectedBookForAction(null);
+            setModals(prev => ({ ...prev, bookAssign: false }));
+            setSelection(prev => ({ ...prev, bookForAction: null }));
           }}
           className="max-w-4xl w-full mx-4"
           showCloseIcon={true}
           closeOnOutsideClick={true}
         >
-          {selectedBookForAction && (
+          {selection.bookForAction && (
             <BulkLibraryManagement
-              preSelectedBook={selectedBookForAction}
+              preSelectedBook={selection.bookForAction}
               onClose={() => {
-                setShowBookAssignModal(false);
-                setSelectedBookForAction(null);
+                setModals(prev => ({ ...prev, bookAssign: false }));
+                setSelection(prev => ({ ...prev, bookForAction: null }));
               }}
             />
           )}
@@ -1002,8 +1000,8 @@ export default function BookManagementEnhanced() {
 
         {/* Batch Update Modal */}
         <Modal 
-          isOpen={showBatchUpdateModal} 
-          onClose={() => setShowBatchUpdateModal(false)}
+          isOpen={modals.batchUpdate} 
+          onClose={() => setModals(prev => ({ ...prev, batchUpdate: false }))}
           className="max-w-sm xs:max-w-md sm:max-w-lg w-full mx-2 xs:mx-3 sm:mx-4"
         >
           <div className="p-3 xs:p-4 sm:p-6">
@@ -1014,14 +1012,14 @@ export default function BookManagementEnhanced() {
               <h3 className="text-sm xs:text-base sm:text-lg font-medium text-gray-900 leading-tight break-words">Batch Update Books</h3>
             </div>
             <div className="mb-3 xs:mb-4 p-2 xs:p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs xs:text-sm text-gray-600">Updating {selectedBooks.length} selected books</p>
+              <p className="text-xs xs:text-sm text-gray-600">Updating {selection.books.length} selected books</p>
             </div>
             <div className="space-y-3 xs:space-y-4">
               <div>
                 <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Status (optional)</label>
                 <select
-                  value={batchUpdateData.status}
-                  onChange={(e) => setBatchUpdateData(prev => ({ ...prev, status: e.target.value }))}
+                  value={forms.batchUpdate.status}
+                  onChange={(e) => setForms(prev => ({ ...prev, batchUpdate: { ...prev.batchUpdate, status: e.target.value } }))}
                   className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Keep current status</option>
@@ -1033,12 +1031,12 @@ export default function BookManagementEnhanced() {
               <div>
                 <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Category (optional)</label>
                 <select
-                  value={batchUpdateData.category_id}
-                  onChange={(e) => setBatchUpdateData(prev => ({ ...prev, category_id: e.target.value }))}
+                  value={forms.batchUpdate.category_id}
+                  onChange={(e) => setForms(prev => ({ ...prev, batchUpdate: { ...prev.batchUpdate, category_id: e.target.value } }))}
                   className="w-full px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Keep current category</option>
-                  {categories.map(category => (
+                  {data.categories.map(category => (
                     <option key={category.id} value={category.id}>{category.name}</option>
                   ))}
                 </select>
@@ -1047,8 +1045,8 @@ export default function BookManagementEnhanced() {
                 <label className="block text-xs xs:text-sm font-medium text-gray-700 mb-1 xs:mb-2">Price Adjustment (optional)</label>
                 <div className="flex gap-1 xs:gap-2">
                   <select
-                    value={batchUpdateData.price_adjustment.type}
-                    onChange={(e) => setBatchUpdateData(prev => ({ ...prev, price_adjustment: { ...prev.price_adjustment, type: e.target.value as 'percentage' | 'fixed' } }))}
+                    value={forms.batchUpdate.price_adjustment.type}
+                    onChange={(e) => setForms(prev => ({ ...prev, batchUpdate: { ...prev.batchUpdate, price_adjustment: { ...prev.batchUpdate.price_adjustment, type: e.target.value as 'percentage' | 'fixed' } } }))}
                     className="w-16 xs:w-20 px-1 xs:px-2 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="percentage">%</option>
@@ -1056,20 +1054,20 @@ export default function BookManagementEnhanced() {
                   </select>
                   <input
                     type="number"
-                    placeholder={batchUpdateData.price_adjustment.type === 'percentage' ? '10' : '1000'}
-                    value={batchUpdateData.price_adjustment.value}
-                    onChange={(e) => setBatchUpdateData(prev => ({ ...prev, price_adjustment: { ...prev.price_adjustment, value: e.target.value } }))}
+                    placeholder={forms.batchUpdate.price_adjustment.type === 'percentage' ? '10' : '1000'}
+                    value={forms.batchUpdate.price_adjustment.value}
+                    onChange={(e) => setForms(prev => ({ ...prev, batchUpdate: { ...prev.batchUpdate, price_adjustment: { ...prev.batchUpdate.price_adjustment, value: e.target.value } } }))}
                     className="flex-1 px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-1 leading-relaxed break-words">
-                  {batchUpdateData.price_adjustment.type === 'percentage' ? 'Increase/decrease by percentage (use negative for decrease)' : 'Add/subtract fixed amount (use negative to subtract)'}
+                  {forms.batchUpdate.price_adjustment.type === 'percentage' ? 'Increase/decrease by percentage (use negative for decrease)' : 'Add/subtract fixed amount (use negative to subtract)'}
                 </p>
               </div>
             </div>
             <div className="flex flex-col xs:flex-row justify-end gap-2 xs:gap-3 mt-4 xs:mt-5 sm:mt-6">
               <button
-                onClick={() => setShowBatchUpdateModal(false)}
+                onClick={() => setModals(prev => ({ ...prev, batchUpdate: false }))}
                 className="w-full xs:w-auto px-3 xs:px-4 py-2 xs:py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-xs xs:text-sm font-medium"
               >
                 Cancel

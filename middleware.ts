@@ -17,7 +17,7 @@ export function middleware(request: NextRequest) {
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.flutterwave.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
     "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com",
-    "img-src 'self' data: https:",
+    "img-src 'self' data: https: http://localhost:* http://0.0.0.0:*",
     "connect-src 'self' https://api.flutterwave.com",
     "frame-src https://checkout.flutterwave.com",
   ].join('; ');

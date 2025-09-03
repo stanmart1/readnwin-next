@@ -276,7 +276,7 @@ export default function BlogPostPage() {
                         }}
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
-                          target.src = 'https://via.placeholder.com/320x192?text=Image+Not+Found';
+                          target.src = '/images/placeholder.svg';
                         }}
                       />
                       {image.is_featured && (

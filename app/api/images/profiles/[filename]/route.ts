@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { readFileSync, existsSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 
 export async function GET(
@@ -9,56 +7,41 @@ export async function GET(
   { params }: { params: { filename: string } }
 ) {
   try {
-    const { filename } = params;
-    const sanitizedFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '');
+    const filename = params.filename;
     
-    const profilePath = process.env.NODE_ENV === 'production'
-      ? join('/app/storage/assets/profiles', sanitizedFilename)
-      : join(process.cwd(), 'storage', 'assets', 'profiles', sanitizedFilename);
-    
-    if (!existsSync(profilePath)) {
-      const defaultPath = join(process.cwd(), 'public', 'images', 'default-avatar.png');
-      if (existsSync(defaultPath)) {
-        const defaultBuffer = readFileSync(defaultPath);
-        return new NextResponse(new Uint8Array(defaultBuffer), {
+    // Try multiple possible locations for profile images
+    const possiblePaths = [
+      join(process.cwd(), 'storage', 'assets', 'profiles', filename),
+      join(process.cwd(), 'public', 'images', 'uploads', filename),
+      join(process.cwd(), 'uploads', 'profiles', filename)
+    ];
+
+    for (const imagePath of possiblePaths) {
+      try {
+        const imageBuffer = await readFile(imagePath);
+        const ext = filename.split('.').pop()?.toLowerCase();
+        
+        let contentType = 'image/jpeg';
+        if (ext === 'png') contentType = 'image/png';
+        if (ext === 'gif') contentType = 'image/gif';
+        if (ext === 'webp') contentType = 'image/webp';
+
+        return new NextResponse(imageBuffer, {
           headers: {
-            'Content-Type': 'image/png',
-            'Cache-Control': 'public, max-age=86400'
+            'Content-Type': contentType,
+            'Cache-Control': 'public, max-age=31536000'
           }
         });
+      } catch (error) {
+        continue; // Try next path
       }
-      return new NextResponse('Image not found', { status: 404 });
     }
-    
-    const imageBuffer = readFileSync(profilePath);
-    const contentType = getContentType(sanitizedFilename);
-    
-    return new NextResponse(new Uint8Array(imageBuffer), {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600'
-      }
-    });
-    
+
+    // Return placeholder if image not found
+    return NextResponse.redirect(new URL('/images/placeholder.svg', request.url));
+
   } catch (error) {
     console.error('Error serving profile image:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
-  }
-}
-
-function getContentType(filename: string): string {
-  const ext = filename.toLowerCase().split('.').pop();
-  switch (ext) {
-    case 'jpg':
-    case 'jpeg':
-      return 'image/jpeg';
-    case 'png':
-      return 'image/png';
-    case 'webp':
-      return 'image/webp';
-    case 'gif':
-      return 'image/gif';
-    default:
-      return 'image/jpeg';
+    return NextResponse.redirect(new URL('/images/placeholder.svg', request.url));
   }
 }

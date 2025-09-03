@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { formatDate } from "@/utils/dateUtils";
 import { toast } from "react-hot-toast";
+import { decodeHtmlEntities } from "@/utils/htmlUtils";
 
 interface LibraryItem {
   book_id?: number;
@@ -357,7 +358,7 @@ export default function UserLibrary() {
 
             <div className="p-4">
               <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
-                {book.title}
+                {decodeHtmlEntities(book.title)}
               </h3>
               <p className="text-gray-600 text-sm mb-2">{book.author}</p>
               {book.category && (

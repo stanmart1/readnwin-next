@@ -214,12 +214,12 @@ export default function ReviewManagement() {
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 flex-1 min-w-0">
           {review.book_cover && (
             <img
               src={review.book_cover}
               alt={review.book_title}
-              className="w-12 h-16 object-cover rounded"
+              className="w-12 h-16 object-cover rounded flex-shrink-0"
             />
           )}
           <div className="flex-1 min-w-0">
@@ -231,9 +231,11 @@ export default function ReviewManagement() {
             )}
           </div>
         </div>
-        <div className="flex flex-col items-end space-y-1">
+        <div className="flex flex-col items-end space-y-1 flex-shrink-0 ml-2">
           {getStatusBadge(review.status, review.is_featured)}
-          {getRatingStars(review.rating)}
+          <div className="flex-shrink-0">
+            {getRatingStars(review.rating)}
+          </div>
         </div>
       </div>
 

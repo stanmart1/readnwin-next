@@ -165,12 +165,33 @@ export default function BookManagementEnhanced() {
     try {
       const assignments = [];
       
-      // Determine which formats to assign based on selection
-      if (selectedFormat === 'both' || selectedFormat === 'ebook') {
-        assignments.push({ format: 'ebook', book_id: selectedBookForAction.id });
-      }
-      if (selectedFormat === 'both' || selectedFormat === 'physical') {
-        assignments.push({ format: 'physical', book_id: selectedBookForAction.id });
+      // Determine which formats to assign based on selection and book availability
+      const bookFormat = selectedBookForAction.format;
+      
+      if (selectedFormat === 'both') {
+        // Assign both formats if book supports both, otherwise assign the book's format
+        if (bookFormat === 'both') {
+          assignments.push({ format: 'ebook', book_id: selectedBookForAction.id });
+          assignments.push({ format: 'physical', book_id: selectedBookForAction.id });
+        } else {
+          assignments.push({ format: bookFormat, book_id: selectedBookForAction.id });
+        }
+      } else if (selectedFormat === 'ebook') {
+        if (bookFormat === 'ebook' || bookFormat === 'both') {
+          assignments.push({ format: 'ebook', book_id: selectedBookForAction.id });
+        } else {
+          toast.error('This book is not available as an ebook');
+          setAssignLoading(false);
+          return;
+        }
+      } else if (selectedFormat === 'physical') {
+        if (bookFormat === 'physical' || bookFormat === 'both') {
+          assignments.push({ format: 'physical', book_id: selectedBookForAction.id });
+        } else {
+          toast.error('This book is not available as a physical book');
+          setAssignLoading(false);
+          return;
+        }
       }
       
       const results = [];
@@ -201,13 +222,14 @@ export default function BookManagementEnhanced() {
       const failed = results.filter(r => !r.success);
       
       if (successful.length > 0) {
-        const formats = successful.map(r => r.format).join(' and ');
+        const formats = successful.map(r => r.format === 'physical' ? 'Physical book' : 'Ebook').join(' and ');
         toast.success(`${formats} "${selectedBookForAction.title}" assigned to ${selectedUser.name} successfully!`);
       }
       
       if (failed.length > 0) {
         failed.forEach(f => {
-          toast.error(`Failed to assign ${f.format}: ${f.error}`);
+          const formatName = f.format === 'physical' ? 'Physical book' : 'Ebook';
+          toast.error(`Failed to assign ${formatName}: ${f.error}`);
         });
       }
       
@@ -599,9 +621,12 @@ export default function BookManagementEnhanced() {
                     <p className="text-xs xs:text-sm font-medium text-gray-900 leading-tight break-words">{selectedBookForAction.title}</p>
                     <p className="text-xs text-gray-600 break-words">by {selectedBookForAction.author_name}</p>
                     <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${
-                      selectedBookForAction.format === 'physical' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
+                      selectedBookForAction.format === 'physical' ? 'bg-orange-100 text-orange-800' : 
+                      selectedBookForAction.format === 'both' ? 'bg-purple-100 text-purple-800' : 
+                      'bg-blue-100 text-blue-800'
                     }`}>
-                      {selectedBookForAction.format === 'physical' ? 'Physical Book' : 'Ebook'}
+                      {selectedBookForAction.format === 'physical' ? 'Physical Book' : 
+                       selectedBookForAction.format === 'both' ? 'Both Formats' : 'Ebook'}
                     </span>
                   </div>
                 </div>

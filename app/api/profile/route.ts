@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { query } from '@/utils/database';
+import { Pool } from 'pg';
+
+// Direct database connection for this endpoint
+const pool = new Pool({
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME || 'postgres',
+  password: process.env.DB_PASSWORD,
+  port: parseInt(process.env.DB_PORT || '5432'),
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 5,
+  connectionTimeoutMillis: 10000,
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch user profile data with fallback for missing columns
-    const profileResult = await query(`
+    const profileResult = await pool.query(`
       SELECT 
         u.id,
         u.email,
@@ -45,7 +57,7 @@ export async function GET(request: NextRequest) {
     let studentInfo = null;
     if (user.is_student) {
       try {
-        const studentResult = await query(`
+        const studentResult = await pool.query(`
           SELECT school_name, matriculation_number, department, course
           FROM student_info 
           WHERE user_id = $1
@@ -65,7 +77,7 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // Try to fetch reading statistics
+    // Default reading statistics
     let readingStats = {
       totalBooksRead: 0,
       totalPagesRead: 0,
@@ -77,7 +89,7 @@ export async function GET(request: NextRequest) {
     
     try {
       // Check if reading_progress table exists and get stats
-      const statsResult = await query(`
+      const statsResult = await pool.query(`
         SELECT 
           COUNT(DISTINCT rp.book_id) as total_books_read,
           COALESCE(SUM(rp.pages_read), 0) as total_pages_read,
@@ -93,34 +105,6 @@ export async function GET(request: NextRequest) {
         readingStats.totalPagesRead = parseInt(stats.total_pages_read) || 0;
         readingStats.totalHoursRead = parseFloat(stats.total_hours_read) || 0;
         readingStats.averageRating = parseFloat(stats.average_rating) || 0;
-      }
-      
-      // Try to get reading streak
-      const streakResult = await query(`
-        SELECT COUNT(DISTINCT DATE(rp.read_date)) as current_streak
-        FROM reading_progress rp
-        WHERE rp.user_id = $1 AND rp.read_date >= CURRENT_DATE - INTERVAL '30 days'
-      `, [userId]);
-      
-      if (streakResult.rows.length > 0) {
-        readingStats.currentStreak = parseInt(streakResult.rows[0].current_streak) || 0;
-      }
-      
-      // Try to get favorite genres
-      const genresResult = await query(`
-        SELECT g.name as genre, COUNT(*) as count
-        FROM reading_progress rp
-        JOIN books b ON rp.book_id = b.id
-        JOIN book_genres bg ON b.id = bg.book_id
-        JOIN genres g ON bg.genre_id = g.id
-        WHERE rp.user_id = $1 AND rp.completed = true
-        GROUP BY g.name
-        ORDER BY count DESC
-        LIMIT 5
-      `, [userId]);
-      
-      if (genresResult.rows.length > 0) {
-        readingStats.favoriteGenres = genresResult.rows.map(row => row.genre);
       }
     } catch (error) {
       console.log('Reading statistics tables not found, using defaults');
@@ -145,11 +129,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, profile });
   } catch (error) {
     console.error('Error fetching profile:', error);
-    
-    // Check if it's a database connection error
-    if (error instanceof Error && error.message.includes('connect')) {
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 503 });
-    }
     
     return NextResponse.json({ 
       error: 'Internal server error',
@@ -177,7 +156,7 @@ export async function PUT(request: NextRequest) {
     } = body;
 
     // Update basic user information
-    await query(`
+    await pool.query(`
       UPDATE users 
       SET 
         first_name = $1,
@@ -193,13 +172,13 @@ export async function PUT(request: NextRequest) {
     if (isStudent && studentInfo) {
       try {
         // Check if student info already exists
-        const existingStudentInfo = await query(`
+        const existingStudentInfo = await pool.query(`
           SELECT id FROM student_info WHERE user_id = $1
         `, [session.user.id]);
 
         if (existingStudentInfo.rows.length > 0) {
           // Update existing student info
-          await query(`
+          await pool.query(`
             UPDATE student_info 
             SET 
               school_name = $1,
@@ -217,7 +196,7 @@ export async function PUT(request: NextRequest) {
           ]);
         } else {
           // Insert new student info
-          await query(`
+          await pool.query(`
             INSERT INTO student_info (
               user_id, school_name, matriculation_number, department, course
             ) VALUES ($1, $2, $3, $4, $5)
@@ -239,4 +218,4 @@ export async function PUT(request: NextRequest) {
     console.error('Error updating profile:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}

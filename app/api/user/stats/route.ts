@@ -57,19 +57,19 @@ export async function GET(request: NextRequest) {
       )
     `);
 
-    // Get user library and reading stats
+    // Get user library and reading stats with fallback for missing columns
     const statsResult = await query(`
       SELECT 
         COUNT(DISTINCT ul.book_id) as total_books,
         COUNT(DISTINCT CASE WHEN rp.progress_percentage >= 100 THEN ul.book_id END) as completed_books,
         COUNT(DISTINCT CASE WHEN rp.progress_percentage > 0 AND rp.progress_percentage < 100 THEN ul.book_id END) as currently_reading,
-        COALESCE(SUM(rp.total_reading_time_seconds), 0) as total_reading_time,
-        COALESCE(SUM(rp.pages_read), 0) as total_pages_read,
+        COALESCE(SUM(COALESCE(rp.total_reading_time_seconds, rp.time_spent, 0)), 0) as total_reading_time,
+        COALESCE(SUM(COALESCE(rp.pages_read, rp.current_page, 0)), 0) as total_pages_read,
         COALESCE(AVG(br.rating), 0) as average_rating
       FROM user_library ul
       LEFT JOIN reading_progress rp ON ul.book_id = rp.book_id AND ul.user_id = rp.user_id
       LEFT JOIN book_reviews br ON ul.book_id = br.book_id AND ul.user_id = br.user_id AND br.status = 'approved'
-      WHERE ul.user_id = $1
+      WHERE ul.user_id = $1 AND (ul.status IS NULL OR ul.status = 'active')
     `, [userId]);
 
     const stats = statsResult.rows[0] || {};
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching user stats:', error);
     return NextResponse.json({ 
-      success: true,
+      success: false,
       error: 'Failed to fetch user stats',
       stats: {
         booksRead: 0,
@@ -119,6 +119,6 @@ export async function GET(request: NextRequest) {
         readingSessions: 0,
         totalReadingTime: 0
       }
-    }, { status: 200 });
+    }, { status: 500 });
   }
 }

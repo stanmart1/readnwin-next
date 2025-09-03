@@ -35,7 +35,7 @@ export default function WorkModal({ isOpen, onClose, work }: WorkModalProps) {
               className="w-full h-64 lg:h-full object-cover object-center"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.src = 'https://via.placeholder.com/600x400?text=Work+Image';
+                target.src = '/images/placeholder.svg';
               }}
             />
           </div>

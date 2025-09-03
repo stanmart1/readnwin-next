@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import SafeImage from '@/components/ui/SafeImage';
+import { decodeHtmlEntities } from '@/utils/htmlUtils';
 
 interface CurrentlyReading {
   id: number;
@@ -92,7 +93,7 @@ export default function ReadingProgress() {
               />
               
               <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-gray-900 truncate">{book.title}</h3>
+                <h3 className="font-medium text-gray-900 truncate">{decodeHtmlEntities(book.title)}</h3>
                 <p className="text-sm text-gray-600">{book.author_name}</p>
                 
                 <div className="mt-2">

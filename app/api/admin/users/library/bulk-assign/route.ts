@@ -7,13 +7,16 @@ import { query } from '@/utils/database';
 import { sanitizeLogInput, validateInput } from '@/utils/security-safe';
 
 // Helper function for processing individual bulk assignments
-async function processBulkAssignment(userId: number, bookId: number, reason: string, adminId: string, books: any[]) {
+async function processBulkAssignment(userId: number, bookId: number, reason: string, adminId: string, books: any[], format?: string) {
   try {
-    // Check if book already exists in user's library
+    const book = books.find(b => b.id === bookId);
+    const assignedFormat = format || book?.format || 'ebook';
+    
+    // Check if book already exists in user's library with this format
     const existingBook = await query(`
       SELECT id FROM user_library 
-      WHERE user_id = $1 AND book_id = $2
-    `, [userId, bookId]);
+      WHERE user_id = $1 AND book_id = $2 AND format = $3
+    `, [userId, bookId, assignedFormat]);
 
     if (existingBook.rows.length > 0) {
       return {
@@ -21,22 +24,24 @@ async function processBulkAssignment(userId: number, bookId: number, reason: str
         data: {
           userId,
           bookId,
-          reason: 'Book already in library'
+          format: assignedFormat,
+          reason: `${assignedFormat === 'physical' ? 'Physical book' : 'Ebook'} already in library`
         }
       };
     }
 
-    // Add book to user's library
-    const success = await ecommerceService.addToLibrary(userId, bookId);
+    // Add book to user's library with specific format
+    const success = await ecommerceService.addToLibrary(userId, bookId, undefined, assignedFormat);
 
     if (success) {
       // Log the admin action with sanitized data
-      const bookTitle = books.find(b => b.id === bookId)?.title || 'Unknown';
+      const bookTitle = book?.title || 'Unknown';
       await query(`
         INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, admin_user_id)
         VALUES ($1, 'library_bulk_add', 'user_library', $2, $3, $4)
       `, [userId, bookId, JSON.stringify({ 
         bookTitle: sanitizeLogInput(bookTitle),
+        format: assignedFormat,
         reason: reason,
         assignedBy: adminId,
         bulkOperation: true
@@ -47,7 +52,8 @@ async function processBulkAssignment(userId: number, bookId: number, reason: str
         data: {
           userId,
           bookId,
-          message: 'Book added successfully'
+          format: assignedFormat,
+          message: `${assignedFormat === 'physical' ? 'Physical book' : 'Ebook'} added successfully`
         }
       };
     } else {
@@ -56,6 +62,7 @@ async function processBulkAssignment(userId: number, bookId: number, reason: str
         data: {
           userId,
           bookId,
+          format: assignedFormat,
           error: 'Failed to add book'
         }
       };
@@ -78,7 +85,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const { userIds, bookIds, reason } = await request.json();
+    const { userIds, bookIds, reason, format } = await request.json();
 
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return NextResponse.json({ error: 'User IDs array is required' }, { status: 400 });
@@ -126,25 +133,34 @@ export async function POST(request: NextRequest) {
     
     for (const userId of userIds) {
       for (const bookId of bookIds) {
-        batchPromises.push(
-          processBulkAssignment(userId, bookId, sanitizedReason, session.user.id, bookResult.rows)
-            .then(result => {
-              if (result.type === 'success') {
-                results.success.push(result.data);
-              } else if (result.type === 'skipped') {
-                results.skipped.push(result.data);
-              } else {
-                results.failed.push(result.data);
-              }
-            })
-            .catch(error => {
-              results.failed.push({
-                userId,
-                bookId,
-                error: error.message || 'Database error'
-              });
-            })
-        );
+        const book = bookResult.rows.find(b => b.id === bookId);
+        
+        // If format is specified, use it; otherwise assign both formats for books that support both
+        const formatsToAssign = format ? [format] : 
+          (book?.format === 'both' ? ['ebook', 'physical'] : [book?.format || 'ebook']);
+        
+        for (const assignFormat of formatsToAssign) {
+          batchPromises.push(
+            processBulkAssignment(userId, bookId, sanitizedReason, session.user.id, bookResult.rows, assignFormat)
+              .then(result => {
+                if (result.type === 'success') {
+                  results.success.push(result.data);
+                } else if (result.type === 'skipped') {
+                  results.skipped.push(result.data);
+                } else {
+                  results.failed.push(result.data);
+                }
+              })
+              .catch(error => {
+                results.failed.push({
+                  userId,
+                  bookId,
+                  format: assignFormat,
+                  error: error.message || 'Database error'
+                });
+              })
+          );
+        }
       }
     }
     

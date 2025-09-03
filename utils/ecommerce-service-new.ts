@@ -653,18 +653,19 @@ export class EcommerceService {
         SELECT 
           ul.id, ul.user_id, ul.book_id, 
           ul.order_id,
-          COALESCE(ul.purchase_date, ul.added_at, ul.created_at, CURRENT_TIMESTAMP) as purchase_date,
+          COALESCE(ul.purchase_date, ul.acquired_at) as purchase_date,
           COALESCE(ul.download_count, 0) as download_count,
           ul.last_downloaded_at,
           COALESCE(ul.is_favorite, false) as is_favorite,
+          COALESCE(ul.access_type, 'purchased') as access_type,
           b.title, b.cover_image_url, b.format, b.ebook_file_url,
           a.name as author_name, c.name as category_name
         FROM user_library ul
         LEFT JOIN books b ON ul.book_id = b.id
         LEFT JOIN authors a ON b.author_id = a.id
         LEFT JOIN categories c ON b.category_id = c.id
-        WHERE ul.user_id = $1 AND COALESCE(ul.status, 'active') = 'active'
-        ORDER BY COALESCE(ul.purchase_date, ul.added_at, ul.created_at) DESC
+        WHERE ul.user_id = $1
+        ORDER BY COALESCE(ul.purchase_date, ul.acquired_at) DESC
       `, [userId]);
 
       return result.rows.map(row => ({
@@ -676,6 +677,7 @@ export class EcommerceService {
         download_count: row.download_count || 0,
         last_downloaded_at: row.last_downloaded_at,
         is_favorite: row.is_favorite || false,
+        access_type: row.access_type || 'purchased',
         book: {
           id: row.book_id,
           title: row.title || '[DEFAULT] Unknown Title',

@@ -37,10 +37,11 @@ export default function BulkLibraryManagement({ preSelectedBook, preSelectedUser
   const [reason, setReason] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [filterEbooksOnly, setFilterEbooksOnly] = useState(true);
+  const [filterEbooksOnly, setFilterEbooksOnly] = useState(false);
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [bookSearchTerm, setBookSearchTerm] = useState('');
   const [results, setResults] = useState<any>(null);
+  const [assignmentFormat, setAssignmentFormat] = useState<'both' | 'ebook' | 'physical'>('both');
 
   useEffect(() => {
     fetchUsers();
@@ -94,7 +95,8 @@ export default function BulkLibraryManagement({ preSelectedBook, preSelectedUser
         body: JSON.stringify({
           userIds: selectedUsers,
           bookIds: selectedBooks,
-          reason: reason || 'Bulk admin assignment'
+          reason: reason || 'Bulk admin assignment',
+          format: assignmentFormat === 'both' ? undefined : assignmentFormat
         }),
       });
 
@@ -342,7 +344,7 @@ export default function BulkLibraryManagement({ preSelectedBook, preSelectedUser
                     onChange={(e) => setFilterEbooksOnly(e.target.checked)}
                     className="mr-2"
                   />
-                  <span className="text-sm">Filter by format (uncheck to show all)</span>
+                  <span className="text-sm">Show only ebooks (uncheck to show all formats)</span>
                 </div>
                 <input
                   type="text"
@@ -400,9 +402,11 @@ export default function BulkLibraryManagement({ preSelectedBook, preSelectedUser
                     <h5 className="font-medium text-gray-900">{preSelectedBook.title}</h5>
                     <p className="text-sm text-gray-500">{preSelectedBook.author_name}</p>
                   </div>
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    <i className="ri-file-text-line mr-1"></i>
-                    Ebook
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    preSelectedBook.format === 'physical' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    <i className={`${preSelectedBook.format === 'physical' ? 'ri-book-line' : 'ri-file-text-line'} mr-1`}></i>
+                    {preSelectedBook.format === 'physical' ? 'Physical Book' : 'Ebook'}
                   </span>
                 </div>
               </div>
@@ -444,6 +448,44 @@ export default function BulkLibraryManagement({ preSelectedBook, preSelectedUser
             </div>
             
             <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Assignment Format</label>
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setAssignmentFormat('both')}
+                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                      assignmentFormat === 'both'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Both Formats
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAssignmentFormat('ebook')}
+                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                      assignmentFormat === 'ebook'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Ebook Only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAssignmentFormat('physical')}
+                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                      assignmentFormat === 'physical'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Physical Only
+                  </button>
+                </div>
+              </div>
               <textarea
                 placeholder="Reason for assignment (optional)"
                 value={reason}
@@ -466,7 +508,7 @@ export default function BulkLibraryManagement({ preSelectedBook, preSelectedUser
                     Assigning...
                   </>
                 ) : (
-                  `Assign ${selectedBooks.length} Book${selectedBooks.length > 1 ? 's' : ''} to ${selectedUsers.length} User${selectedUsers.length > 1 ? 's' : ''}`
+                  `Assign ${selectedBooks.length} Book${selectedBooks.length > 1 ? 's' : ''} (${assignmentFormat === 'both' ? 'Both Formats' : assignmentFormat === 'ebook' ? 'Ebook' : 'Physical'}) to ${selectedUsers.length} User${selectedUsers.length > 1 ? 's' : ''}`
                 )}
               </button>
             </div>

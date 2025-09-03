@@ -21,29 +21,46 @@ export default function ReadingPage() {
 
   const bookId = params.bookId as string;
 
-  // Check if book is readable (ebook)
+  // Check if book is readable (ebook) and user has access
   useEffect(() => {
     const checkBookAccess = async () => {
       if (!bookId || status !== 'authenticated') return;
       
       try {
         setBookLoading(true);
-        const response = await fetch(`/api/books/${bookId}`);
         
+        // First check if user has access to this book in their library
+        const libraryResponse = await fetch('/api/dashboard/library');
+        if (!libraryResponse.ok) {
+          setError('Unable to verify book access.');
+          return;
+        }
+        
+        const libraryData = await libraryResponse.json();
+        const userBooks = libraryData.books || [];
+        const userBook = userBooks.find((book: any) => book.id.toString() === bookId);
+        
+        if (!userBook) {
+          setError('You do not have access to this book. Please check your library or contact support.');
+          return;
+        }
+        
+        // Check if it's a physical-only book
+        if (userBook.format === 'physical') {
+          setError('Physical books cannot be read digitally. You can leave a review for this book instead.');
+          return;
+        }
+        
+        // Get full book details
+        const response = await fetch(`/api/books/${bookId}`);
         if (response.ok) {
           const data = await response.json();
-          const book = data.book;
-          
-          // Check if it's a physical book
-          if (book.format === 'physical') {
-            setError('Physical books cannot be read digitally. You can leave a review for this book instead.');
-            return;
-          }
-          
-          setBookInfo(book);
+          setBookInfo(data.book);
         } else {
-          setError('Book not found or access denied.');
+          // Fallback to library book info if book API fails
+          setBookInfo(userBook);
         }
+        
       } catch (error) {
         console.error('Error checking book access:', error);
         setError('Failed to load book information.');
@@ -84,6 +101,19 @@ export default function ReadingPage() {
           <p className="text-gray-600 mb-6">
             {error || 'The requested book could not be found.'}
           </p>
+          {error && error.includes('do not have access') && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start">
+                <i className="ri-information-line text-blue-600 text-lg mr-3 mt-0.5"></i>
+                <div>
+                  <h4 className="font-medium text-blue-900 mb-1">Need Access?</h4>
+                  <p className="text-blue-700 text-sm">
+                    This book may be available for purchase or assignment. Check the book details or contact an administrator.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="space-y-3">
             {error && error.includes('Physical books') && (
               <button

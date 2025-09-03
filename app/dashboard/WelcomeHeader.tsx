@@ -24,10 +24,10 @@ export default function WelcomeHeader() {
     const firstName = session?.user?.firstName || '';
     const lastName = session?.user?.lastName || '';
     
-    const firstInitial = firstName.charAt(0).toUpperCase();
-    const lastInitial = lastName.charAt(0).toUpperCase();
+    const firstInitial = firstName.length > 0 ? firstName.charAt(0).toUpperCase() : '';
+    const lastInitial = lastName.length > 0 ? lastName.charAt(0).toUpperCase() : '';
     
-    return firstInitial + lastInitial;
+    return firstInitial + lastInitial || 'U';
   };
 
   if (loading) {
@@ -105,16 +105,16 @@ export default function WelcomeHeader() {
               <div className="text-xs text-blue-100">Completed</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-bold">{stats?.totalBooks || 0}</div>
-              <div className="text-xs text-blue-100">Library</div>
-            </div>
-            <div className="text-center">
               <div className="text-lg font-bold">{stats?.readingSessions || 0}</div>
               <div className="text-xs text-blue-100">Sessions</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-bold">{Math.round((stats?.averageRating || 0) * 10)}%</div>
+              <div className="text-lg font-bold">{Math.round((stats?.averageRating || 0) * 20)}%</div>
               <div className="text-xs text-blue-100">Avg Rating</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold">{Math.round((stats?.totalHours || 0))}h</div>
+              <div className="text-xs text-blue-100">Time Read</div>
             </div>
           </div>
         </div>

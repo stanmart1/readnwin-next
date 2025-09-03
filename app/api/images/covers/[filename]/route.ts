@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
-import { sanitizePath, validateFilePath, safeLog } from '@/utils/security';
+import { query } from '@/utils/database';
 
 export async function GET(
   request: NextRequest,
@@ -10,99 +8,27 @@ export async function GET(
   try {
     const { filename } = params;
     
-    // Handle placeholder request
-    if (filename === 'placeholder') {
-      const placeholderPath = join(process.cwd(), 'public', 'placeholder-book.jpg');
-      if (existsSync(placeholderPath)) {
-        const placeholderBuffer = readFileSync(placeholderPath);
-        return new NextResponse(new Uint8Array(placeholderBuffer), {
-          headers: {
-            'Content-Type': 'image/jpeg',
-            'Cache-Control': 'public, max-age=86400'
-          }
-        });
-      }
-    }
+    const result = await query(`
+      SELECT image_data, mime_type FROM images 
+      WHERE filename = $1 AND category = 'cover' AND is_active = true
+    `, [filename]);
     
-    // Sanitize filename to prevent path traversal
-    const sanitizedFilename = sanitizePath(filename);
-    
-    // Try multiple possible paths for cover images (check main covers directory first)
-    const possiblePaths = [
-      // Main covers directory (where files actually are)
-      process.env.NODE_ENV === 'production'
-        ? join('/app/storage/covers', sanitizedFilename)
-        : join(process.cwd(), 'storage', 'covers', sanitizedFilename),
-      // Original subdirectory
-      process.env.NODE_ENV === 'production'
-        ? join('/app/storage/covers/original', sanitizedFilename)
-        : join(process.cwd(), 'storage', 'covers', 'original', sanitizedFilename),
-      // Legacy paths
-      join(process.cwd(), 'public', 'uploads', 'covers', sanitizedFilename),
-      join(process.cwd(), 'uploads', 'covers', sanitizedFilename)
-    ];
-    
-    let coverPath = null;
-    for (const path of possiblePaths) {
-      try {
-        // Validate path is safe before checking existence
-        const basePath = process.env.NODE_ENV === 'production' ? '/app/storage' : join(process.cwd(), 'storage');
-        validateFilePath(sanitizedFilename, basePath);
-        
-        if (existsSync(path)) {
-          coverPath = path;
-          break;
-        }
-      } catch (pathError) {
-        safeLog.warn('Invalid path detected:', path);
-        continue;
-      }
-    }
-    
-    if (!coverPath) {
-      // Return placeholder image
-      const placeholderPath = join(process.cwd(), 'public', 'placeholder-book.jpg');
-      if (existsSync(placeholderPath)) {
-        const placeholderBuffer = readFileSync(placeholderPath);
-        return new NextResponse(new Uint8Array(placeholderBuffer), {
-          headers: {
-            'Content-Type': 'image/jpeg',
-            'Cache-Control': 'public, max-age=86400'
-          }
-        });
-      }
+    if (result.rows.length === 0) {
       return new NextResponse('Image not found', { status: 404 });
     }
     
-    const imageBuffer = readFileSync(coverPath);
-    const contentType = getContentType(sanitizedFilename);
+    const image = result.rows[0];
     
-    return new NextResponse(new Uint8Array(imageBuffer), {
+    return new NextResponse(image.image_data, {
       headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400'
+        'Content-Type': image.mime_type,
+        'Cache-Control': 'public, max-age=3600'
       }
     });
     
   } catch (error) {
-    safeLog.error('Error serving cover image:', error);
+    console.error('Error serving cover image:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 
-function getContentType(filename: string): string {
-  const ext = filename.toLowerCase().split('.').pop();
-  switch (ext) {
-    case 'jpg':
-    case 'jpeg':
-      return 'image/jpeg';
-    case 'png':
-      return 'image/png';
-    case 'webp':
-      return 'image/webp';
-    case 'gif':
-      return 'image/gif';
-    default:
-      return 'image/jpeg';
-  }
-}

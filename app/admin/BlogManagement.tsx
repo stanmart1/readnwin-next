@@ -963,7 +963,7 @@ function ImageModal({
                             className="w-full h-32 object-cover rounded-lg border border-gray-200 shadow-sm"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
-                              target.src = 'https://via.placeholder.com/200x150?text=Image+Not+Found';
+                              target.src = '/images/placeholder.svg';
                             }}
                           />
                           <button

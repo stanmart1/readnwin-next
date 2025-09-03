@@ -89,7 +89,11 @@ export default function BookCard({
   const { addItem: addToSecureCart, refreshCart } = useSecureCart();
 
   const getImageSrc = () => {
-    return displayCover || '/api/images/covers/placeholder';
+    if (!displayCover) return '/api/images/covers/placeholder';
+    
+    // Extract filename and use relative API path to avoid ad blocker issues
+    const filename = displayCover.split('/').pop() || 'placeholder';
+    return `/api/images/covers/${filename}`;
   };
 
   const handleWishlist = () => {

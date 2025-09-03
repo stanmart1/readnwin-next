@@ -4,6 +4,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import SafeImage from '@/components/ui/SafeImage';
+import Modal from '@/components/ui/Modal';
+import ReviewForm from '@/components/ReviewForm';
+import { decodeHtmlEntities } from '@/utils/htmlUtils';
+import { toast } from 'react-hot-toast';
 
 interface LibraryBook {
   id: number;
@@ -23,6 +27,8 @@ export default function LibrarySection() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'reading' | 'completed'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedBookForReview, setSelectedBookForReview] = useState<LibraryBook | null>(null);
 
   useEffect(() => {
     const fetchLibrary = async () => {
@@ -106,6 +112,16 @@ export default function LibrarySection() {
     };
   }, [books, filter]);
 
+  const openReviewModal = (book: LibraryBook) => {
+    setSelectedBookForReview(book);
+    setReviewModalOpen(true);
+  };
+
+  const closeReviewModal = () => {
+    setReviewModalOpen(false);
+    setSelectedBookForReview(null);
+  };
+
   if (loading || status === 'loading') {
     return (
       <div className="space-y-6">
@@ -140,113 +156,122 @@ export default function LibrarySection() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Library</h1>
-          <p className="text-gray-600 mt-1">
-            {books.length === 0 ? 'No books yet' : `${books.length} book${books.length !== 1 ? 's' : ''} in your collection`}
-          </p>
-        </div>
-        
-        {books.length > 0 && (
-          <div className="flex items-center gap-2">
-            {/* View Mode Toggle */}
-            <div className="hidden sm:flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-md transition-all ${
-                  viewMode === 'grid' 
-                    ? 'bg-white text-blue-600 shadow-sm' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-                title="Grid view"
-              >
-                <i className="ri-grid-line text-lg"></i>
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-md transition-all ${
-                  viewMode === 'list' 
-                    ? 'bg-white text-blue-600 shadow-sm' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-                title="List view"
-              >
-                <i className="ri-list-check text-lg"></i>
-              </button>
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 sm:p-8 border border-blue-100">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center space-x-3 mb-2">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+                <i className="ri-book-line text-white text-lg"></i>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Library</h1>
             </div>
+            <p className="text-gray-600 ml-13">
+              {books.length === 0 ? 'Start building your digital collection' : `${books.length} book${books.length !== 1 ? 's' : ''} in your collection`}
+            </p>
           </div>
-        )}
+          
+          {books.length > 0 && (
+            <div className="flex items-center gap-3">
+              {/* View Mode Toggle */}
+              <div className="flex bg-white rounded-xl p-1 shadow-sm border border-gray-200">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 sm:p-3 rounded-lg transition-all duration-200 ${
+                    viewMode === 'grid' 
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md transform scale-105' 
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  title="Grid view"
+                >
+                  <i className="ri-grid-line text-lg"></i>
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 sm:p-3 rounded-lg transition-all duration-200 ${
+                    viewMode === 'list' 
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md transform scale-105' 
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  title="List view"
+                >
+                  <i className="ri-list-check text-lg"></i>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filter Tabs */}
       {books.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {[
-            { key: 'all' as const, label: 'All Books', icon: 'ri-book-line', count: counts.all },
-            { key: 'reading' as const, label: 'Reading', icon: 'ri-play-line', count: counts.reading },
-            { key: 'completed' as const, label: 'Completed', icon: 'ri-check-line', count: counts.completed }
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setFilter(tab.key)}
-              className={`inline-flex items-center px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all ${
-                filter === tab.key
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                  : 'bg-white text-gray-600 hover:text-blue-600 hover:bg-blue-50 border border-gray-200 hover:border-blue-200'
-              }`}
-            >
-              <i className={`${tab.icon} mr-1.5 sm:mr-2 text-sm sm:text-base`}></i>
-              <span className="hidden sm:inline">{tab.label}</span>
-              <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
-              {tab.count > 0 && (
-                <span className={`ml-1.5 sm:ml-2 px-1.5 py-0.5 rounded-full text-xs font-semibold ${
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
+            {[
+              { key: 'all' as const, label: 'All Books', icon: 'ri-book-line', count: counts.all },
+              { key: 'reading' as const, label: 'Reading', icon: 'ri-play-line', count: counts.reading },
+              { key: 'completed' as const, label: 'Completed', icon: 'ri-check-line', count: counts.completed }
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setFilter(tab.key)}
+                className={`inline-flex items-center px-4 sm:px-6 py-3 sm:py-3.5 rounded-xl text-sm font-semibold transition-all duration-200 transform hover:scale-105 ${
                   filter === tab.key
-                    ? 'bg-white/20 text-white'
-                    : 'bg-gray-100 text-gray-600'
-                }`}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-600/25'
+                    : 'bg-gray-50 text-gray-600 hover:text-blue-600 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 hover:shadow-md'
+                }`}
+              >
+                <i className={`${tab.icon} mr-2 text-base`}></i>
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
+                {tab.count > 0 && (
+                  <span className={`ml-2 px-2 py-1 rounded-full text-xs font-bold ${
+                    filter === tab.key
+                      ? 'bg-white/20 text-white'
+                      : 'bg-blue-100 text-blue-600'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Content */}
       {filteredBooks.length === 0 ? (
-        <div className="text-center py-12 sm:py-16">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
-            <i className="ri-book-line text-2xl sm:text-3xl text-blue-600"></i>
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 text-center py-16 sm:py-20">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 mx-auto mb-6 sm:mb-8 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center shadow-lg">
+            <i className="ri-book-line text-3xl sm:text-4xl text-blue-600"></i>
           </div>
-          <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
-            {books.length === 0 ? 'No books in your library yet' : `No ${filter} books`}
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">
+            {books.length === 0 ? 'Your Library Awaits' : `No ${filter} Books Found`}
           </h3>
-          <p className="text-gray-600 mb-6 max-w-sm mx-auto">
+          <p className="text-gray-600 mb-8 max-w-md mx-auto text-base sm:text-lg">
             {books.length === 0 
-              ? 'Start building your digital library today' 
-              : `You don&apos;t have any ${filter} books at the moment`}
+              ? 'Discover amazing books and start your reading journey today' 
+              : `You don't have any ${filter} books at the moment`}
           </p>
           {books.length === 0 && (
             <Link 
               href="/books"
-              className="inline-flex items-center px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm sm:text-base font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all"
+              className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-base sm:text-lg font-semibold rounded-2xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
             >
-              <i className="ri-search-line mr-2"></i>
-              Browse Books
+              <i className="ri-search-line mr-2 text-lg"></i>
+              Explore Books
             </Link>
           )}
         </div>
       ) : (
         <div className={viewMode === 'grid' 
-          ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4" 
+          ? "flex flex-wrap gap-4 sm:gap-6" 
           : "space-y-3"
         }>
           {filteredBooks.map(book => (
             viewMode === 'grid' ? (
-              <div key={book.id} className="group bg-white rounded-xl sm:rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-100 hover:border-blue-200">
+              <div key={book.id} className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-blue-200 transform hover:-translate-y-2 w-full sm:w-72 md:w-80 flex-shrink-0">
                 <div className="aspect-[3/4] relative overflow-hidden">
                   <SafeImage
                     src={book.cover_image_url}
@@ -254,21 +279,21 @@ export default function LibrarySection() {
                     bookTitle={book.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   
                   {/* Book Type Badge */}
-                  <div className="absolute top-2 right-2">
-                    <span className={`px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-xs font-medium backdrop-blur-sm ${
+                  <div className="absolute top-3 right-3">
+                    <span className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm shadow-lg ${
                       book.format === 'ebook' 
-                        ? 'bg-blue-600/90 text-white' 
-                        : 'bg-amber-600/90 text-white'
+                        ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white' 
+                        : 'bg-gradient-to-r from-amber-600 to-orange-600 text-white'
                     }`}>
                       {book.format === 'ebook' ? 'Digital' : 'Physical'}
                     </span>
                   </div>
 
                   {/* Progress Overlay */}
-                  {book.progress_percentage > 0 && (
+                  {book.progress_percentage > 0 && (book.format === 'ebook' || book.format === 'hybrid') && (
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 sm:p-3">
                       <div className="flex items-center space-x-2">
                         <div className="flex-1 bg-white/20 rounded-full h-1 sm:h-1.5">
@@ -285,52 +310,65 @@ export default function LibrarySection() {
                 
                 <div className="p-3 sm:p-4">
                   <h3 className="font-semibold text-gray-900 text-xs sm:text-sm mb-1 line-clamp-2 group-hover:text-blue-700 transition-colors leading-tight">
-                    {book.title}
+                    {decodeHtmlEntities(book.title)}
                   </h3>
                   <p className="text-gray-600 text-xs mb-2 sm:mb-3 truncate">{book.author_name}</p>
                   
                   {/* Reading Stats */}
                   <div className="flex items-center justify-between text-xs text-gray-500 mb-3 sm:mb-4">
-                    <span>{Math.round(book.progress_percentage)}%</span>
+                    {(book.format === 'ebook' || book.format === 'hybrid') && (
+                      <span>{Math.round(book.progress_percentage)}%</span>
+                    )}
                     {book.total_reading_time_seconds > 0 && (
                       <span className="hidden sm:inline">{Math.round(book.total_reading_time_seconds / 3600)}h</span>
                     )}
                   </div>
 
-                  {/* Action Button */}
-                  {book.format === 'ebook' ? (
-                    <Link
-                      href={`/reading/${book.id}`}
-                      className="w-full inline-flex items-center justify-center px-2 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all"
+                  {/* Action Buttons */}
+                  <div className="space-y-2">
+                    {book.format === 'ebook' || book.format === 'hybrid' ? (
+                      <Link
+                        href={`/reading/${book.id}`}
+                        className="w-full inline-flex items-center justify-center px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                      >
+                        <i className={`${book.progress_percentage > 0 ? 'ri-play-line' : 'ri-book-open-line'} mr-2 text-base`}></i>
+                        <span className="hidden sm:inline">
+                          {book.progress_percentage > 0 ? 'Continue Reading' : 'Start Reading'}
+                        </span>
+                        <span className="sm:hidden">
+                          {book.progress_percentage > 0 ? 'Continue' : 'Read'}
+                        </span>
+                      </Link>
+                    ) : (
+                      <div className="w-full inline-flex items-center justify-center px-4 py-3 bg-gradient-to-r from-gray-400 to-gray-500 text-white text-sm font-semibold rounded-xl shadow-lg">
+                        <i className="ri-book-line mr-2 text-base"></i>
+                        <span className="hidden sm:inline">Physical Book</span>
+                        <span className="sm:hidden">Physical</span>
+                      </div>
+                    )}
+                    
+                    <button
+                      onClick={() => openReviewModal(book)}
+                      className="w-full inline-flex items-center justify-center px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-sm font-semibold rounded-xl hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                     >
-                      <i className={`${book.progress_percentage > 0 ? 'ri-play-line' : 'ri-book-open-line'} mr-1 sm:mr-2 text-sm`}></i>
-                      <span className="hidden sm:inline">
-                        {book.progress_percentage > 0 ? 'Continue Reading' : 'Start Reading'}
-                      </span>
-                      <span className="sm:hidden">
-                        {book.progress_percentage > 0 ? 'Continue' : 'Read'}
-                      </span>
-                    </Link>
-                  ) : (
-                    <div className="w-full inline-flex items-center justify-center px-2 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-gray-400 to-gray-500 text-white text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl shadow-sm transition-all">
-                      <i className="ri-book-line mr-1 sm:mr-2 text-sm"></i>
-                      <span className="hidden sm:inline">Physical Book</span>
-                      <span className="sm:hidden">Physical</span>
-                    </div>
-                  )}
+                      <i className="ri-star-line mr-2 text-base"></i>
+                      <span className="hidden sm:inline">Add Review</span>
+                      <span className="sm:hidden">Review</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
-              <div key={book.id} className="group bg-white rounded-xl border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all duration-300 p-4">
-                <div className="flex items-center space-x-4">
-                  <div className="flex-shrink-0 w-16 h-20 sm:w-20 sm:h-24 relative overflow-hidden rounded-lg">
+              <div key={book.id} className="group bg-white rounded-2xl border border-gray-100 hover:border-blue-200 hover:shadow-lg transition-all duration-300 p-6 transform hover:-translate-y-1">
+                <div className="flex items-center space-x-6">
+                  <div className="flex-shrink-0 w-20 h-24 sm:w-24 sm:h-28 relative overflow-hidden rounded-xl shadow-md">
                     <SafeImage
                       src={book.cover_image_url}
                       alt={book.title}
                       bookTitle={book.title}
                       className="w-full h-full object-cover"
                     />
-                    {book.progress_percentage > 0 && (
+                    {book.progress_percentage > 0 && (book.format === 'ebook' || book.format === 'hybrid') && (
                       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1">
                         <div className="bg-white/20 rounded-full h-1">
                           <div 
@@ -346,12 +384,14 @@ export default function LibrarySection() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 text-sm sm:text-base mb-1 line-clamp-2 group-hover:text-blue-700 transition-colors">
-                          {book.title}
+                          {decodeHtmlEntities(book.title)}
                         </h3>
                         <p className="text-gray-600 text-xs sm:text-sm mb-2">{book.author_name}</p>
                         
                         <div className="flex items-center space-x-4 text-xs sm:text-sm text-gray-500">
-                          <span>{Math.round(book.progress_percentage)}% complete</span>
+                          {(book.format === 'ebook' || book.format === 'hybrid') && (
+                            <span>{Math.round(book.progress_percentage)}% complete</span>
+                          )}
                           {book.total_reading_time_seconds > 0 && (
                             <span>{Math.round(book.total_reading_time_seconds / 3600)}h read</span>
                           )}
@@ -365,13 +405,13 @@ export default function LibrarySection() {
                         </div>
                       </div>
                       
-                      <div className="flex-shrink-0 ml-4">
-                        {book.format === 'ebook' ? (
+                      <div className="flex-shrink-0 ml-4 flex flex-col space-y-3">
+                        {book.format === 'ebook' || book.format === 'hybrid' ? (
                           <Link
                             href={`/reading/${book.id}`}
-                            className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs sm:text-sm font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all"
+                            className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                           >
-                            <i className={`${book.progress_percentage > 0 ? 'ri-play-line' : 'ri-book-open-line'} mr-1 sm:mr-2`}></i>
+                            <i className={`${book.progress_percentage > 0 ? 'ri-play-line' : 'ri-book-open-line'} mr-2`}></i>
                             <span className="hidden sm:inline">
                               {book.progress_percentage > 0 ? 'Continue' : 'Read'}
                             </span>
@@ -380,14 +420,25 @@ export default function LibrarySection() {
                             </span>
                           </Link>
                         ) : (
-                          <div className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-gray-400 to-gray-500 text-white text-xs sm:text-sm font-medium rounded-lg shadow-sm transition-all">
-                            <i className="ri-book-line mr-1 sm:mr-2"></i>
+                          <div className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-gray-400 to-gray-500 text-white text-sm font-semibold rounded-xl shadow-lg">
+                            <i className="ri-book-line mr-2"></i>
                             <span className="hidden sm:inline">Physical</span>
                             <span className="sm:hidden">
                               <i className="ri-book-line"></i>
                             </span>
                           </div>
                         )}
+                        
+                        <button
+                          onClick={() => openReviewModal(book)}
+                          className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-sm font-semibold rounded-xl hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                        >
+                          <i className="ri-star-line mr-2"></i>
+                          <span className="hidden sm:inline">Review</span>
+                          <span className="sm:hidden">
+                            <i className="ri-star-line"></i>
+                          </span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -397,6 +448,52 @@ export default function LibrarySection() {
           ))}
         </div>
       )}
+      
+      {/* Review Modal */}
+      <Modal
+        isOpen={reviewModalOpen}
+        onClose={closeReviewModal}
+        className="max-w-lg w-full mx-4 max-h-[95vh] overflow-hidden"
+        showCloseIcon={false}
+      >
+        {selectedBookForReview && (
+          <div className="flex flex-col h-full">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
+                  <i className="ri-star-line text-white text-lg"></i>
+                </div>
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+                    Write a Review
+                  </h2>
+                  <p className="text-sm text-gray-600 truncate max-w-[200px] sm:max-w-none">
+                    {decodeHtmlEntities(selectedBookForReview.title)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closeReviewModal}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-white/80 hover:bg-white text-gray-500 hover:text-gray-700 transition-all duration-200 shadow-sm"
+              >
+                <i className="ri-close-line text-lg"></i>
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              <ReviewForm
+                bookId={selectedBookForReview.id}
+                onReviewSubmitted={() => {
+                  toast.success('Review submitted successfully! It will be reviewed by our team.');
+                  closeReviewModal();
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

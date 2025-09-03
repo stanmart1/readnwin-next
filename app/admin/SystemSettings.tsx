@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import EmailGatewayManagement from './EmailGatewayManagement';
 import PaymentGatewayManagement from './PaymentGatewayManagement';
+import ImageCacheManager from './ImageCacheManager';
 
 export default function SystemSettings() {
   const [activeTab, setActiveTab] = useState('general');
@@ -206,6 +207,11 @@ export default function SystemSettings() {
             </label>
           ))}
         </div>
+      </div>
+      
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <h4 className="font-medium text-blue-800 mb-4">Image Cache Management</h4>
+        <ImageCacheManager />
       </div>
       
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">

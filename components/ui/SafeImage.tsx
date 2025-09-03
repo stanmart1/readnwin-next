@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { fetchBookCover } from '@/utils/bookCoverFetcher';
+import { decodeHtmlEntities } from '@/utils/htmlUtils';
 
 interface SafeImageProps {
   src?: string | null;
@@ -51,38 +52,35 @@ export default function SafeImage({
 
   useEffect(() => {
     const newSrc = getImageSrc(src);
-    if (src && newSrc !== imgSrc) {
+    if (src && newSrc !== imgSrc && newSrc !== fallbackSrc) {
       setImgSrc(newSrc);
       setHasError(false);
       setRetryCount(0);
     }
-  }, [src, imgSrc]);
+  }, [src, imgSrc, fallbackSrc]);
 
   const handleError = async () => {
-    if (hasError || retryCount >= 3) {
-      if (imgSrc !== fallbackSrc) {
-        setImgSrc(fallbackSrc);
-      }
+    // Prevent infinite loops by checking if we're already using fallback
+    if (imgSrc === fallbackSrc || retryCount >= 2) {
+      setHasError(true);
       onError?.();
       return;
     }
 
-    setHasError(true);
-    setRetryCount(prev => prev + 1);
+    const newRetryCount = retryCount + 1;
+    setRetryCount(newRetryCount);
     
-    if (retryCount === 0 && src) {
-      // Try API route if not already using it
-      if (!src.startsWith('/api/images/covers/')) {
-        const filename = src.split('/').pop();
-        if (filename) {
-          setImgSrc(`/api/images/covers/${filename}`);
-          return;
-        }
+    // First retry: try API route if not already using it
+    if (newRetryCount === 1 && src && !src.startsWith('/api/images/covers/')) {
+      const filename = src.split('/').pop();
+      if (filename) {
+        setImgSrc(`/api/images/covers/${filename}`);
+        return;
       }
     }
     
-    // Try fetching from public sources using book title
-    if (retryCount === 1 && bookTitle) {
+    // Second retry: try fetching from public sources using book title
+    if (newRetryCount === 2 && bookTitle) {
       try {
         const publicCover = await fetchBookCover(bookTitle);
         if (publicCover) {
@@ -94,6 +92,8 @@ export default function SafeImage({
       }
     }
     
+    // Final fallback
+    setHasError(true);
     setImgSrc(fallbackSrc);
     onError?.();
   };
@@ -101,7 +101,7 @@ export default function SafeImage({
   return (
     <Image
       src={imgSrc}
-      alt={alt}
+      alt={decodeHtmlEntities(alt)}
       width={width || 200}
       height={height || 300}
       className={className}

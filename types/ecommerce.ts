@@ -188,6 +188,7 @@ export interface UserLibraryItem {
   download_count: number;
   last_downloaded_at?: string;
   is_favorite: boolean;
+  access_type?: 'purchased' | 'assigned' | 'promotional';
   book?: Book;
   readingProgress?: {
     currentPage: number;

@@ -1064,13 +1064,29 @@ class EcommerceService {
 
 
 
-        // Add to user library if ebook
-        if (book.format === 'ebook' && orderData.user_id) {
-          await client.query(`
-            INSERT INTO user_library (user_id, book_id, order_id)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (user_id, book_id) DO NOTHING
-          `, [orderData.user_id, item.book_id, order.id]);
+        // Add to user library based on book format
+        if (orderData.user_id) {
+          if (book.format === 'ebook') {
+            await client.query(`
+              INSERT INTO user_library (user_id, book_id, order_id, format)
+              VALUES ($1, $2, $3, 'ebook')
+              ON CONFLICT (user_id, book_id, format) DO NOTHING
+            `, [orderData.user_id, item.book_id, order.id]);
+          } else if (book.format === 'both') {
+            // For books with both formats, add both to library
+            await client.query(`
+              INSERT INTO user_library (user_id, book_id, order_id, format)
+              VALUES ($1, $2, $3, 'ebook')
+              ON CONFLICT (user_id, book_id, format) DO NOTHING
+            `, [orderData.user_id, item.book_id, order.id]);
+            
+            await client.query(`
+              INSERT INTO user_library (user_id, book_id, order_id, format)
+              VALUES ($1, $2, $3, 'physical')
+              ON CONFLICT (user_id, book_id, format) DO NOTHING
+            `, [orderData.user_id, item.book_id, order.id]);
+          }
+          // Note: Physical-only books are not added to digital library
         }
       }
 
@@ -1701,7 +1717,8 @@ class EcommerceService {
         ul.purchase_date,
         ul.download_count,
         ul.last_downloaded_at,
-        ul.is_favorite
+        ul.is_favorite,
+        ul.format as library_format
       FROM user_library ul
       JOIN books b ON ul.book_id = b.id
       LEFT JOIN authors a ON b.author_id = a.id
@@ -1712,27 +1729,40 @@ class EcommerceService {
     return result.rows;
   }
 
-  async addToLibrary(userId: number, bookId: number, orderId?: number): Promise<boolean> {
+  async addToLibrary(userId: number, bookId: number, orderId?: number, format?: string): Promise<boolean> {
+    // Get book format if not provided
+    if (!format) {
+      const bookResult = await query('SELECT format FROM books WHERE id = $1', [bookId]);
+      format = bookResult.rows[0]?.format || 'ebook';
+    }
+    
     const result = await query(`
-      INSERT INTO user_library (user_id, book_id, order_id)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (user_id, book_id) DO NOTHING
-    `, [userId, bookId, orderId]);
+      INSERT INTO user_library (user_id, book_id, order_id, format)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (user_id, book_id, format) DO NOTHING
+    `, [userId, bookId, orderId, format]);
     return (result.rowCount || 0) > 0;
   }
 
   // Alias method for enhanced checkout compatibility
-  async addToUserLibrary(userId: number, bookId: number, orderId?: number): Promise<boolean> {
-    return this.addToLibrary(userId, bookId, orderId);
+  async addToUserLibrary(userId: number, bookId: number, orderId?: number, format?: string): Promise<boolean> {
+    return this.addToLibrary(userId, bookId, orderId, format);
   }
 
-  async hasUserPurchasedBook(userId: number, bookId: number): Promise<boolean> {
-    const result = await query(`
+  async hasUserPurchasedBook(userId: number, bookId: number, format?: string): Promise<boolean> {
+    let queryStr = `
       SELECT COUNT(*) as count
       FROM user_library
       WHERE user_id = $1 AND book_id = $2
-    `, [userId, bookId]);
+    `;
+    let params = [userId, bookId];
     
+    if (format) {
+      queryStr += ` AND format = $3`;
+      params.push(format);
+    }
+    
+    const result = await query(queryStr, params);
     return parseInt(result.rows[0]?.count || '0') > 0;
   }
 

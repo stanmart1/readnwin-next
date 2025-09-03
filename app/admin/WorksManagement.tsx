@@ -545,7 +545,7 @@ export default function WorksManagement() {
                   className="w-full h-48 object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = 'https://via.placeholder.com/400x300?text=Image+Not+Found';
+                    target.src = '/images/placeholder.svg';
                   }}
                 />
                 <div className="absolute top-2 right-2">

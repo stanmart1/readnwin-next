@@ -16,40 +16,48 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
     }
 
-    // Get both purchased and assigned books
+    // Get all books from user_library (both purchased and assigned)
     let libraryItems = [];
     
     try {
-      // Get purchased books from user_library
-      const purchasedBooks = await ecommerceService.getUserLibrary(userId);
-      
-      // Get assigned books from book_assignments table
+      // Get all books from user_library table
       const { query } = await import('@/utils/database');
-      const assignedResult = await query(`
+      const libraryResult = await query(`
         SELECT 
-          ba.id, ba.user_id, ba.book_id, ba.assigned_at as purchase_date,
-          'assigned' as access_type, false as is_favorite,
-          b.title, b.cover_image_url, b.format, b.ebook_file_url,
-          a.name as author_name, c.name as category_name
-        FROM book_assignments ba
-        LEFT JOIN books b ON ba.book_id = b.id
+          ul.id,
+          ul.user_id,
+          ul.book_id,
+          ul.order_id,
+          COALESCE(ul.purchase_date, ul.acquired_at) as purchase_date,
+          COALESCE(ul.download_count, 0) as download_count,
+          ul.last_downloaded_at,
+          COALESCE(ul.is_favorite, false) as is_favorite,
+          COALESCE(ul.access_type, 'purchased') as access_type,
+          b.title,
+          b.cover_image_url,
+          b.format,
+          b.ebook_file_url,
+          COALESCE(a.name, 'Unknown Author') as author_name,
+          COALESCE(c.name, 'Uncategorized') as category_name
+        FROM user_library ul
+        LEFT JOIN books b ON ul.book_id = b.id
         LEFT JOIN authors a ON b.author_id = a.id
         LEFT JOIN categories c ON b.category_id = c.id
-        WHERE ba.user_id = $1 AND ba.status = 'active'
-        ORDER BY ba.assigned_at DESC
+        WHERE ul.user_id = $1
+        ORDER BY COALESCE(ul.purchase_date, ul.acquired_at) DESC
       `, [userId]);
       
-      // Convert assigned books to library format
-      const assignedBooks = assignedResult.rows.map(row => ({
+      // Convert to library format
+      libraryItems = libraryResult.rows.map(row => ({
         id: row.id,
         user_id: row.user_id,
         book_id: row.book_id,
-        order_id: null,
+        order_id: row.order_id,
         purchase_date: row.purchase_date,
-        download_count: 0,
-        last_downloaded_at: null,
-        is_favorite: false,
-        access_type: 'assigned',
+        download_count: row.download_count,
+        last_downloaded_at: row.last_downloaded_at,
+        is_favorite: row.is_favorite,
+        access_type: row.access_type,
         book: {
           id: row.book_id,
           title: row.title || 'Unknown Title',
@@ -60,26 +68,6 @@ export async function GET(request: NextRequest) {
           ebook_file_url: row.ebook_file_url
         }
       }));
-      
-      // Combine both lists, removing duplicates (prefer purchased over assigned)
-      const bookIds = new Set();
-      libraryItems = [];
-      
-      // Add purchased books first
-      purchasedBooks.forEach(book => {
-        if (!bookIds.has(book.book_id)) {
-          libraryItems.push({ ...book, access_type: 'purchased' });
-          bookIds.add(book.book_id);
-        }
-      });
-      
-      // Add assigned books that aren't already purchased
-      assignedBooks.forEach(book => {
-        if (!bookIds.has(book.book_id)) {
-          libraryItems.push(book);
-          bookIds.add(book.book_id);
-        }
-      });
       
     } catch (error) {
       console.error('Error fetching library:', error);

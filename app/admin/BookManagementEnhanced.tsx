@@ -83,7 +83,7 @@ export default function BookManagementEnhanced() {
   const [data, setData] = useState({ categories: [] as Category[], authors: [] as Author[], users: [] as any[] });
   const [selection, setSelection] = useState({ books: [] as number[], user: null as any, bookForAction: null as Book | null });
   const [modals, setModals] = useState({ deleteConfirm: false, assign: false, analytics: false, edit: false, details: false, batchUpdate: false, bookAssign: false });
-  const [loading, setLoadingStates] = useState({ delete: false, assign: false });
+  const [loadingStates, setLoadingStates] = useState({ delete: false, assign: false });
   const [forms, setForms] = useState({ 
     userSearch: '', 
     selectedFormat: 'both' as 'both' | 'ebook' | 'physical',
@@ -237,7 +237,7 @@ export default function BookManagementEnhanced() {
   };
 
   const confirmDeleteBook = async () => {
-    if (!forms.bookToDelete || loading.delete) return;
+    if (!forms.bookToDelete || loadingStates.delete) return;
     
     setLoadingStates(prev => ({ ...prev, delete: true }));
     const success = await deleteBooks([forms.bookToDelete]);

@@ -4,14 +4,22 @@ import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 import { sanitizeInt } from '@/utils/security';
 import { imageStorageService } from '@/utils/image-storage-service';
+import { SecurityUtils } from '@/utils/security-utils';
 
 export const dynamic = 'force-dynamic';
 
 
 
+interface EbookMetadata {
+  title?: string;
+  creator?: string;
+  pageCount?: number;
+  wordCount?: number;
+}
+
 // Extract metadata without altering book structure
-async function extractEbookMetadata(buffer: Buffer, filename: string) {
-  const metadata: any = {};
+async function extractEbookMetadata(buffer: Buffer, filename: string): Promise<EbookMetadata> {
+  const metadata: EbookMetadata = {};
   
   try {
     if (filename.toLowerCase().endsWith('.epub')) {
@@ -142,7 +150,8 @@ export async function POST(request: NextRequest) {
     try {
       const buffer = Buffer.from(await cover_image.arrayBuffer());
       const timestamp = Date.now();
-      const filename = `${bookId}_cover_${timestamp}.${cover_image.name.split('.').pop()}`;
+      const safeExtension = SecurityUtils.sanitizeFilename(cover_image.name.split('.').pop() || 'jpg');
+      const filename = `${bookId}_cover_${timestamp}.${safeExtension}`;
       
       const imageId = await imageStorageService.uploadImage({
         filename,
@@ -158,6 +167,7 @@ export async function POST(request: NextRequest) {
       coverUrl = `/api/images/covers/${filename}`;
     } catch (uploadError) {
       await query('DELETE FROM books WHERE id = $1', [bookId]);
+      console.error('Cover upload failed:', SecurityUtils.sanitizeForLog(uploadError));
       return NextResponse.json({ error: 'Failed to upload cover image' }, { status: 500 });
     }
 
@@ -168,8 +178,17 @@ export async function POST(request: NextRequest) {
       try {
         const ebookBuffer = Buffer.from(await ebook_file.arrayBuffer());
         extractedMetadata = await extractEbookMetadata(ebookBuffer, ebook_file.name);
-        ebookUrl = `/api/ebooks/${bookId}/${ebook_file.name}`;
+        const safeFilename = SecurityUtils.sanitizeFilename(ebook_file.name);
+        ebookUrl = `/api/ebooks/${bookId}/${safeFilename}`;
       } catch (ebookError) {
+        // Clean up uploaded cover image
+        if (coverUrl) {
+          try {
+            await imageStorageService.deleteImage(coverUrl);
+          } catch (cleanupError) {
+            console.error('Failed to cleanup cover image:', SecurityUtils.sanitizeForLog(cleanupError));
+          }
+        }
         await query('DELETE FROM books WHERE id = $1', [bookId]);
         return NextResponse.json({ error: 'Failed to process e-book file' }, { status: 500 });
       }
@@ -327,29 +346,39 @@ export async function DELETE(request: NextRequest) {
     const failedIds: number[] = [];
     const errors: string[] = [];
 
-    for (const bookId of bookIdArray) {
-      try {
-        // Cascade delete from all related tables
-        await query('DELETE FROM cart_items WHERE book_id = $1', [bookId]);
-        await query('DELETE FROM order_items WHERE book_id = $1', [bookId]);
-        await query('DELETE FROM user_library WHERE book_id = $1', [bookId]);
-        await query('DELETE FROM book_reviews WHERE book_id = $1', [bookId]);
-        await query('DELETE FROM reading_progress WHERE book_id = $1', [bookId]);
-        
-        // Delete the book record itself
-        const deleteResult = await query('DELETE FROM books WHERE id = $1 RETURNING id', [bookId]);
-        
-        if (deleteResult.rows.length > 0) {
-          deletedCount++;
-        } else {
+    // Use transaction for better performance and consistency
+    try {
+      await query('BEGIN');
+      
+      for (const bookId of bookIdArray) {
+        try {
+          // Cascade delete from all related tables
+          await query('DELETE FROM cart_items WHERE book_id = $1', [bookId]);
+          await query('DELETE FROM order_items WHERE book_id = $1', [bookId]);
+          await query('DELETE FROM user_library WHERE book_id = $1', [bookId]);
+          await query('DELETE FROM book_reviews WHERE book_id = $1', [bookId]);
+          await query('DELETE FROM reading_progress WHERE book_id = $1', [bookId]);
+          
+          // Delete the book record itself
+          const deleteResult = await query('DELETE FROM books WHERE id = $1 RETURNING id', [bookId]);
+          
+          if (deleteResult.rows.length > 0) {
+            deletedCount++;
+          } else {
+            failedIds.push(bookId);
+            errors.push(`Book ${bookId}: Not found`);
+          }
+        } catch (error) {
+          console.error(`Error deleting book ${SecurityUtils.sanitizeForLog(bookId)}:`, SecurityUtils.sanitizeForLog(error));
           failedIds.push(bookId);
-          errors.push(`Book ${bookId}: Not found`);
+          errors.push(`Failed to delete book ${bookId}: ${error instanceof Error ? SecurityUtils.sanitizeHtml(error.message) : 'Unknown error'}`);
         }
-      } catch (error) {
-        console.error(`Error deleting book ${bookId}:`, error);
-        failedIds.push(bookId);
-        errors.push(`Failed to delete book ${bookId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
+      
+      await query('COMMIT');
+    } catch (transactionError) {
+      await query('ROLLBACK');
+      throw transactionError;
     }
 
     return NextResponse.json({

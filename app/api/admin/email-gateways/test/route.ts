@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 
 interface EmailGatewayConfig {
@@ -17,13 +17,14 @@ interface EmailGatewayConfig {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions) as any;
     
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (session.user.role !== 'admin' && session.user.role !== 'super_admin') {
+    const user = session.user as any;
+    if (user.role !== 'admin' && user.role !== 'super_admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

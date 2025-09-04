@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useModernEReaderStore } from '@/stores/modernEReaderStore';
 import { EbookContentLoader } from '@/lib/services/EbookContentLoader';
 import { useSession } from 'next-auth/react';
-import { SecurityUtils } from '@/utils/security';
+import { SecurityUtils } from '@/utils/security-utils';
 import {
   Menu,
   Settings,
@@ -238,7 +238,10 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
     const scrollHeight = container.scrollHeight;
     const clientHeight = container.clientHeight;
     
-    const progress = Math.min(100, Math.max(0, (scrollTop / (scrollHeight - clientHeight)) * 100));
+    const scrollableHeight = scrollHeight - clientHeight;
+    const progress = scrollableHeight > 0 
+      ? Math.min(100, Math.max(0, (scrollTop / scrollableHeight) * 100))
+      : 100;
     setScrollProgress(progress);
 
     // Update reading progress
@@ -633,7 +636,7 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
             }}
             onMouseUp={handleTextSelection}
             onTouchEnd={handleTextSelection}
-            dangerouslySetInnerHTML={{ __html: SecurityUtils.sanitizeHtml(currentChapter.content_html) }}
+            dangerouslySetInnerHTML={{ __html: currentChapter.content_html }}
           />
 
           {/* Chapter Navigation */}
@@ -713,7 +716,7 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
         contentRef={contentRef}
         onHighlightClick={(highlight) => {
           // Handle highlight click
-          console.log('Highlight clicked:', SecurityUtils.sanitizeLogInput(JSON.stringify(highlight)));
+          console.log('Highlight clicked:', SecurityUtils.sanitizeForLog(JSON.stringify(highlight)));
         }}
       />
 

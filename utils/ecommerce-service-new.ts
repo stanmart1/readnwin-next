@@ -57,8 +57,7 @@ export class EcommerceService {
           b.pages,
           b.publication_date,
           b.publisher,
-          COALESCE(b.book_type, b.format, 'ebook') as book_type,
-          COALESCE(b.book_type, b.format, 'ebook') as format,
+          COALESCE(b.format, 'ebook') as format,
           COALESCE(b.stock_quantity, 0) as stock_quantity,
           'pending' as parsing_status,
           b.cover_image_url,
@@ -71,7 +70,7 @@ export class EcommerceService {
         FROM books b
         LEFT JOIN authors a ON b.author_id = a.id
         LEFT JOIN categories c ON b.category_id = c.id
-        WHERE b.id = $1 AND b.status = 'published'
+        WHERE b.id = $1
       `, [id]);
 
       return result.rows[0] || null;

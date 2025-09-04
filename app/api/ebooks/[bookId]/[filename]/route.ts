@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { query } from '@/utils/database';
+import { SecurityUtils } from '@/utils/security-utils';
 
 export async function GET(
   request: NextRequest,
@@ -29,8 +30,14 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    // Serve the original e-book file
-    const filePath = join(process.cwd(), 'storage', 'ebooks', filename);
+    // Serve the original e-book file with safe path
+    const safeFilename = SecurityUtils.sanitizeFilename(filename);
+    const storageDir = join(process.cwd(), 'storage', 'ebooks');
+    const filePath = join(storageDir, safeFilename);
+    
+    if (!SecurityUtils.isPathSafe(filePath, storageDir)) {
+      return NextResponse.json({ error: 'Invalid file path' }, { status: 400 });
+    }
     
     if (!existsSync(filePath)) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 });

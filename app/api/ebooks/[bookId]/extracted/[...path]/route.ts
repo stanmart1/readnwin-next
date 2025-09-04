@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { SecurityUtils } from '@/utils/security-utils';
 
 export async function GET(
   request: NextRequest,
@@ -16,7 +17,8 @@ export async function GET(
     }
 
     const { bookId, path } = params;
-    const filePath = path.join('/');
+    const sanitizedPath = path.map(p => SecurityUtils.sanitizePath(p)).join('/');
+    const filePath = sanitizedPath;
     
     // Verify user has access to this book
     const bookCheck = await query(`
@@ -36,8 +38,14 @@ export async function GET(
     }
 
     const urlParts = book.ebook_file_url.split('/');
-    const filename = urlParts[urlParts.length - 1]; // This already includes bookId prefix
-    const ebookPath = join(process.cwd(), 'storage', 'ebooks', filename);
+    const rawFilename = urlParts[urlParts.length - 1]; // This already includes bookId prefix
+    const filename = SecurityUtils.sanitizeFilename(rawFilename);
+    const storageDir = join(process.cwd(), 'storage', 'ebooks');
+    const ebookPath = join(storageDir, filename);
+    
+    if (!SecurityUtils.isPathSafe(ebookPath, storageDir)) {
+      return NextResponse.json({ error: 'Invalid file path' }, { status: 400 });
+    }
     
     if (!existsSync(ebookPath) || !filename.toLowerCase().endsWith('.epub')) {
       return NextResponse.json({ error: 'EPUB file not found' }, { status: 404 });

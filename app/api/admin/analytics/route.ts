@@ -98,27 +98,126 @@ export async function GET(request: NextRequest) {
       { day: 'Sun', active: Math.floor(userCount * 0.09), orders: Math.floor(orderCount * 0.10) }
     ];
     
-    // Simplified recent activities for faster loading
-    const recentActivities = [
-      {
-        action: 'Dashboard loaded',
-        user: 'System',
-        time: 'Just now',
-        type: 'system',
-        book: '',
-        amount: ''
-      },
-      {
-        action: 'Analytics updated',
-        user: 'System',
-        time: '2 minutes ago',
-        type: 'system',
-        book: '',
-        amount: ''
-      }
-    ];
+    // Fetch real recent activities from multiple sources
+    let recentActivities = [];
     
-    function getTimeAgo(date: any) {
+    try {
+      // Get recent activities from various sources with timeout
+      const activitiesPromise = Promise.race([
+        Promise.all([
+          // Recent orders
+          secureQuery(`
+            SELECT 
+              'New order placed' as action,
+              CONCAT(u.first_name, ' ', u.last_name) as user,
+              o.created_at,
+              'order' as type,
+              '' as book,
+              CONCAT('₦', o.total_amount) as amount
+            FROM orders o
+            LEFT JOIN users u ON o.user_id = u.id
+            WHERE o.created_at >= CURRENT_DATE - INTERVAL '7 days'
+            ORDER BY o.created_at DESC
+            LIMIT 3
+          `),
+          // Recent user registrations
+          secureQuery(`
+            SELECT 
+              'New user registered' as action,
+              CONCAT(first_name, ' ', last_name) as user,
+              created_at,
+              'user' as type,
+              '' as book,
+              '' as amount
+            FROM users
+            WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+            ORDER BY created_at DESC
+            LIMIT 2
+          `),
+          // Recent book additions
+          secureQuery(`
+            SELECT 
+              'New book added' as action,
+              'Admin' as user,
+              created_at,
+              'book' as type,
+              title as book,
+              '' as amount
+            FROM books
+            WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+            ORDER BY created_at DESC
+            LIMIT 2
+          `)
+        ]),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Activities timeout')), 2000))
+      ]);
+      
+      const [ordersResult, usersResult, booksResult] = await activitiesPromise;
+      
+      // Combine and sort all activities
+      const allActivities = [
+        ...ordersResult.rows.map((row: any) => ({
+          action: row.action,
+          user: row.user || 'Guest User',
+          time: getTimeAgo(new Date(row.created_at)),
+          type: row.type,
+          book: row.book || '',
+          amount: row.amount || ''
+        })),
+        ...usersResult.rows.map((row: any) => ({
+          action: row.action,
+          user: row.user || 'New User',
+          time: getTimeAgo(new Date(row.created_at)),
+          type: row.type,
+          book: row.book || '',
+          amount: row.amount || ''
+        })),
+        ...booksResult.rows.map((row: any) => ({
+          action: row.action,
+          user: row.user || 'Admin',
+          time: getTimeAgo(new Date(row.created_at)),
+          type: row.type,
+          book: row.book || '',
+          amount: row.amount || ''
+        }))
+      ];
+      
+      // Sort by most recent and take top 5
+      recentActivities = allActivities
+        .sort((a, b) => {
+          // Simple time sorting - 'Just now' comes first
+          if (a.time === 'Just now') return -1;
+          if (b.time === 'Just now') return 1;
+          return 0;
+        })
+        .slice(0, 5);
+        
+      console.log('✅ Recent activities fetched:', recentActivities.length);
+      
+    } catch (activitiesError) {
+      console.error('❌ Error fetching recent activities:', activitiesError);
+      // Fallback to system activities
+      recentActivities = [
+        {
+          action: 'Dashboard loaded',
+          user: 'System',
+          time: 'Just now',
+          type: 'system',
+          book: '',
+          amount: ''
+        },
+        {
+          action: 'Analytics updated',
+          user: 'System',
+          time: '2 minutes ago',
+          type: 'system',
+          book: '',
+          amount: ''
+        }
+      ];
+    }
+    
+    function getTimeAgo(date: Date) {
       const now = new Date();
       const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
       

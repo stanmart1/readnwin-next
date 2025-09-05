@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { Pool } from 'pg';
-
-// Direct database connection for this endpoint
-const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME || 'postgres',
-  password: process.env.DB_PASSWORD,
-  port: parseInt(process.env.DB_PORT || '5432'),
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 5,
-  connectionTimeoutMillis: 10000,
-});
+import { query } from '@/utils/database';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,18 +17,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
     }
 
-    // Fetch user profile data with fallback for missing columns
-    const profileResult = await pool.query(`
+    // Fetch user profile data
+    const profileResult = await query(`
       SELECT 
         u.id,
         u.email,
-        u.username,
+        COALESCE(u.username, u.email) as username,
         COALESCE(u.first_name, '') as first_name,
         COALESCE(u.last_name, '') as last_name,
         COALESCE(u.bio, '') as bio,
-        COALESCE(u.profile_image, u.avatar_url, '') as profile_image,
+        COALESCE(u.profile_image, '') as profile_image,
         COALESCE(u.is_student, false) as is_student,
-        u.status,
+        COALESCE(u.status, 'active') as status,
         u.created_at,
         COALESCE(u.last_login, u.updated_at) as last_login
       FROM users u
@@ -57,7 +45,7 @@ export async function GET(request: NextRequest) {
     let studentInfo = null;
     if (user.is_student) {
       try {
-        const studentResult = await pool.query(`
+        const studentResult = await query(`
           SELECT school_name, matriculation_number, department, course
           FROM student_info 
           WHERE user_id = $1
@@ -89,7 +77,7 @@ export async function GET(request: NextRequest) {
     
     try {
       // Check if reading_progress table exists and get stats
-      const statsResult = await pool.query(`
+      const statsResult = await query(`
         SELECT 
           COUNT(DISTINCT rp.book_id) as total_books_read,
           COALESCE(SUM(rp.pages_read), 0) as total_pages_read,

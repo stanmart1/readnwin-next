@@ -54,6 +54,12 @@ export default function OverviewStats() {
     router.push(url);
   };
 
+  const handleTabChange = (tab: string) => {
+    // Navigate to the corresponding tab
+    const url = `/admin?tab=${tab}`;
+    router.push(url);
+  };
+
   useEffect(() => {
     // Show skeleton data immediately, then fetch real data
     const timer = setTimeout(() => {
@@ -280,32 +286,14 @@ export default function OverviewStats() {
             <h2 className="text-2xl font-bold text-gray-900">Analytics Overview</h2>
             <p className="text-gray-600 mt-1">Real-time insights and performance metrics</p>
           </div>
-          <div className="flex space-x-3">
-            <button 
-              onClick={async () => {
-                try {
-                  const response = await fetch('/api/admin/db-health');
-                  const data = await response.json();
-                  console.log('Database health:', data);
-                  alert(`Database Status: ${data.success ? 'Connected' : 'Failed'}\n${JSON.stringify(data, null, 2)}`);
-                } catch (e) {
-                  alert('Failed to check database health');
-                }
-              }}
-              className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-105 flex items-center"
-            >
-              <i className="ri-database-2-line mr-2"></i>
-              Check DB
-            </button>
-            <button 
-              onClick={() => fetchAnalytics(0)}
-              disabled={loading}
-              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-            >
-              <i className={`ri-refresh-line mr-2 ${loading ? 'animate-spin' : ''}`}></i>
-              Refresh Data
-            </button>
-          </div>
+          <button 
+            onClick={() => fetchAnalytics(0)}
+            disabled={loading}
+            className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+          >
+            <i className={`ri-refresh-line mr-2 ${loading ? 'animate-spin' : ''}`}></i>
+            Refresh Data
+          </button>
         </div>
       </div>
 
@@ -382,12 +370,17 @@ export default function OverviewStats() {
 
       {/* Recent Activities */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activities</h3>
-        <div className="space-y-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Recent Activities</h3>
+          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+            Last 7 days
+          </span>
+        </div>
+        <div className="space-y-3">
           {recentActivities.length > 0 ? (
             recentActivities.map((activity, index) => (
-              <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                   activity.type === 'user' ? 'bg-blue-100 text-blue-600' :
                   activity.type === 'book' ? 'bg-green-100 text-green-600' :
                   activity.type === 'order' ? 'bg-purple-100 text-purple-600' :
@@ -398,26 +391,52 @@ export default function OverviewStats() {
                     activity.type === 'user' ? 'ri-user-add-line' :
                     activity.type === 'book' ? 'ri-book-line' :
                     activity.type === 'order' ? 'ri-shopping-cart-line' :
-                    activity.type === 'review' ? 'ri-flag-line' :
-                    'ri-user-line'
+                    activity.type === 'review' ? 'ri-star-line' :
+                    'ri-settings-line'
                   } text-sm`}></i>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                  <p className="text-xs text-gray-600">
-                    {activity.user || activity.book || activity.amount || 'System activity'}
-                  </p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{activity.action}</p>
+                  <div className="flex items-center space-x-2 mt-1">
+                    {activity.user && (
+                      <span className="text-xs text-gray-600 bg-white px-2 py-0.5 rounded border">
+                        {activity.user}
+                      </span>
+                    )}
+                    {activity.book && (
+                      <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200 truncate max-w-32" title={activity.book}>
+                        {activity.book}
+                      </span>
+                    )}
+                    {activity.amount && (
+                      <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 font-medium">
+                        {activity.amount}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <span className="text-xs text-gray-500">{activity.time}</span>
+                <span className="text-xs text-gray-500 flex-shrink-0">{activity.time}</span>
               </div>
             ))
           ) : (
             <div className="text-center py-8">
-              <i className="ri-information-line text-2xl text-gray-400 mb-2"></i>
-              <p className="text-gray-600">No recent activities found</p>
+              <i className="ri-time-line text-3xl text-gray-300 mb-3"></i>
+              <p className="text-gray-500 font-medium">No recent activities</p>
+              <p className="text-xs text-gray-400 mt-1">Activities will appear here as they happen</p>
             </div>
           )}
         </div>
+        {recentActivities.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-gray-100">
+            <button 
+              onClick={() => handleTabChange('audit')}
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center"
+            >
+              View all activities
+              <i className="ri-arrow-right-line ml-1"></i>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

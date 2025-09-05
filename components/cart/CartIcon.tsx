@@ -1,7 +1,7 @@
 'use client';
 
 import { ShoppingCart } from 'lucide-react';
-import { useSecureCart } from '@/contexts/SecureCartContext';
+import { useUnifiedCart } from '@/contexts/UnifiedCartContext';
 import Link from 'next/link';
 
 interface CartIconProps {
@@ -10,11 +10,13 @@ interface CartIconProps {
 }
 
 export default function CartIcon({ className = '', showCount = true }: CartIconProps) {
-  const { totalItems, isEmpty } = useSecureCart();
+  const { getTotalItems, cartItems } = useUnifiedCart();
+  const totalItems = getTotalItems();
+  const isEmpty = cartItems.length === 0;
 
   return (
     <Link 
-      href="/cart/secure" 
+      href="/cart" 
       className={`relative inline-flex items-center p-2 text-gray-600 hover:text-gray-900 transition-colors ${className}`}
       title={`Cart (${totalItems} items)`}
     >

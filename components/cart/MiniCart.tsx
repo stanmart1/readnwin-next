@@ -3,7 +3,7 @@
 import { Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { X, ShoppingBag, Trash2 } from 'lucide-react';
-import { useSecureCart } from '@/contexts/SecureCartContext';
+import { useUnifiedCart } from '@/contexts/UnifiedCartContext';
 import SafeImage from '@/components/ui/SafeImage';
 import Link from 'next/link';
 
@@ -13,7 +13,10 @@ interface MiniCartProps {
 }
 
 export default function MiniCart({ isOpen, onClose }: MiniCartProps) {
-  const { items, removeItem, isEmpty, totalItems, totalValue } = useSecureCart();
+  const { cartItems, removeFromCart, getTotalItems, getSubtotal } = useUnifiedCart();
+  const totalItems = getTotalItems();
+  const totalValue = getSubtotal();
+  const isEmpty = cartItems.length === 0;
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
@@ -122,7 +125,7 @@ export default function MiniCart({ isOpen, onClose }: MiniCartProps) {
                         <p className="mt-0.5 text-sm text-gray-500">Shipping calculated at checkout.</p>
                         <div className="mt-6">
                           <Link
-                            href="/cart/secure"
+                            href="/cart"
                             onClick={onClose}
                             className="flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-blue-700 w-full"
                           >

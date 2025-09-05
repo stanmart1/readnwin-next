@@ -5,8 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { useGuestCart } from '@/contexts/GuestCartContext';
-import { useSecureCart } from '@/contexts/SecureCartContext';
+import { useUnifiedCart } from '@/contexts/UnifiedCartContext';
 import { protectNavigation, ensureNavigationResponsive } from '@/utils/navigationProtection';
 
 
@@ -17,12 +16,8 @@ export default function Header() {
   const router = useRouter();
   const { data: session } = useSession();
   
-  const guestCart = useGuestCart();
-  const secureCart = useSecureCart();
-  
-  // Use appropriate cart based on authentication status
-  const totalItems = session ? secureCart.totalItems : guestCart.getTotalItems();
-  const cartItems = session ? secureCart.items : guestCart.cartItems;
+  const { cartItems, getTotalItems } = useUnifiedCart();
+  const totalItems = getTotalItems();
   
   // Force re-render when cart changes
   useEffect(() => {
@@ -120,7 +115,7 @@ export default function Header() {
           {/* Right side - Cart, User */}
           <div className="flex items-center space-x-4 navigation-safe">
             {/* Cart */}
-            <Link href={session ? "/cart/secure" : "/checkout-guest"} className="relative flex items-center justify-center p-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 cursor-pointer navigation-safe" data-navigation="cart-link">
+            <Link href="/cart" className="relative flex items-center justify-center p-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 cursor-pointer navigation-safe" data-navigation="cart-link">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.5 5M7 13l-1.5 5m0 0h9m-9 0a1 1 0 102 0m7 0a1 1 0 102 0" />
               </svg>

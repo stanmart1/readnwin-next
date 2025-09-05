@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 // Using RemixIcon classes instead of Lucide icons
 import { useGuestCart } from '@/contexts/GuestCartContext';
-import { useSecureCart } from '@/contexts/SecureCartContext';
+import { useUnifiedCart } from '@/contexts/UnifiedCartContext';
 import { useFlutterwaveInline } from '@/hooks/useFlutterwaveInline';
 import Header from '@/components/Header';
 import NewCheckoutFlow from '@/components/checkout/NewCheckoutFlow';
@@ -14,7 +14,7 @@ export default function EnhancedCheckoutPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const guestCart = useGuestCart();
-  const secureCart = useSecureCart();
+  const { cartItems, getSubtotal, getTotalItems, isLoading, error } = useUnifiedCart();
   
   // Use appropriate cart based on authentication status
   const { items: cartItems, isLoading, error } = session ? secureCart : guestCart;
@@ -48,7 +48,7 @@ export default function EnhancedCheckoutPage() {
   // Redirect to cart if no items
   useEffect(() => {
     if (!isLoading && cartItems && cartItems.length === 0) {
-      router.push(session ? '/cart/secure' : '/cart-new');
+      router.push('/cart');
       return;
     }
   }, [cartItems, isLoading, session, router]);
@@ -132,7 +132,7 @@ export default function EnhancedCheckoutPage() {
   };
 
   const handleCancel = () => {
-    router.push(session ? '/cart/secure' : '/cart-new');
+    router.push('/cart');
   };
 
   // Loading state
@@ -193,7 +193,7 @@ export default function EnhancedCheckoutPage() {
               <span>Browse Books</span>
             </button>
             <button
-              onClick={() => router.push(session ? '/cart/secure' : '/cart-new')}
+              onClick={() => router.push('/cart')}
               className="btn-secondary inline-flex items-center space-x-2"
             >
               <i className="ri-shopping-cart-line"></i>
@@ -225,7 +225,7 @@ export default function EnhancedCheckoutPage() {
               <span>Retry</span>
             </button>
             <button
-              onClick={() => router.push(session ? '/cart/secure' : '/cart-new')}
+              onClick={() => router.push('/cart')}
               className="btn-secondary inline-flex items-center space-x-2"
             >
               <i className="ri-arrow-left-line"></i>
@@ -301,7 +301,7 @@ export default function EnhancedCheckoutPage() {
         {/* Back to Cart */}
         <div className="mb-6">
           <button
-            onClick={() => router.push(session ? '/cart/secure' : '/cart-new')}
+            onClick={() => router.push('/cart')}
             className="flex items-center text-gray-600 hover:text-blue-600 transition-colors font-medium"
           >
             <i className="ri-arrow-left-line mr-2"></i>

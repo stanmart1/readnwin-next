@@ -102,10 +102,9 @@ export async function GET(request: NextRequest) {
           enabled: false,
           testMode: true,
           apiKeys: {
-            publicKey: '',
-            secretKey: '',
-            webhookSecret: '',
-            hash: '',
+            clientId: '',
+            clientSecret: '',
+            encryptionKey: '',
           },
           supportedCurrencies: ['NGN'],
           features: ['Mobile Money', 'Bank Transfers', 'Credit Cards', 'USSD', 'QR Payments'],
@@ -120,9 +119,9 @@ export async function GET(request: NextRequest) {
           enabled: false,
           testMode: false,
           apiKeys: {
-            publicKey: '',
-            secretKey: '',
-            webhookSecret: '',
+            clientId: '',
+            clientSecret: '',
+            encryptionKey: '',
           },
           supportedCurrencies: ['NGN'],
           features: ['Bank Transfers', 'Proof of Payment', 'Manual Verification'],
@@ -153,18 +152,30 @@ export async function GET(request: NextRequest) {
               }
             }
 
+            // Parse API keys config
+            let apiKeysConfig = {};
+            if (dbGateway.config) {
+              try {
+                const config = typeof dbGateway.config === 'string' 
+                  ? JSON.parse(dbGateway.config) 
+                  : dbGateway.config;
+                apiKeysConfig = config;
+              } catch (error) {
+                console.error('Error parsing API keys config:', error);
+              }
+            }
+
             return {
               ...gateway,
               enabled: dbGateway.enabled,
               testMode: dbGateway.test_mode,
               apiKeys: {
-                publicKey: dbGateway.public_key || '',
-                secretKey: dbGateway.secret_key || '',
-                webhookSecret: dbGateway.webhook_secret || '',
-                hash: dbGateway.hash || '',
+                clientId: (apiKeysConfig as any).clientId || '',
+                clientSecret: (apiKeysConfig as any).clientSecret || '',
+                encryptionKey: (apiKeysConfig as any).encryptionKey || '',
               },
               bankAccount,
-              status: dbGateway.status || 'inactive',
+              status: dbGateway.status === 'error' ? 'inactive' : (dbGateway.status || 'inactive'),
             };
           }
           return gateway;

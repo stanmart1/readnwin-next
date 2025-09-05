@@ -67,32 +67,34 @@ export interface FlutterwaveTransaction {
 }
 
 export class FlutterwaveService {
-  private secretKey: string;
-  private publicKey: string;
-  private hash: string;
+  private clientId: string;
+  private clientSecret: string;
+  private encryptionKey: string;
   private baseUrl: string;
   private testMode: boolean;
 
-  constructor(secretKey?: string, publicKey?: string, hash?: string, testMode?: boolean) {
-    // Use environment variables if not provided
-    this.secretKey = secretKey || process.env.RAVE_LIVE_SECRET_KEY || '';
-    this.publicKey = publicKey || process.env.RAVE_LIVE_PUBLIC_KEY || '';
-    this.hash = hash || process.env.FLUTTER_WAVE_HASH || '';
+  constructor(
+    clientSecret: string,
+    clientId: string,
+    encryptionKey: string,
+    testMode?: boolean
+  ) {
+    this.clientId = clientId || process.env.FLUTTERWAVE_CLIENT_ID || '';
+    this.clientSecret = clientSecret || process.env.FLUTTERWAVE_CLIENT_SECRET || '';
+    this.encryptionKey = encryptionKey || process.env.FLUTTERWAVE_ENCRYPTION_KEY || '';
     this.testMode = testMode !== undefined ? testMode : process.env.NODE_ENV !== 'production';
     
-    this.baseUrl = this.testMode 
-      ? 'https://sandbox-api.flutterwave.com' 
-      : 'https://api.flutterwave.com';
+    this.baseUrl = 'https://api.flutterwave.com/v3';
 
-    // Validate required environment variables
-    if (!this.secretKey) {
-      console.error('❌ Flutterwave secret key not found in environment variables');
+    // Validate required credentials
+    if (!this.clientSecret) {
+      console.error('❌ Flutterwave client secret not found');
     }
-    if (!this.publicKey) {
-      console.error('❌ Flutterwave public key not found in environment variables');
+    if (!this.clientId) {
+      console.error('❌ Flutterwave client ID not found');
     }
-    if (!this.hash) {
-      console.error('❌ Flutterwave hash not found in environment variables');
+    if (!this.encryptionKey) {
+      console.error('❌ Flutterwave encryption key not found');
     }
   }
 
@@ -104,8 +106,8 @@ export class FlutterwaveService {
       // Ensure all required fields are present and properly formatted
       const paymentData = {
         tx_ref: data.tx_ref,
-        amount: Number(data.amount), // Ensure amount is a number
-        currency: data.currency.toUpperCase(), // Ensure currency is uppercase
+        amount: Number(data.amount),
+        currency: data.currency.toUpperCase(),
         redirect_url: data.redirect_url,
         customer: {
           email: data.customer.email,
@@ -119,34 +121,17 @@ export class FlutterwaveService {
         },
         meta: {
           ...data.meta,
-          // Add comprehensive internal service configuration to prevent 400 errors
-          disable_forter: true,
-          disable_fingerprint: true,
-          disable_metrics: true,
-          disable_analytics: true,
-          disable_tracking: true,
-          disable_fraud_detection: true,
-          disable_device_fingerprinting: true,
           source: 'readnwin_web',
-          integration: 'flutterwave_v3',
-          version: '3.11.14'
-        },
-        // Add additional configuration to prevent service loading
-        config: {
-          disable_forter: true,
-          disable_fingerprint: true,
-          disable_metrics: true,
-          disable_analytics: true,
-          disable_tracking: true
+          integration: 'flutterwave_v3'
         }
       };
 
       console.log('🔍 Sending payment data to Flutterwave:', JSON.stringify(paymentData, null, 2));
 
-      const response = await fetch(`${this.baseUrl}/v3/payments`, {
+      const response = await fetch(`${this.baseUrl}/payments`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.secretKey}`,
+          'Authorization': `Bearer ${this.clientSecret}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(paymentData),
@@ -210,7 +195,7 @@ export class FlutterwaveService {
    */
   prepareInlinePaymentData(data: FlutterwavePaymentData): FlutterwaveInlinePaymentData {
     return {
-      public_key: this.publicKey,
+      public_key: this.clientId,
       tx_ref: data.tx_ref,
       amount: Number(data.amount),
       currency: data.currency.toUpperCase(),
@@ -227,17 +212,8 @@ export class FlutterwaveService {
       },
       meta: {
         ...data.meta,
-        // Add comprehensive internal service configuration to prevent 400 errors
-        disable_forter: true,
-        disable_fingerprint: true,
-        disable_metrics: true,
-        disable_analytics: true,
-        disable_tracking: true,
-        disable_fraud_detection: true,
-        disable_device_fingerprinting: true,
         source: 'readnwin_web',
-        integration: 'flutterwave_v3',
-        version: '3.11.14'
+        integration: 'flutterwave_v3'
       },
       callback: () => {},
       onClose: () => {},
@@ -249,10 +225,10 @@ export class FlutterwaveService {
    */
   async verifyPayment(transactionId: string): Promise<any> {
     try {
-      const response = await fetch(`${this.baseUrl}/v3/transactions/${transactionId}/verify`, {
+      const response = await fetch(`${this.baseUrl}/transactions/${transactionId}/verify`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.secretKey}`,
+          'Authorization': `Bearer ${this.clientSecret}`,
           'Content-Type': 'application/json',
         },
       });
@@ -276,7 +252,7 @@ export class FlutterwaveService {
   validateWebhookSignature(payload: string, signature: string, secretHash?: string): boolean {
     try {
       const crypto = require('crypto');
-      const hash = crypto.createHmac('sha256', secretHash || this.hash)
+      const hash = crypto.createHmac('sha256', secretHash || this.encryptionKey)
         .update(payload)
         .digest('hex');
       
@@ -293,7 +269,7 @@ export class FlutterwaveService {
   generatePaymentHash(data: any): string {
     try {
       const crypto = require('crypto');
-      const hashString = `${this.publicKey}${data.tx_ref}${data.amount}${data.currency}${data.email}${this.secretKey}`;
+      const hashString = `${this.clientId}${data.tx_ref}${data.amount}${data.currency}${data.email}${this.clientSecret}`;
       return crypto.createHash('sha256').update(hashString).digest('hex');
     } catch (error) {
       console.error('Error generating Flutterwave payment hash:', error);
@@ -314,9 +290,9 @@ export class FlutterwaveService {
    */
   getConfig() {
     return {
-      secretKey: this.secretKey ? `${this.secretKey.substring(0, 20)}...` : 'NOT SET',
-      publicKey: this.publicKey ? `${this.publicKey.substring(0, 20)}...` : 'NOT SET',
-      hash: this.hash ? `${this.hash.substring(0, 20)}...` : 'NOT SET',
+      clientId: this.clientId ? `${this.clientId.substring(0, 20)}...` : 'NOT SET',
+      clientSecret: this.clientSecret ? `${this.clientSecret.substring(0, 20)}...` : 'NOT SET',
+      encryptionKey: this.encryptionKey ? `${this.encryptionKey.substring(0, 20)}...` : 'NOT SET',
       baseUrl: this.baseUrl,
       testMode: this.testMode
     };

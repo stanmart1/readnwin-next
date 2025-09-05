@@ -52,7 +52,7 @@ export default function HeroSection() {
               Your favorite book could
             </span>
             <span className="block">
-              win you amazing prices!
+              win you amazing PRIZES!
             </span>
           </h1>
           

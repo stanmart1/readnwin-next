@@ -4,8 +4,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { useGuestCart } from '@/contexts/GuestCartContext';
-import { useSecureCart } from '@/contexts/SecureCartContext';
+import { useUnifiedCart } from '@/contexts/UnifiedCartContext';
 import { Book } from '@/types/ecommerce';
 
 interface BookCardProps {
@@ -85,8 +84,7 @@ export default function BookCard({
   const [isHovered, setIsHovered] = useState(false);
   const [wishlistStatus, setWishlistStatus] = useState(isWishlisted);
   const { data: session } = useSession();
-  const { addToCart: addToGuestCart } = useGuestCart();
-  const { addItem: addToSecureCart, refreshCart } = useSecureCart();
+  const { addToCart } = useUnifiedCart();
 
   const getImageSrc = () => {
     if (!displayCover) return '/placeholder-book.jpg';
@@ -113,40 +111,31 @@ export default function BookCard({
 
   const handleAddToCart = async () => {
     try {
-      if (!session) {
-        // For guest users, add to guest cart
-        const bookData: Book = {
-          id: typeof id === 'string' ? parseInt(id) : id,
-          title,
-          author_name: displayAuthor,
-          price,
-          original_price: displayOriginalPrice,
-          cover_image_url: displayCover,
-          category_name,
-          format: format || 'ebook',
-          author_id,
-          category_id,
-          language,
-          stock_quantity,
-          low_stock_threshold,
-          is_featured,
-          is_bestseller,
-          is_new_release,
-          status: status || 'published',
-          view_count,
-          created_at,
-          updated_at
-        };
-        
-        await addToGuestCart(bookData, 1);
-        alert('Item added to cart successfully!');
-      } else {
-        // For authenticated users, use the secure cart context
-        const bookId = typeof id === 'string' ? parseInt(id) : id;
-        await addToSecureCart(bookId, 1);
-        await refreshCart(); // Ensure cart is refreshed
-        alert('Item added to cart successfully!');
-      }
+      const bookData: Book = {
+        id: typeof id === 'string' ? parseInt(id) : id,
+        title,
+        author_name: displayAuthor,
+        price,
+        original_price: displayOriginalPrice,
+        cover_image_url: displayCover,
+        category_name,
+        format: format || 'ebook',
+        author_id,
+        category_id,
+        language,
+        stock_quantity,
+        low_stock_threshold,
+        is_featured,
+        is_bestseller,
+        is_new_release,
+        status: status || 'published',
+        view_count,
+        created_at,
+        updated_at
+      };
+      
+      await addToCart(bookData, 1);
+      alert('Item added to cart successfully!');
     } catch (error) {
       console.error('Error adding to cart:', error);
       alert('Failed to add item to cart');

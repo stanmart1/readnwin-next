@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ShoppingCart, Plus, Check, Loader2 } from 'lucide-react';
-import { useSecureCart } from '@/contexts/SecureCartContext';
+import { useUnifiedCart } from '@/contexts/UnifiedCartContext';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
@@ -23,7 +23,7 @@ export default function CartButton({
 }: CartButtonProps) {
   const { data: session } = useSession();
   const router = useRouter();
-  const { addItem, items, isLoading } = useSecureCart();
+  const { addToCart, cartItems, isLoading } = useUnifiedCart();
   const [isAdding, setIsAdding] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
@@ -38,7 +38,7 @@ export default function CartButton({
     }
 
     if (isInCart) {
-      router.push('/cart/secure');
+      router.push('/cart');
       return;
     }
 

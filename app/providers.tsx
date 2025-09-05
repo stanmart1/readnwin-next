@@ -1,17 +1,14 @@
 'use client';
 
 import { SessionProvider } from 'next-auth/react';
-import { GuestCartProvider } from '@/contexts/GuestCartContext';
-import { SecureCartProvider } from '@/contexts/SecureCartContext';
+import { UnifiedCartProvider } from '@/contexts/UnifiedCartContext';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <GuestCartProvider>
-        <SecureCartProvider>
-          {children}
-        </SecureCartProvider>
-      </GuestCartProvider>
+      <UnifiedCartProvider>
+        {children}
+      </UnifiedCartProvider>
     </SessionProvider>
   );
 }

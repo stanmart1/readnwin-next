@@ -4,14 +4,16 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useSecureCart } from '@/contexts/SecureCartContext';
+import { useUnifiedCart } from '@/contexts/UnifiedCartContext';
 import SafeImage from '@/components/ui/SafeImage';
 import Header from '@/components/Header';
 
 export default function SecureCartPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { items, summary, isLoading, error, updateQuantity, removeItem, isEmpty } = useSecureCart();
+  const { cartItems, isLoading, error, updateQuantity, removeFromCart, getTotalItems, getSubtotal } = useUnifiedCart();
+  const isEmpty = cartItems.length === 0;
+  const summary = { subtotal: getSubtotal(), total: getSubtotal(), itemCount: getTotalItems() };
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -27,7 +29,7 @@ export default function SecureCartPage() {
   };
 
   const handleRemoveItem = async (bookId: number) => {
-    await removeItem(bookId);
+    await removeFromCart(bookId);
   };
 
   const handleCheckout = () => {
@@ -188,7 +190,7 @@ export default function SecureCartPage() {
               <div className="card p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">Cart Items</h2>
                 <div className="space-y-6">
-                  {items.map((item) => (
+                  {cartItems.map((item) => (
                     <div key={item.id} className="flex items-center space-x-4 p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
                       {/* Book Cover */}
                       <div className="flex-shrink-0">
@@ -276,14 +278,14 @@ export default function SecureCartPage() {
                 
                 <div className="space-y-4">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Subtotal ({summary.totalItems} items)</span>
-                    <span className="font-medium">₦{summary.totalValue.toLocaleString()}</span>
+                    <span className="text-gray-600">Subtotal ({summary.itemCount} items)</span>
+                    <span className="font-medium">₦{summary.subtotal.toLocaleString()}</span>
                   </div>
                   
                   {summary.totalSavings > 0 && (
                     <div className="flex justify-between">
                       <span className="text-green-600">Savings</span>
-                      <span className="font-medium text-green-600">-₦{summary.totalSavings.toLocaleString()}</span>
+                      <span className="font-medium text-green-600">-₦0</span>
                     </div>
                   )}
 
@@ -297,7 +299,7 @@ export default function SecureCartPage() {
                   <div className="border-t pt-4">
                     <div className="flex justify-between text-lg font-semibold">
                       <span>Total</span>
-                      <span>₦{summary.totalValue.toLocaleString()}</span>
+                      <span>₦{summary.total.toLocaleString()}</span>
                     </div>
                     <p className="text-sm text-gray-500 mt-1">
                       {summary.isEbookOnly ? 'No shipping required' : 'Shipping calculated at checkout'}

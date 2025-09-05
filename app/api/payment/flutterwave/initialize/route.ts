@@ -77,11 +77,27 @@ export async function POST(request: NextRequest) {
 
       const gateway = gatewayResult.rows[0];
       
-      // Create Flutterwave service instance using admin-configured parameters
+      // Parse gateway config to get v3 API fields
+      let gatewayConfig = {};
+      if (gateway.config) {
+        try {
+          gatewayConfig = typeof gateway.config === 'string' 
+            ? JSON.parse(gateway.config) 
+            : gateway.config;
+        } catch (error) {
+          console.error('Error parsing gateway config:', error);
+        }
+      }
+
+      // Create Flutterwave service instance using v3 API fields
+      const clientSecret = (gatewayConfig as any).clientSecret || gateway.secret_key;
+      const clientId = (gatewayConfig as any).clientId || gateway.public_key;
+      const encryptionKey = (gatewayConfig as any).encryptionKey || gateway.hash;
+      
       const flutterwaveService = new FlutterwaveService(
-        gateway.secret_key,
-        gateway.public_key,
-        gateway.hash,
+        clientSecret,
+        clientId,
+        encryptionKey,
         gateway.test_mode
       );
 

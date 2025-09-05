@@ -150,7 +150,7 @@ export default function PaymentMethodSelectionPage() {
         {/* Breadcrumb */}
         <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-8">
           <button 
-            onClick={() => router.push('/cart-new')}
+            onClick={() => router.push('/cart')
             className="hover:text-blue-600 transition-colors cursor-pointer"
           >
             Cart

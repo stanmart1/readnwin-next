@@ -93,7 +93,7 @@ export default function PaymentFailedPage() {
             </button>
 
             <Link
-              href="/cart-new"
+              href="/cart"
               className="w-full bg-gray-200 text-gray-800 py-3 px-6 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center justify-center"
             >
               <ArrowLeft className="w-5 h-5 mr-2" />

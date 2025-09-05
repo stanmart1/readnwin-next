@@ -39,17 +39,23 @@ export async function POST(request: NextRequest) {
     const client = await pool.connect();
     try {
       console.log('🔍 Gateway API: Checking user role...');
-      const userResult = await client.query(
-        'SELECT role FROM users WHERE id = $1',
-        [session.user.id]
-      );
+      const userResult = await client.query(`
+        SELECT r.name as role_name
+        FROM users u
+        LEFT JOIN user_roles ur ON u.id = ur.user_id AND ur.is_active = TRUE
+        LEFT JOIN roles r ON ur.role_id = r.id
+        WHERE u.id = $1
+        ORDER BY r.priority DESC
+        LIMIT 1
+      `, [session.user.id]);
 
       console.log('🔍 Gateway API: User query result:', {
         rowsFound: userResult.rows.length,
-        userRole: userResult.rows[0]?.role
+        userRole: userResult.rows[0]?.role_name
       });
 
-      if (userResult.rows.length === 0 || userResult.rows[0].role !== 'admin') {
+      if (userResult.rows.length === 0 || 
+          (userResult.rows[0].role_name !== 'admin' && userResult.rows[0].role_name !== 'super_admin')) {
         console.log('❌ Gateway API: Admin access denied');
         return NextResponse.json(
           { error: 'Admin access required' },
@@ -83,10 +89,15 @@ export async function POST(request: NextRequest) {
         name: gateway.name,
         enabled: gateway.enabled,
         test_mode: gateway.testMode,
-        public_key: gateway.apiKeys?.publicKey || null,
-        secret_key: gateway.apiKeys?.secretKey || null,
-        webhook_secret: gateway.apiKeys?.webhookSecret || null,
-        hash: gateway.apiKeys?.hash || null,
+        public_key: gateway.apiKeys?.clientId || null,
+        secret_key: gateway.apiKeys?.clientSecret || null,
+        webhook_secret: null,
+        hash: gateway.apiKeys?.encryptionKey || null,
+        config: {
+          clientId: gateway.apiKeys?.clientId || null,
+          clientSecret: gateway.apiKeys?.clientSecret || null,
+          encryptionKey: gateway.apiKeys?.encryptionKey || null
+        },
         status: gateway.status || 'inactive',
         updated_at: new Date(),
       };
@@ -149,11 +160,11 @@ export async function POST(request: NextRequest) {
       } else {
         console.log('🔍 Gateway API: Processing regular gateway...');
         
-        // For other gateways, save without bank account config
+        // For other gateways, save with v3 config
         await client.query(
           `INSERT INTO payment_gateways 
-           (gateway_id, name, enabled, test_mode, public_key, secret_key, webhook_secret, hash, status, updated_at) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           (gateway_id, name, enabled, test_mode, public_key, secret_key, webhook_secret, hash, status, config, updated_at) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
            ON CONFLICT (gateway_id) 
            DO UPDATE SET 
              name = $2, 
@@ -164,7 +175,8 @@ export async function POST(request: NextRequest) {
              webhook_secret = $7, 
              hash = $8, 
              status = $9, 
-             updated_at = $10`,
+             config = $10,
+             updated_at = $11`,
           [
             gatewayData.gateway_id,
             gatewayData.name,
@@ -175,6 +187,7 @@ export async function POST(request: NextRequest) {
             gatewayData.webhook_secret,
             gatewayData.hash,
             gatewayData.status,
+            JSON.stringify(gatewayData.config),
             gatewayData.updated_at,
           ]
         );

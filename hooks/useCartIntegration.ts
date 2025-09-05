@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useSecureCart } from '@/contexts/SecureCartContext';
+import { useUnifiedCart } from '@/contexts/UnifiedCartContext';
 import { safeLog } from '@/utils/security';
 
 /**
@@ -13,7 +13,7 @@ import { safeLog } from '@/utils/security';
  */
 export function useCartIntegration() {
   const { data: session } = useSession();
-  const { clearCart, refreshCart } = useSecureCart();
+  const { clearCart, refreshCart } = useUnifiedCart();
 
   // Clear cart after successful order
   const clearCartAfterOrder = async (orderId: number) => {

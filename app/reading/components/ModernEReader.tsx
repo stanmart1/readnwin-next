@@ -72,11 +72,30 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const selectionTimeoutRef = useRef<NodeJS.Timeout>();
+  const progressSyncTimeout = useRef<NodeJS.Timeout>();
 
   // Local state
   const [isMenuVisible, setIsMenuVisible] = useState(true);
   const [lastInteraction, setLastInteraction] = useState(Date.now());
   const [scrollProgress, setScrollProgress] = useState(0);
+
+  // Sync reading progress to database
+  const syncProgressToDatabase = useCallback(async (bookId: string, userId: string, progressData: any) => {
+    try {
+      await fetch('/api/reading/progress', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          book_id: parseInt(bookId),
+          ...progressData
+        })
+      });
+    } catch (error) {
+      console.warn('Failed to sync progress:', error);
+    }
+  }, []);
 
   const loadEbook = useCallback(async (bookId: string, userId: string) => {
     try {
@@ -231,7 +250,7 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
 
   // Handle scroll for progress tracking
   const handleScroll = useCallback(() => {
-    if (!containerRef.current || !currentChapter) return;
+    if (!containerRef.current || !currentChapter || !bookId) return;
 
     const container = containerRef.current;
     const scrollTop = container.scrollTop;
@@ -244,14 +263,27 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
       : 100;
     setScrollProgress(progress);
 
-    // Update reading progress
+    // Update reading progress in store
     updateProgress({
       current_position: scrollTop,
       progress_percentage: progress,
     });
 
+    // Sync with database (throttled)
+    if (session?.user?.id) {
+      clearTimeout(progressSyncTimeout.current);
+      progressSyncTimeout.current = setTimeout(() => {
+        syncProgressToDatabase(bookId, session.user.id, {
+          chapter_id: currentChapter.id,
+          current_position: scrollTop,
+          progress_percentage: progress,
+          chapter_number: currentChapter.chapter_number
+        });
+      }, 2000); // Sync every 2 seconds of inactivity
+    }
+
     handleInteraction();
-  }, [currentChapter, updateProgress, handleInteraction]);
+  }, [currentChapter, updateProgress, handleInteraction, bookId, session]);
 
   // Handle text selection
   const handleTextSelection = useCallback(() => {

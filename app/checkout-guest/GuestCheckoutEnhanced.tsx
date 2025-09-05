@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/Toast';
 import { ShoppingBag, Download, Package, AlertCircle, Lock, User, Mail, MapPin, Truck, ChevronRight, Check } from 'lucide-react';
 import { useGuestCart } from '@/contexts/GuestCartContext';
 import Header from '@/components/Header';
+import SafeImage from '@/components/ui/SafeImage';
 
 interface CheckoutStep {
   id: number;
@@ -770,10 +771,14 @@ export default function GuestCheckoutEnhanced() {
               <div className="space-y-3 mb-4">
                 {cartItems.map((item) => (
                   <div key={item.id} className="flex items-center space-x-3 p-2 border border-gray-100 rounded">
-                    <img
-                      src={item.book?.cover_image_url || '/placeholder-book.png'}
-                      alt={item.book?.title}
+                    <SafeImage
+                      src={item.book?.cover_image_url ? `/api/images/covers/${item.book.cover_image_url.split('/').pop()}` : null}
+                      alt={item.book?.title || 'Book cover'}
+                      bookTitle={item.book?.title}
+                      width={48}
+                      height={64}
                       className="w-12 h-16 object-cover rounded"
+                      fallbackSrc="/placeholder-book.jpg"
                     />
                     <div className="flex-1 min-w-0">
                       <h4 className="text-sm font-medium text-gray-900 truncate">

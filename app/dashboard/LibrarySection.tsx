@@ -269,9 +269,9 @@ export default function LibrarySection() {
           ? "flex flex-wrap gap-4 sm:gap-6" 
           : "space-y-3"
         }>
-          {filteredBooks.map(book => (
+          {filteredBooks.map((book, index) => (
             viewMode === 'grid' ? (
-              <div key={`grid-${book.id}`} className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-blue-200 transform hover:-translate-y-2 w-full sm:w-72 md:w-80 flex-shrink-0">
+              <div key={`grid-${book.id}-${index}`} className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-blue-200 transform hover:-translate-y-2 w-full sm:w-72 md:w-80 flex-shrink-0">
                 <div className="aspect-[3/4] relative overflow-hidden">
                   <SafeImage
                     src={book.cover_image_url}
@@ -359,7 +359,7 @@ export default function LibrarySection() {
                 </div>
               </div>
             ) : (
-              <div key={`list-${book.id}`} className="group bg-white rounded-2xl border border-gray-100 hover:border-blue-200 hover:shadow-lg transition-all duration-300 p-6 transform hover:-translate-y-1">
+              <div key={`list-${book.id}-${index}`} className="group bg-white rounded-2xl border border-gray-100 hover:border-blue-200 hover:shadow-lg transition-all duration-300 p-6 transform hover:-translate-y-1">
                 <div className="flex items-center space-x-6">
                   <div className="flex-shrink-0 w-20 h-24 sm:w-24 sm:h-28 relative overflow-hidden rounded-xl shadow-md">
                     <SafeImage

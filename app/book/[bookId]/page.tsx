@@ -9,7 +9,7 @@ import SafeImage from '@/components/ui/SafeImage';
 import { formatNumber } from '@/utils/dateUtils';
 import { useGuestCart } from '@/contexts/GuestCartContext';
 import ReviewForm from '@/components/ReviewForm';
-import { sanitizeHtml } from '@/utils/security';
+import { sanitizeHtml, sanitizeForXSS } from '@/utils/security';
 
 
 interface BookDetails {
@@ -48,7 +48,18 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
   const [relatedBooks, setRelatedBooks] = useState<BookDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reviews, setReviews] = useState<any[]>([]);
+  interface Review {
+    id: number;
+    rating: number;
+    review_text: string;
+    title?: string;
+    first_name: string;
+    last_name: string;
+    created_at: string;
+    is_verified_purchase?: boolean;
+  }
+  
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const { data: session } = useSession();
   const { addToCart } = useGuestCart();
@@ -63,9 +74,13 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
       if (response.ok) {
         const data = await response.json();
         setReviews(data.reviews || []);
+      } else {
+        console.error('Failed to load reviews:', response.status);
+        setError('Failed to load reviews');
       }
     } catch (error) {
       console.error('Error loading reviews:', error);
+      setError('Failed to load reviews');
     } finally {
       setReviewsLoading(false);
     }
@@ -75,27 +90,33 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
   const loadBookData = useCallback(async () => {
     try {
       setLoading(true);
+      
+      // Load book and related books concurrently when possible
       const response = await fetch(`/api/books/${params.bookId}`);
       
       if (response.ok) {
         const data = await response.json();
         setBook(data.book);
         
-        // Load related books from the same category
+        // Load related books concurrently if category_id is available
         if (data.book?.category_id) {
-          try {
-            const relatedResponse = await fetch(`/api/books?category_id=${data.book.category_id}&limit=3`);
-            if (relatedResponse.ok) {
-              const relatedData = await relatedResponse.json();
-              // Filter out the current book from related books
+          const relatedPromise = fetch(`/api/books?category_id=${data.book.category_id}&limit=4`)
+            .then(relatedResponse => {
+              if (relatedResponse.ok) {
+                return relatedResponse.json();
+              }
+              throw new Error(`Failed to load related books: ${relatedResponse.status}`);
+            })
+            .then(relatedData => {
               const filteredRelatedBooks = relatedData.books?.filter((relatedBook: BookDetails) => relatedBook.id !== data.book.id) || [];
               setRelatedBooks(filteredRelatedBooks.slice(0, 3));
-            } else {
-              console.error('Failed to load related books:', relatedResponse.status);
-            }
-          } catch (relatedError) {
-            console.error('Error loading related books:', relatedError);
-          }
+            })
+            .catch(relatedError => {
+              console.error('Error loading related books:', relatedError);
+            });
+          
+          // Don't await - let it load in background
+          relatedPromise;
         }
       } else {
         setError('Book not found');
@@ -276,8 +297,8 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
             {/* Book Info */}
             <div className="lg:col-span-2">
               <div className="mb-6">
-                <h1 className="text-5xl font-bold text-gray-900 mb-3 leading-tight">{sanitizeHtml(book.title)}</h1>
-                <p className="text-2xl text-gray-600 mb-6">by <span className="font-semibold text-blue-600">{sanitizeHtml(book.author_name)}</span></p>
+                <h1 className="text-5xl font-bold text-gray-900 mb-3 leading-tight">{sanitizeForXSS(book.title)}</h1>
+                <p className="text-2xl text-gray-600 mb-6">by <span className="font-semibold text-blue-600">{sanitizeForXSS(book.author_name)}</span></p>
                 
                 {/* Rating */}
                 <div className="flex items-center space-x-4 mb-6">
@@ -344,7 +365,7 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-xl border border-blue-100">
                     <span className="text-gray-500 text-sm font-medium">Category</span>
-                    <p className="font-semibold text-gray-900 text-lg">{sanitizeHtml(book.category_name)}</p>
+                    <p className="font-semibold text-gray-900 text-lg">{sanitizeForXSS(book.category_name)}</p>
                   </div>
                   <div className="bg-gradient-to-r from-green-50 to-teal-50 p-4 rounded-xl border border-green-100">
                     <span className="text-gray-500 text-sm font-medium">Pages</span>
@@ -361,7 +382,7 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                   </div>
                   <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-xl border border-yellow-100">
                     <span className="text-gray-500 text-sm font-medium">Language</span>
-                    <p className="font-semibold text-gray-900 text-lg">{sanitizeHtml(book.language)}</p>
+                    <p className="font-semibold text-gray-900 text-lg">{sanitizeForXSS(book.language)}</p>
                   </div>
                 </div>
               </div>
@@ -398,7 +419,7 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                 <h3 className="text-3xl font-bold text-gray-900 mb-6">About this book</h3>
                 <div className="prose prose-lg max-w-none">
                   {book.description ? (
-                    <p className="text-gray-600 leading-relaxed text-lg">{book.description}</p>
+                    <p className="text-gray-600 leading-relaxed text-lg">{sanitizeForXSS(book.description)}</p>
                   ) : (
                     <div className="text-center py-8">
                       <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -437,7 +458,7 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                   ) : reviews.length > 0 ? (
                     <div className="space-y-6">
                       <h4 className="text-xl font-semibold text-gray-900">All Reviews ({reviews.length})</h4>
-                      {reviews.map((review: any) => (
+                      {reviews.map((review: Review) => (
                         <div key={review.id} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center space-x-3">
@@ -467,9 +488,9 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                             </span>
                           </div>
                           {review.title && (
-                            <h5 className="font-semibold text-gray-900 mb-2">{review.title}</h5>
+                            <h5 className="font-semibold text-gray-900 mb-2">{sanitizeForXSS(review.title)}</h5>
                           )}
-                          <p className="text-gray-700 leading-relaxed">{review.review_text}</p>
+                          <p className="text-gray-700 leading-relaxed">{sanitizeForXSS(review.review_text)}</p>
                         </div>
                       ))}
                     </div>
@@ -522,11 +543,11 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                     </div>
                     <div className="bg-gradient-to-r from-emerald-50 to-green-50 p-6 rounded-2xl border border-emerald-100">
                       <span className="text-gray-500 text-sm font-medium">Language</span>
-                      <p className="font-semibold text-gray-900 text-xl">{book.language}</p>
+                      <p className="font-semibold text-gray-900 text-xl">{sanitizeForXSS(book.language)}</p>
                     </div>
                     <div className="bg-gradient-to-r from-rose-50 to-red-50 p-6 rounded-2xl border border-rose-100">
                       <span className="text-gray-500 text-sm font-medium">Category</span>
-                      <p className="font-semibold text-gray-900 text-xl">{book.category_name}</p>
+                      <p className="font-semibold text-gray-900 text-xl">{sanitizeForXSS(book.category_name)}</p>
                     </div>
 
                   </div>
@@ -573,9 +594,9 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
                         </div>
                         <div className="p-6">
                           <h4 className="font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors line-clamp-2 text-lg">
-                            {relatedBook.title}
+                            {sanitizeForXSS(relatedBook.title)}
                           </h4>
-                          <p className="text-gray-600 mb-3">{relatedBook.author_name}</p>
+                          <p className="text-gray-600 mb-3">{sanitizeForXSS(relatedBook.author_name)}</p>
                           <span className="text-xl font-bold gradient-text">₦{relatedBook.price.toLocaleString()}</span>
                         </div>
                       </div>

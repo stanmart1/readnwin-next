@@ -219,7 +219,7 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center">
               <h1 className="text-2xl font-bold text-gray-900 mb-4">Book Not Found</h1>
-              <p className="text-gray-600 mb-8">{error || 'The book you are looking for does not exist.'}</p>
+              <p className="text-gray-600 mb-8">{sanitizeForXSS(error || 'The book you are looking for does not exist.')}</p>
               <Link 
                 href="/books" 
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -244,7 +244,7 @@ export default function BookDetailsPage({ params }: { params: { bookId: string }
           <i className="ri-arrow-right-s-line"></i>
           <Link href="/books" className="hover:text-blue-600 transition-colors cursor-pointer">Books</Link>
           <i className="ri-arrow-right-s-line"></i>
-          <span className="text-gray-900 font-medium">{book.title}</span>
+          <span className="text-gray-900 font-medium">{sanitizeForXSS(book.title)}</span>
         </nav>
 
         {/* Book Details Section */}

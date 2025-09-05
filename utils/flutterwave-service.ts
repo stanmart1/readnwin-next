@@ -204,7 +204,7 @@ export class FlutterwaveService {
       tx_ref: data.tx_ref,
       amount: Number(data.amount),
       currency: data.currency.toUpperCase(),
-      payment_options: 'card,mobilemoney,ussd',
+      payment_options: 'card,banktransfer,ussd',
       customer: {
         email: data.customer.email,
         phone_number: data.customer.phone_number || '',

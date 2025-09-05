@@ -5,97 +5,83 @@ import { authOptions } from '@/lib/auth';
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const formData = await request.formData();
-    const file = formData.get('ebook_file') as File;
+    const file = formData.get('file') as File;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    const fileName = file.name.toLowerCase();
-    const isEpub = fileName.endsWith('.epub');
-    const isHtml = fileName.endsWith('.html') || fileName.endsWith('.htm');
-    
-    if (!isEpub && !isHtml) {
-      return NextResponse.json({ error: 'Only EPUB and HTML files are supported' }, { status: 400 });
+    const buffer = Buffer.from(await file.arrayBuffer());
+    let metadata = {
+      title: '',
+      author: '',
+      pages: 0,
+      wordCount: 0
+    };
+
+    if (file.name.toLowerCase().endsWith('.epub')) {
+      try {
+        const JSZip = (await import('jszip')).default;
+        const zip = await JSZip.loadAsync(buffer);
+        
+        const containerFile = zip.file('META-INF/container.xml');
+        if (containerFile) {
+          const containerXml = await containerFile.async('text');
+          const opfMatch = containerXml.match(/full-path="([^"]+)"/i);
+          
+          if (opfMatch) {
+            const opfFile = zip.file(opfMatch[1]);
+            if (opfFile) {
+              const opfXml = await opfFile.async('text');
+              
+              const titleMatch = opfXml.match(/<dc:title[^>]*>([^<]+)<\/dc:title>/i);
+              const creatorMatch = opfXml.match(/<dc:creator[^>]*>([^<]+)<\/dc:creator>/i);
+              
+              if (titleMatch) metadata.title = titleMatch[1];
+              if (creatorMatch) metadata.author = creatorMatch[1];
+              
+              const spineMatches = opfXml.match(/<itemref[^>]*idref="[^"]+"/gi);
+              if (spineMatches) {
+                metadata.pages = Math.max(spineMatches.length * 2, 10);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('EPUB parsing error:', error);
+      }
+    } else if (file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm')) {
+      const htmlContent = buffer.toString('utf-8');
+      
+      const titleMatch = htmlContent.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const authorMatch = htmlContent.match(/<meta[^>]*name=["']author["'][^>]*content=["']([^"']+)["']/i);
+      
+      if (titleMatch) metadata.title = titleMatch[1];
+      if (authorMatch) metadata.author = authorMatch[1];
+      
+      const textContent = htmlContent.replace(/<[^>]*>/g, ' ');
+      const words = textContent.trim().split(/\s+/).filter(w => w.length > 0);
+      metadata.wordCount = words.length;
+      metadata.pages = Math.ceil(words.length / 250);
     }
 
-    try {
-      let pages = 0;
-      
-      if (isEpub) {
-        const buffer = await file.arrayBuffer();
-        pages = await parseEpubPages(buffer);
-      } else if (isHtml) {
-        const text = await file.text();
-        pages = await parseHtmlPages(text);
-      }
-      
-      return NextResponse.json({ 
-        success: true, 
-        pages,
-        format: isEpub ? 'epub' : 'html',
-        message: `Successfully extracted ${pages} pages from ${isEpub ? 'EPUB' : 'HTML'} file`
-      });
-    } catch (parseError) {
-      console.error('Error parsing file:', parseError);
-      return NextResponse.json({ 
-        error: `Failed to parse ${isEpub ? 'EPUB' : 'HTML'} file`,
-        details: parseError instanceof Error ? parseError.message : 'Unknown error'
-      }, { status: 500 });
-    }
+    return NextResponse.json({
+      success: true,
+      metadata
+    });
+
   } catch (error) {
     console.error('Parse ebook error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
-  }
-}
-
-async function parseEpubPages(buffer: ArrayBuffer): Promise<number> {
-  try {
-    const JSZip = (await import('jszip')).default;
-    const zip = await JSZip.loadAsync(buffer);
-    
-    const htmlFiles = Object.keys(zip.files).filter(filename => 
-      filename.toLowerCase().match(/\.(html|xhtml|htm)$/) && 
-      !filename.startsWith('META-INF/') &&
-      !filename.includes('toc.') &&
-      !filename.includes('nav.')
-    );
-    
-    let totalContentLength = 0;
-    for (const filename of htmlFiles) {
-      try {
-        const content = await zip.files[filename].async('text');
-        const textContent = content.replace(/<[^>]*>/g, '').trim();
-        totalContentLength += textContent.length;
-      } catch (error) {
-        console.warn(`Could not read file ${filename}:`, error);
-      }
-    }
-    
-    const estimatedPages = Math.max(1, Math.ceil(totalContentLength / 2000));
-    return Math.max(htmlFiles.length, estimatedPages);
-  } catch (error) {
-    console.error('Error parsing EPUB:', error);
-    return 100;
-  }
-}
-
-async function parseHtmlPages(htmlContent: string): Promise<number> {
-  try {
-    const textContent = htmlContent.replace(/<[^>]*>/g, '').trim();
-    const wordCount = textContent.split(/\s+/).filter(word => word.length > 0).length;
-    const estimatedPages = Math.max(1, Math.ceil(wordCount / 250)); // 250 words per page
-    return estimatedPages;
-  } catch (error) {
-    console.error('Error parsing HTML:', error);
-    return 50;
+    return NextResponse.json({ error: 'Failed to parse ebook' }, { status: 500 });
   }
 }

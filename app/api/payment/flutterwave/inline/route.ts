@@ -148,6 +148,7 @@ export async function POST(request: NextRequest) {
           description: 'Payment for your order',
           logo: `${process.env.NEXTAUTH_URL || 'https://readnwin.com'}/logo.png`,
         },
+        payment_options: 'card,banktransfer,ussd',
         meta: {
           ...meta,
           user_id: session.user.id,

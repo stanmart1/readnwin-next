@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  return NextResponse.json({ categories: [] });
+  return NextResponse.json({ message: 'About us endpoint' });
 }

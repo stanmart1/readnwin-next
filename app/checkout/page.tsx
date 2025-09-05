@@ -13,16 +13,12 @@ import NewCheckoutFlow from '@/components/checkout/NewCheckoutFlow';
 export default function EnhancedCheckoutPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const guestCart = useGuestCart();
   const { cartItems, getSubtotal, getTotalItems, isLoading, error } = useUnifiedCart();
-  
-  // Use appropriate cart based on authentication status
-  const { items: cartItems, isLoading, error } = session ? secureCart : guestCart;
-  const getTotalItems = () => session ? secureCart.totalItems : guestCart.getTotalItems();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [selectedShippingMethod, setSelectedShippingMethod] = useState<any>(null);
 
   // Flutterwave inline payment hook
   const { initializePayment, isLoading: isPaymentLoading, error: paymentError } = useFlutterwaveInline({
@@ -61,29 +57,20 @@ export default function EnhancedCheckoutPage() {
       console.log('Checkout completed:', orderData);
       
       if (orderData.success && orderData.order) {
-        const orderId = orderData.order.id || orderData.order.order_number;
+        const orderId = orderData.orderId || orderData.order.order_number || orderData.order.id;
         console.log('Order ID for redirect:', orderId);
         
         if (!orderId) {
           throw new Error('Order ID not found in response');
         }
         
-        // Refresh cart context to reflect cleared cart
-        try {
-          if (session) {
-            await secureCart.refreshCart();
-          } else {
-            guestCart.clearCart();
-          }
-          console.log('Cart refreshed after successful order creation');
-        } catch (cartRefreshError) {
-          console.warn('Failed to refresh cart after checkout:', cartRefreshError);
-        }
+        // Cart will be cleared automatically after successful checkout
         
         // Handle different payment methods
-        if (orderData.paymentMethod === 'flutterwave' && orderData.inlinePaymentData) {
-          // Use inline payment for Flutterwave
-          await handleInlinePayment(orderData);
+        if (orderData.paymentMethod === 'flutterwave' && orderData.paymentUrl) {
+          // Redirect to Flutterwave payment page
+          window.location.href = orderData.paymentUrl;
+          return;
         } else if (orderData.paymentMethod === 'bank_transfer') {
           // Redirect to bank transfer instructions
           router.push(`/order-confirmation/${orderId}?payment=bank_transfer`);
@@ -330,13 +317,14 @@ export default function EnhancedCheckoutPage() {
               cartItems={cartItems || []}
               onComplete={handleCheckoutComplete}
               onCancel={handleCancel}
+              onShippingMethodChange={setSelectedShippingMethod}
             />
           </div>
 
           {/* Order Summary Sidebar */}
           <div className="lg:col-span-1 order-first lg:order-last">
             <div className="lg:sticky lg:top-8">
-              <OrderSummarySidebar cartItems={cartItems || []} />
+              <OrderSummarySidebar cartItems={cartItems || []} shippingMethod={selectedShippingMethod} />
             </div>
           </div>
         </div>
@@ -346,7 +334,9 @@ export default function EnhancedCheckoutPage() {
 }
 
 // Order Summary Sidebar Component
-function OrderSummarySidebar({ cartItems }: { cartItems: any[] }) {
+function OrderSummarySidebar({ cartItems, shippingMethod }: { cartItems: any[]; shippingMethod?: any }) {
+  const { updateQuantity } = useUnifiedCart();
+  
   // Calculate cart analytics
   const ebooks = cartItems.filter(item => 
     item.book?.format === 'ebook' || item.book?.format === 'both'
@@ -362,23 +352,63 @@ function OrderSummarySidebar({ cartItems }: { cartItems: any[] }) {
     return sum + (price * quantity);
   }, 0);
   
-  // Use the same shipping calculation logic as the backend
-  const shipping = isEbookOnly ? 0 : 3000; // ₦3,000 base cost for Express Shipping
+  // Calculate shipping cost from selected method
+  const shipping = isEbookOnly ? 0 : parseFloat(shippingMethod?.base_cost || 0);
   const tax = Math.round(subtotal * 0.075); // 7.5% tax
-  const total = subtotal + shipping + tax;
+  const total = parseFloat(subtotal) + parseFloat(shipping) + parseFloat(tax);
 
   return (
     <div className="card p-6">
       <h3 className="text-xl font-bold text-gray-900 mb-6">Order Summary</h3>
       
-      <div className="space-y-3 mb-4">
+      {/* Cart Items */}
+      <div className="space-y-4 mb-6 max-h-64 overflow-y-auto">
+        {cartItems.map((item) => (
+          <div key={item.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+            <img
+              src={item.book?.cover_image_url}
+              alt={item.book?.title}
+              className="w-12 h-16 object-cover rounded"
+            />
+            <div className="flex-1 min-w-0">
+              <h4 className="text-sm font-medium text-gray-900 truncate">
+                {item.book?.title}
+              </h4>
+              <p className="text-xs text-gray-500">
+                ₦{item.book?.price?.toLocaleString()}
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => updateQuantity(item.book_id, item.quantity - 1)}
+                className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 text-xs"
+              >
+                <i className="ri-subtract-line"></i>
+              </button>
+              <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+              <button
+                onClick={() => updateQuantity(item.book_id, item.quantity + 1)}
+                className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 text-xs"
+              >
+                <i className="ri-add-line"></i>
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="space-y-3 mb-4 border-t pt-4">
         <div className="flex justify-between">
           <span>Subtotal ({cartItems.length} items)</span>
           <span>₦{subtotal.toLocaleString()}</span>
         </div>
         <div className="flex justify-between">
           <span>Shipping</span>
-          <span>{isEbookOnly ? 'Free' : `₦${shipping.toLocaleString()}`}</span>
+          <span>
+            {isEbookOnly ? 'Free' : 
+             shippingMethod ? `₦${shipping.toLocaleString()}` : 
+             'Select method'}
+          </span>
         </div>
         <div className="flex justify-between">
           <span>Tax (7.5%)</span>

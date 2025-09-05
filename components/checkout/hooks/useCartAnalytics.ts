@@ -45,12 +45,12 @@ export function useCartAnalytics(cartItems: CartItem[], selectedShippingMethod?:
     const isMixedCart = hasEbooks && hasPhysicalBooks;
 
     const subtotal = cartItems.reduce((sum, item) => {
-      return sum + ((item.book?.price || 0) * item.quantity);
+      return sum + ((parseFloat(item.book?.price || 0)) * parseInt(item.quantity || 0));
     }, 0);
 
-    const estimatedShipping = isEbookOnly ? 0 : (selectedShippingMethod?.base_cost || 3000);
-    const tax = subtotal * 0.075; // 7.5% VAT
-    const total = subtotal + estimatedShipping + tax;
+    const estimatedShipping = isEbookOnly ? 0 : parseFloat(selectedShippingMethod?.base_cost || 0);
+    const tax = Math.round(subtotal * 0.075); // 7.5% VAT
+    const total = parseFloat(subtotal) + parseFloat(estimatedShipping) + parseFloat(tax);
 
     return {
       hasEbooks,

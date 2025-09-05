@@ -231,15 +231,7 @@ export async function POST(request: NextRequest) {
       // Don't throw error here as the order was created successfully
     }
 
-    // Clear cart after successful order creation (for all payment methods)
-    try {
-      console.log('🔍 Clearing cart after successful order creation...');
-      await ecommerceService.clearCart(userId);
-      console.log('✅ Cart cleared successfully after order creation');
-    } catch (cartError) {
-      console.error('❌ Error clearing cart after order creation:', sanitizeLogInput(cartError));
-      // Don't fail the entire checkout for cart clearing issues
-    }
+    // Note: Cart will be cleared after successful payment processing
 
     // Handle different payment methods
     if (formData.payment.method === 'bank_transfer') {
@@ -268,13 +260,13 @@ export async function POST(request: NextRequest) {
       
       console.log('🔍 Bank transfer record created:', bankTransfer.id);
       
-      // Update order payment status to payment_processing (waiting for proof)
+      // Update order payment status to pending (waiting for proof)
       await query(`
         UPDATE orders 
-        SET payment_status = 'payment_processing', updated_at = CURRENT_TIMESTAMP 
+        SET payment_status = 'pending', updated_at = CURRENT_TIMESTAMP 
         WHERE id = $1
       `, [order.id]);
-      console.log('🔍 Order payment status updated to payment_processing');
+      console.log('🔍 Order payment status updated to pending');
       
       // Get default bank account details
       const defaultBankAccount = await bankTransferService.getDefaultBankAccount();
@@ -289,16 +281,19 @@ export async function POST(request: NextRequest) {
         expires_at: bankTransfer.expires_at
       };
 
+      // Note: Cart will be cleared after payment verification
+      
       console.log('✅ Bank transfer processed successfully');
       console.log('🔍 Bank transfer ID:', bankTransfer.id);
       console.log('🔍 Bank transfer details:', bankTransferDetails);
       
       return NextResponse.json({
         success: true,
-        order: { ...order, payment_status: 'payment_processing' },
+        order: { ...order, payment_status: 'pending' },
         paymentMethod: 'bank_transfer',
         bankTransferId: bankTransfer.id,
         bankTransferDetails,
+        orderId: order.order_number, // Use order_number for routing
         message: 'Order created successfully. Please complete bank transfer and upload proof.'
       });
 
@@ -306,13 +301,36 @@ export async function POST(request: NextRequest) {
       console.log('🔍 Processing Flutterwave payment...');
       // Initialize Flutterwave payment
       try {
-        const gateway = await getPaymentGateway('flutterwave');
+        let gateway = await getPaymentGateway('flutterwave');
         console.log('🔍 Payment gateway:', gateway ? 'Found' : 'Not found');
         
-        if (!gateway || !gateway.enabled) {
-          console.log('❌ Flutterwave payment not available');
+        // Fallback to environment variables if gateway not found in database
+        if (!gateway) {
+          const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+          const publicKey = process.env.FLUTTERWAVE_PUBLIC_KEY;
+          
+          console.log('🔍 Environment variables check:', {
+            hasSecretKey: !!secretKey,
+            hasPublicKey: !!publicKey,
+            secretKeyPrefix: secretKey ? secretKey.substring(0, 10) + '...' : 'NOT SET'
+          });
+          
+          gateway = {
+            gateway_id: 'flutterwave',
+            name: 'Flutterwave',
+            enabled: !!secretKey,
+            secret_key: secretKey,
+            public_key: publicKey,
+            hash: process.env.FLUTTERWAVE_HASH,
+            test_mode: process.env.NODE_ENV !== 'production'
+          };
+          console.log('🔍 Using fallback Flutterwave configuration from environment');
+        }
+        
+        if (!gateway.enabled || !gateway.secret_key) {
+          console.log('❌ Flutterwave payment not configured. Missing secret key.');
           return NextResponse.json(
-            { error: 'Flutterwave payment is not available' },
+            { error: 'Payment processing is temporarily unavailable. Please try bank transfer.' },
             { status: 400 }
           );
         }
@@ -324,7 +342,12 @@ export async function POST(request: NextRequest) {
           testMode: gateway.test_mode
         });
 
-        const flutterwaveService = new FlutterwaveService();
+        const flutterwaveService = new FlutterwaveService(
+          gateway.secret_key,
+          gateway.public_key,
+          gateway.hash,
+          gateway.test_mode
+        );
 
         const paymentData = {
           amount: Number(order.total_amount), // Ensure amount is a number
@@ -341,13 +364,16 @@ export async function POST(request: NextRequest) {
           customizations: {
             title: 'ReadnWin Payment',
             description: `Payment for order ${order.order_number}`,
-            logo: `${process.env.NEXTAUTH_URL || 'https://readnwin.com'}/logo.png`,
+            logo: 'https://readnwin.com/logo.png',
           },
           meta: {
             order_id: order.id,
             user_id: userId,
             order_number: order.order_number,
             is_ebook_only: isEbookOnly,
+            disable_forter: true,
+            disable_fingerprint: true,
+            disable_metrics: true
           },
         };
 
@@ -363,6 +389,8 @@ export async function POST(request: NextRequest) {
         
         const result = await flutterwaveService.initializePayment(paymentData);
         console.log('✅ Flutterwave payment initialized:', JSON.stringify(result, null, 2));
+
+        // Note: Cart will be cleared after successful payment verification
 
         return NextResponse.json({
           success: true,

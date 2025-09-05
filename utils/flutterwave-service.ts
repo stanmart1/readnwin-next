@@ -74,17 +74,25 @@ export class FlutterwaveService {
   private testMode: boolean;
 
   constructor(
-    clientSecret: string,
-    clientId: string,
-    encryptionKey: string,
+    clientSecret?: string,
+    clientId?: string,
+    encryptionKey?: string,
     testMode?: boolean
   ) {
-    this.clientId = clientId || process.env.FLUTTERWAVE_CLIENT_ID || '';
-    this.clientSecret = clientSecret || process.env.FLUTTERWAVE_CLIENT_SECRET || '';
-    this.encryptionKey = encryptionKey || process.env.FLUTTERWAVE_ENCRYPTION_KEY || '';
+    this.clientSecret = clientSecret || process.env.FLUTTERWAVE_SECRET_KEY || '';
+    this.clientId = clientId || process.env.FLUTTERWAVE_PUBLIC_KEY || '';
+    this.encryptionKey = encryptionKey || process.env.FLUTTERWAVE_HASH || '';
     this.testMode = testMode !== undefined ? testMode : process.env.NODE_ENV !== 'production';
     
     this.baseUrl = 'https://api.flutterwave.com/v3';
+
+    console.log('🔍 FlutterwaveService initialized:', {
+      hasSecretKey: !!this.clientSecret,
+      hasPublicKey: !!this.clientId,
+      hasHash: !!this.encryptionKey,
+      testMode: this.testMode,
+      secretKeyPrefix: this.clientSecret ? this.clientSecret.substring(0, 10) + '...' : 'NOT SET'
+    });
 
     // Validate required credentials
     if (!this.clientSecret) {
@@ -92,9 +100,6 @@ export class FlutterwaveService {
     }
     if (!this.clientId) {
       console.error('❌ Flutterwave client ID not found');
-    }
-    if (!this.encryptionKey) {
-      console.error('❌ Flutterwave encryption key not found');
     }
   }
 

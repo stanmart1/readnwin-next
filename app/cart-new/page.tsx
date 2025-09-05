@@ -356,7 +356,7 @@ export default function CartPage() {
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Shipping</span>
                       <span className="font-medium text-xs sm:text-sm">
-                        {session ? 'Calculated at checkout' : 'Sign in to calculate'}
+                        {session ? 'Based on delivery address' : 'Requires sign in'}
                       </span>
                     </div>
                   )}
@@ -368,10 +368,10 @@ export default function CartPage() {
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
                       {isEbookOnly() 
-                        ? 'No shipping required' 
+                        ? 'Digital delivery - no shipping fees' 
                         : session 
-                          ? 'Shipping calculated at checkout'
-                          : 'Sign in to see final total'
+                          ? 'Shipping fees added at checkout based on location'
+                          : 'Sign in to calculate shipping and final total'
                       }
                     </p>
                   </div>

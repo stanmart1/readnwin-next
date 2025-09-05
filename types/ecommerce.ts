@@ -388,6 +388,6 @@ export interface UserStats {
 // Utility Types
 export type BookFormat = 'ebook' | 'physical' | 'both';
 export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
-export type PaymentStatus = 'pending' | 'pending_bank_transfer' | 'paid' | 'failed' | 'refunded';
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 export type PaymentMethod = 'flutterwave' | 'bank_transfer';
 export type TransactionStatus = 'pending' | 'success' | 'failed' | 'cancelled'; 

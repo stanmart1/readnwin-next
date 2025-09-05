@@ -181,17 +181,26 @@ export function UnifiedCartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    setIsLoading(true);
     try {
       if (session?.user?.id) {
+        // Update state immediately for better UX
+        setCartItems(prev => 
+          prev.map(item => 
+            item.book_id === bookId ? { ...item, quantity } : item
+          )
+        );
+
+        // Update on server in background
         const response = await fetch('/api/cart/secure', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ bookId, quantity })
         });
         
-        if (response.ok) {
+        if (!response.ok) {
+          // Revert on error
           await loadAuthenticatedCart();
+          throw new Error('Failed to update quantity');
         }
       } else {
         setCartItems(prev => {
@@ -205,23 +214,26 @@ export function UnifiedCartProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error updating quantity:', error);
       setError('Failed to update quantity');
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const removeFromCart = async (bookId: number) => {
-    setIsLoading(true);
     try {
       if (session?.user?.id) {
+        // Update state immediately for better UX
+        setCartItems(prev => prev.filter(item => item.book_id !== bookId));
+
+        // Update on server in background
         const response = await fetch('/api/cart/secure', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ bookId })
         });
         
-        if (response.ok) {
+        if (!response.ok) {
+          // Revert on error
           await loadAuthenticatedCart();
+          throw new Error('Failed to remove item');
         }
       } else {
         setCartItems(prev => {
@@ -233,8 +245,6 @@ export function UnifiedCartProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error removing from cart:', error);
       setError('Failed to remove item');
-    } finally {
-      setIsLoading(false);
     }
   };
 

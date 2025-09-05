@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { sanitizeForXSS, sanitizeLogInput } from '@/utils/security';
 import { useToast } from '@/components/ui/Toast';
 import { useCheckoutData } from './hooks/useCheckoutData';
-import { useCartAnalytics } from './hooks/useCartAnalytics';
 import { 
   CheckCircle, 
   Truck, 
@@ -30,6 +29,7 @@ interface CheckoutFlowProps {
   cartItems: CartItem[];
   onComplete: (orderData: any) => void;
   onCancel: () => void;
+  onShippingMethodChange?: (method: any) => void;
 }
 
 interface ShippingAddress {
@@ -87,49 +87,66 @@ interface CartAnalytics {
   total: number;
 }
 
-export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: CheckoutFlowProps) {
+export default function NewCheckoutFlow({ cartItems, onComplete, onCancel, onShippingMethodChange }: CheckoutFlowProps) {
   const { data: session } = useSession();
   const router = useRouter();
   const { showToast, ToastContainer } = useToast();
   
-  // State management
-  const [currentStep, setCurrentStep] = useState(1);
+  // State management with localStorage persistence
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('checkout_step');
+      return saved ? parseInt(saved) : 1;
+    }
+    return 1;
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [formData, setFormData] = useState<CheckoutFormData>({
-    shipping: {
-      first_name: session?.user?.firstName || '',
-      last_name: session?.user?.lastName || '',
-      email: session?.user?.email || '',
-      phone: '',
-      address: '',
-      city: '',
-      state: '',
-      zip_code: '',
-      country: 'NG'
-    },
-    billing: {
-      same_as_shipping: true,
-      first_name: '',
-      last_name: '',
-      email: '',
-      phone: '',
-      address: '',
-      city: '',
-      state: '',
-      zip_code: '',
-      country: 'NG'
-    },
-    payment: {
-      gateway: 'flutterwave',
-      method: 'card'
+  const [formData, setFormData] = useState<CheckoutFormData>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('checkout_form');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error('Failed to parse saved checkout form:', e);
+        }
+      }
     }
+    return {
+      shipping: {
+        first_name: session?.user?.firstName || '',
+        last_name: session?.user?.lastName || '',
+        email: session?.user?.email || '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        zip_code: '',
+        country: 'NG'
+      },
+      billing: {
+        same_as_shipping: true,
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        zip_code: '',
+        country: 'NG'
+      },
+      payment: {
+        gateway: 'flutterwave',
+        method: 'card'
+      }
+    };
   });
   
   // Use custom hooks for data management
   const { shippingMethods, paymentGateways, isLoading: dataLoading, error: dataError } = useCheckoutData();
-  const analytics = useCartAnalytics(cartItems, formData.shipping_method);
 
   // Analyze cart contents to determine checkout flow
   const analyzeCart = useCallback((selectedShippingMethod?: ShippingMethod) => {
@@ -149,13 +166,13 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
     const isMixedCart = hasEbooks && hasPhysicalBooks;
 
     const subtotal = cartItems.reduce((sum, item) => {
-      return sum + ((item.book?.price || 0) * item.quantity);
+      return sum + ((parseFloat(item.book?.price || 0)) * parseInt(item.quantity || 0));
     }, 0);
 
     // Use selected shipping method cost or default to Express Shipping (₦3,000)
-    const estimatedShipping = isEbookOnly ? 0 : (selectedShippingMethod?.base_cost || 3000);
-    const tax = subtotal * 0.075; // 7.5% VAT
-    const total = subtotal + estimatedShipping + tax;
+    const estimatedShipping = isEbookOnly ? 0 : parseFloat(selectedShippingMethod?.base_cost || 3000);
+    const tax = Math.round(subtotal * 0.075); // 7.5% VAT
+    const total = parseFloat(subtotal) + parseFloat(estimatedShipping) + parseFloat(tax);
 
     return {
       hasEbooks,
@@ -170,6 +187,9 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
       total
     };
   }, [cartItems]);
+
+  // Calculate analytics using the analyzeCart function
+  const analytics = analyzeCart(formData.shipping_method);
 
   // Generate checkout steps based on cart contents
   const generateSteps = useCallback((): CheckoutStep[] => {
@@ -240,11 +260,30 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
         [section]: { ...prev[section], ...data }
       };
       
-      // Shipping method changes will be handled by the useCartAnalytics hook
-      
       return newFormData;
     });
   };
+
+  // Save form data to localStorage when it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('checkout_form', JSON.stringify(formData));
+    }
+  }, [formData]);
+
+  // Save current step to localStorage when it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('checkout_step', currentStep.toString());
+    }
+  }, [currentStep]);
+
+  // Notify parent of shipping method changes
+  useEffect(() => {
+    if (formData.shipping_method && onShippingMethodChange) {
+      onShippingMethodChange(formData.shipping_method);
+    }
+  }, [formData.shipping_method, onShippingMethodChange]);
 
   const validateStep = (step: number): boolean => {
     const steps = generateSteps();
@@ -299,7 +338,14 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
       }
 
       const checkoutData = {
-        formData,
+        formData: {
+          ...formData,
+          shippingMethod: formData.shipping_method?.id, // Extract ID for API
+          payment: {
+            ...formData.payment,
+            method: formData.payment.gateway // Map gateway to method for consistency
+          }
+        },
         cartItems,
         analytics
       };
@@ -322,6 +368,11 @@ export default function NewCheckoutFlow({ cartItems, onComplete, onCancel }: Che
       
       // Handle successful checkout
       if (result.success) {
+        // Clear saved checkout data on success
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('checkout_form');
+          localStorage.removeItem('checkout_step');
+        }
         showToast('Order created successfully!', 'success');
         onComplete(result);
       } else {
@@ -634,17 +685,43 @@ function ShippingAddressStep({ formData, updateFormData }: {
             onChange={(e) => updateFormData('shipping', { state: e.target.value })}
           >
             <option value="">Select State</option>
-            <option value="Lagos">Lagos</option>
-            <option value="Abuja">Abuja (FCT)</option>
-            <option value="Kano">Kano</option>
-            <option value="Rivers">Rivers</option>
-            <option value="Oyo">Oyo</option>
-            <option value="Kaduna">Kaduna</option>
-            <option value="Ogun">Ogun</option>
-            <option value="Imo">Imo</option>
-            <option value="Plateau">Plateau</option>
+            <option value="Abia">Abia</option>
+            <option value="Adamawa">Adamawa</option>
+            <option value="Akwa Ibom">Akwa Ibom</option>
+            <option value="Anambra">Anambra</option>
+            <option value="Bauchi">Bauchi</option>
+            <option value="Bayelsa">Bayelsa</option>
+            <option value="Benue">Benue</option>
+            <option value="Borno">Borno</option>
+            <option value="Cross River">Cross River</option>
             <option value="Delta">Delta</option>
-            {/* Add more Nigerian states as needed */}
+            <option value="Ebonyi">Ebonyi</option>
+            <option value="Edo">Edo</option>
+            <option value="Ekiti">Ekiti</option>
+            <option value="Enugu">Enugu</option>
+            <option value="FCT">FCT (Abuja)</option>
+            <option value="Gombe">Gombe</option>
+            <option value="Imo">Imo</option>
+            <option value="Jigawa">Jigawa</option>
+            <option value="Kaduna">Kaduna</option>
+            <option value="Kano">Kano</option>
+            <option value="Katsina">Katsina</option>
+            <option value="Kebbi">Kebbi</option>
+            <option value="Kogi">Kogi</option>
+            <option value="Kwara">Kwara</option>
+            <option value="Lagos">Lagos</option>
+            <option value="Nasarawa">Nasarawa</option>
+            <option value="Niger">Niger</option>
+            <option value="Ogun">Ogun</option>
+            <option value="Ondo">Ondo</option>
+            <option value="Osun">Osun</option>
+            <option value="Oyo">Oyo</option>
+            <option value="Plateau">Plateau</option>
+            <option value="Rivers">Rivers</option>
+            <option value="Sokoto">Sokoto</option>
+            <option value="Taraba">Taraba</option>
+            <option value="Yobe">Yobe</option>
+            <option value="Zamfara">Zamfara</option>
           </select>
         </div>
       </div>

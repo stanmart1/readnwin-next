@@ -630,12 +630,29 @@ export class EcommerceService {
   // User Library Management
   async addToUserLibrary(userId: number, bookId: number, orderId?: number): Promise<UserLibraryItem> {
     try {
+      // Check if the book already exists in user's library
+      const existing = await query(`
+        SELECT * FROM user_library WHERE user_id = $1 AND book_id = $2
+      `, [userId, bookId]);
+
+      if (existing.rows.length > 0) {
+        // Update existing record if orderId is provided
+        if (orderId) {
+          const result = await query(`
+            UPDATE user_library 
+            SET order_id = COALESCE($3, order_id), updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = $1 AND book_id = $2
+            RETURNING *
+          `, [userId, bookId, orderId]);
+          return result.rows[0];
+        }
+        return existing.rows[0];
+      }
+
+      // Insert new record
       const result = await query(`
         INSERT INTO user_library (user_id, book_id, order_id, purchase_date)
         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-        ON CONFLICT (user_id, book_id) DO UPDATE SET
-          order_id = COALESCE(EXCLUDED.order_id, user_library.order_id),
-          purchase_date = COALESCE(user_library.purchase_date, EXCLUDED.purchase_date)
         RETURNING *
       `, [userId, bookId, orderId]);
 

@@ -4,6 +4,7 @@ import { useUnifiedCart } from '@/contexts/UnifiedCartContext';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import SafeImage from '@/components/ui/SafeImage';
+import Header from '@/components/Header';
 
 export default function CartPage() {
   const { data: session } = useSession();
@@ -20,25 +21,34 @@ export default function CartPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
       </div>
     );
   }
 
   if (cartItems.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center">
-            <i className="ri-shopping-cart-line text-6xl text-gray-400 mb-4"></i>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h1>
-            <p className="text-gray-600 mb-8">Add some books to get started!</p>
+            <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <i className="ri-shopping-cart-line text-white text-3xl"></i>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Your cart is empty</h1>
+            <p className="text-gray-600 mb-8 max-w-md mx-auto">
+              Discover amazing books and start building your digital library today.
+            </p>
             <Link
               href="/books"
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-full hover:from-blue-700 hover:to-blue-800 hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 font-medium inline-flex items-center space-x-2"
             >
-              Browse Books
+              <i className="ri-book-line"></i>
+              <span>Browse Books</span>
             </Link>
           </div>
         </div>
@@ -47,16 +57,24 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 relative">
+      <Header />
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Shopping Cart ({getTotalItems()} items)
-          </h1>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Shopping Cart
+            </h1>
+            <p className="text-gray-600 mt-2">
+              {getTotalItems()} item{getTotalItems() !== 1 ? 's' : ''} in your cart
+            </p>
+          </div>
           <button
             onClick={clearCart}
-            className="text-red-600 hover:text-red-700 text-sm font-medium"
+            className="text-red-600 hover:text-red-700 text-sm font-medium hover:bg-red-50 px-3 py-2 rounded-lg transition-colors"
           >
+            <i className="ri-delete-bin-line mr-1"></i>
             Clear Cart
           </button>
         </div>
@@ -67,7 +85,7 @@ export default function CartPage() {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-sm">
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           <div className="divide-y divide-gray-200">
             {cartItems.map((item) => (
               <div key={item.id} className="p-6 flex items-center space-x-4">

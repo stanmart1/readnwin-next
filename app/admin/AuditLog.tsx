@@ -4,6 +4,32 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { formatDateTime } from '@/utils/dateUtils';
 
+// Helper function to format time in a human-readable way
+const getTimeAgo = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  return formatDateTime(dateString);
+};
+
+// Helper function to get time period for grouping
+const getTimePeriod = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+  
+  if (diffInHours < 1) return 'Recent Activity';
+  if (diffInHours < 24) return 'Today';
+  if (diffInHours < 48) return 'Yesterday';
+  if (diffInHours < 168) return 'This Week';
+  return 'Earlier';
+};
+
 interface AuditLog {
   id: number;
   user_id?: number;
@@ -84,12 +110,14 @@ export default function AuditLog() {
   }, [fetchAuditLogs]);
 
   const getActionColor = (action: string) => {
-    if (action.includes('create')) return 'bg-gradient-to-r from-green-500 to-teal-500';
-    if (action.includes('update')) return 'bg-gradient-to-r from-blue-500 to-cyan-500';
-    if (action.includes('delete')) return 'bg-gradient-to-r from-red-500 to-pink-500';
-    if (action.includes('login')) return 'bg-gradient-to-r from-purple-500 to-pink-500';
-    if (action.includes('logout')) return 'bg-gradient-to-r from-gray-500 to-gray-600';
-    return 'bg-gradient-to-r from-yellow-500 to-orange-500';
+    if (action.includes('create')) return 'bg-green-100 text-green-600';
+    if (action.includes('update')) return 'bg-blue-100 text-blue-600';
+    if (action.includes('delete')) return 'bg-red-100 text-red-600';
+    if (action.includes('login')) return 'bg-purple-100 text-purple-600';
+    if (action.includes('logout')) return 'bg-gray-100 text-gray-600';
+    if (action.includes('payment')) return 'bg-emerald-100 text-emerald-600';
+    if (action.includes('order')) return 'bg-orange-100 text-orange-600';
+    return 'bg-yellow-100 text-yellow-600';
   };
 
   const getActionIcon = (action: string) => {
@@ -102,56 +130,58 @@ export default function AuditLog() {
     return 'ri-information-line';
   };
 
-  const getActionDisplayName = (action: string) => {
+  const getActionDisplayName = (action: string, log: AuditLog) => {
+    const userName = log.user ? `${log.user.first_name} ${log.user.last_name}` : 'System';
+    
     // User authentication actions
-    if (action.includes('login')) return 'User Login';
-    if (action.includes('logout')) return 'User Logout';
-    if (action.includes('register')) return 'User Registration';
-    if (action.includes('password_reset')) return 'Password Reset';
+    if (action.includes('login')) return `${userName} signed in`;
+    if (action.includes('logout')) return `${userName} signed out`;
+    if (action.includes('register')) return `${userName} created an account`;
+    if (action.includes('password_reset')) return `${userName} reset their password`;
     
     // CRUD operations with resource context
     if (action.includes('create')) {
-      if (action.includes('book')) return 'Book Created';
-      if (action.includes('order')) return 'Order Created';
-      if (action.includes('user')) return 'User Created';
-      if (action.includes('review')) return 'Review Created';
-      return 'Resource Created';
+      if (action.includes('book')) return `New book was added to the library`;
+      if (action.includes('order')) return `${userName} placed a new order`;
+      if (action.includes('user')) return `New user account was created`;
+      if (action.includes('review')) return `${userName} wrote a book review`;
+      return `${userName} created a new resource`;
     }
     
     if (action.includes('update')) {
-      if (action.includes('book')) return 'Book Updated';
-      if (action.includes('order')) return 'Order Updated';
-      if (action.includes('user')) return 'User Updated';
-      if (action.includes('review')) return 'Review Updated';
-      if (action.includes('profile')) return 'Profile Updated';
-      return 'Resource Updated';
+      if (action.includes('book')) return `Book information was updated`;
+      if (action.includes('order')) return `${userName} updated an order`;
+      if (action.includes('user')) return `${userName} updated their profile`;
+      if (action.includes('review')) return `${userName} edited their review`;
+      if (action.includes('profile')) return `${userName} updated their profile`;
+      return `${userName} updated a resource`;
     }
     
     if (action.includes('delete')) {
-      if (action.includes('book')) return 'Book Deleted';
-      if (action.includes('order')) return 'Order Deleted';
-      if (action.includes('user')) return 'User Deleted';
-      if (action.includes('review')) return 'Review Deleted';
-      return 'Resource Deleted';
+      if (action.includes('book')) return `A book was removed from the library`;
+      if (action.includes('order')) return `An order was cancelled`;
+      if (action.includes('user')) return `A user account was deleted`;
+      if (action.includes('review')) return `A review was removed`;
+      return `${userName} deleted a resource`;
     }
     
     if (action.includes('read') || action.includes('view')) {
-      if (action.includes('book')) return 'Book Viewed';
-      if (action.includes('order')) return 'Order Viewed';
-      if (action.includes('user')) return 'User Profile Viewed';
-      if (action.includes('review')) return 'Review Viewed';
-      return 'Resource Viewed';
+      if (action.includes('book')) return `${userName} viewed a book`;
+      if (action.includes('order')) return `${userName} checked order details`;
+      if (action.includes('user')) return `${userName} viewed a profile`;
+      if (action.includes('review')) return `${userName} read reviews`;
+      return `${userName} viewed content`;
     }
     
     // Payment and order actions
-    if (action.includes('payment')) return 'Payment Processed';
-    if (action.includes('order_status')) return 'Order Status Changed';
-    if (action.includes('shipping')) return 'Shipping Updated';
+    if (action.includes('payment')) return `${userName} completed a payment`;
+    if (action.includes('order_status')) return `Order status was updated`;
+    if (action.includes('shipping')) return `Shipping information was updated`;
     
     // Admin actions
-    if (action.includes('admin')) return 'Admin Action';
-    if (action.includes('export')) return 'Data Exported';
-    if (action.includes('import')) return 'Data Imported';
+    if (action.includes('admin')) return `Admin performed an action`;
+    if (action.includes('export')) return `Data was exported`;
+    if (action.includes('import')) return `Data was imported`;
     
     // Default: capitalize and format the action
     return action.split('_').map(word => 
@@ -193,35 +223,40 @@ export default function AuditLog() {
     ).join(' ');
   };
 
-  const formatDetails = (details: any) => {
-    if (!details) return 'No details available';
+  const formatDetails = (details: any, log: AuditLog) => {
+    if (!details) return 'No additional details';
     
     if (typeof details === 'string') {
-      // If it's already a formatted string, return as is
-      if (details.length < 100) return details;
-      // For longer strings, truncate and add ellipsis
-      return details.length > 100 ? details.substring(0, 100) + '...' : details;
+      return details.length > 80 ? details.substring(0, 80) + '...' : details;
     }
     
     if (typeof details === 'object') {
       try {
-        // Handle common audit log detail structures
+        // Handle common audit log detail structures with human-readable formatting
         if (details.changes) {
           const changes = Object.entries(details.changes)
             .map(([field, values]: [string, any]) => {
+              const fieldName = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
               if (Array.isArray(values) && values.length === 2) {
-                return `${field}: "${values[0]}" → "${values[1]}"`;
+                return `${fieldName} changed from "${values[0]}" to "${values[1]}"`;
               }
-              return `${field}: ${JSON.stringify(values)}`;
+              return `${fieldName} was updated`;
             })
             .join(', ');
-          return changes || 'Field changes recorded';
+          return changes || 'Information was updated';
         }
         
-        if (details.fields) {
-          return Object.entries(details.fields)
-            .map(([key, value]) => `${key}: ${value}`)
-            .join(', ');
+        if (details.amount || details.total_amount) {
+          const amount = details.amount || details.total_amount;
+          return `Amount: ₦${parseFloat(amount).toLocaleString()}`;
+        }
+        
+        if (details.book_title) {
+          return `Book: ${details.book_title}`;
+        }
+        
+        if (details.order_id) {
+          return `Order #${details.order_id}`;
         }
         
         if (details.message) {
@@ -229,25 +264,26 @@ export default function AuditLog() {
         }
         
         if (details.error) {
-          return `Error: ${details.error}`;
+          return `Issue encountered: ${details.error}`;
         }
         
         // For simple objects, create a readable summary
         const entries = Object.entries(details);
-        if (entries.length <= 3) {
+        if (entries.length <= 2) {
           return entries
             .map(([key, value]) => {
               const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-              const formattedValue = typeof value === 'string' ? value : JSON.stringify(value);
-              return `${formattedKey}: ${formattedValue}`;
+              if (key === 'ip_address') return `From ${value}`;
+              if (key === 'user_agent') return `Using ${String(value).split(' ')[0]}`;
+              return `${formattedKey}: ${value}`;
             })
-            .join(', ');
+            .join(' • ');
         }
         
-        // For complex objects, provide a summary
-        return `${entries.length} data fields recorded`;
+        // For complex objects, provide a contextual summary
+        return `Activity completed with ${entries.length} data points`;
       } catch {
-        return 'Complex data structure';
+        return 'Activity details recorded';
       }
     }
     
@@ -357,7 +393,7 @@ export default function AuditLog() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">Loading audit logs...</span>
+            <span className="ml-3 text-gray-600">Loading activities...</span>
           </div>
         </div>
       </div>
@@ -380,280 +416,291 @@ export default function AuditLog() {
       )}
 
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Audit Log</h2>
-            <p className="text-sm sm:text-base text-gray-600 mt-1">System activity and security audit trail</p>
+            <h2 className="text-2xl font-bold text-gray-900">Activity Log</h2>
+            <p className="text-gray-600 mt-1">Track user activities and system events</p>
           </div>
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+          <div className="flex items-center space-x-3">
             <button 
               onClick={() => fetchAuditLogs(currentPage)}
               disabled={loading}
-              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 disabled:opacity-50 flex items-center"
             >
               <i className={`ri-refresh-line mr-2 ${loading ? 'animate-spin' : ''}`}></i>
               Refresh
             </button>
             <button 
               onClick={handleExport}
-              className="px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg hover:from-green-600 hover:to-teal-600 transition-all duration-300 transform hover:scale-105 flex items-center justify-center"
+              className="px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg hover:from-green-600 hover:to-teal-600 transition-all duration-300 flex items-center"
             >
               <i className="ri-download-line mr-2"></i>
-              Export CSV
+              Export
             </button>
           </div>
         </div>
+        {totalLogs > 0 && (
+          <div className="flex items-center justify-between text-sm border-t pt-4">
+            <span className="text-gray-600">Showing {auditLogs.length} of {totalLogs.toLocaleString()} activities</span>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+              Page {currentPage} of {totalPages}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Filters Toggle */}
-      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-          >
-            <i className={`ri-${showFilters ? 'eye-off' : 'eye'}-line`}></i>
-            <span>{showFilters ? 'Hide' : 'Show'} Filters</span>
-          </button>
+      {/* Quick Filters */}
+      <div className="bg-white rounded-lg shadow-md p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-gray-700">Quick Filters:</span>
+          <input
+            type="text"
+            value={filters.action}
+            onChange={(e) => setFilters({...filters, action: e.target.value})}
+            className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Search actions..."
+          />
+          <input
+            type="text"
+            value={filters.resourceType}
+            onChange={(e) => setFilters({...filters, resourceType: e.target.value})}
+            className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Resource type..."
+          />
+          <input
+            type="date"
+            value={filters.startDate}
+            onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+            className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {(filters.action || filters.resourceType || filters.startDate || filters.endDate || filters.userId) && (
+            <button
+              onClick={clearFilters}
+              className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+            >
+              <i className="ri-close-line mr-1"></i>
+              Clear
+            </button>
+          )}
         </div>
+      </div>
 
-        {showFilters && (
-          <div className="mt-4 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">User ID</label>
-                <input
-                  type="text"
-                  value={filters.userId}
-                  onChange={(e) => setFilters({...filters, userId: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Filter by user ID"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Action</label>
-                <input
-                  type="text"
-                  value={filters.action}
-                  onChange={(e) => setFilters({...filters, action: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Filter by action"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Resource Type</label>
-                <input
-                  type="text"
-                  value={filters.resourceType}
-                  onChange={(e) => setFilters({...filters, resourceType: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Filter by resource type"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                <input
-                  type="date"
-                  value={filters.startDate}
-                  onChange={(e) => setFilters({...filters, startDate: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                <input
-                  type="date"
-                  value={filters.endDate}
-                  onChange={(e) => setFilters({...filters, endDate: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex items-end">
-                <button
-                  onClick={clearFilters}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+      {/* Activity Feed - Recent Activities Style */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">System Activities</h3>
+          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+            {totalLogs.toLocaleString()} total activities
+          </span>
+        </div>
+        <div className="space-y-3">
+          {auditLogs.length > 0 ? (
+            auditLogs.map((log) => {
+              const actionType = log.action.includes('user') ? 'user' :
+                               log.action.includes('book') ? 'book' :
+                               log.action.includes('order') ? 'order' :
+                               log.action.includes('review') ? 'review' :
+                               'system';
+              
+              return (
+                <div 
+                  key={log.id} 
+                  className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
+                  onClick={() => handleViewDetails(log)}
                 >
-                  Clear Filters
-                </button>
-              </div>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    actionType === 'user' ? 'bg-blue-100 text-blue-600' :
+                    actionType === 'book' ? 'bg-green-100 text-green-600' :
+                    actionType === 'order' ? 'bg-purple-100 text-purple-600' :
+                    actionType === 'review' ? 'bg-yellow-100 text-yellow-600' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                    <i className={`${
+                      actionType === 'user' ? 'ri-user-line' :
+                      actionType === 'book' ? 'ri-book-line' :
+                      actionType === 'order' ? 'ri-shopping-cart-line' :
+                      actionType === 'review' ? 'ri-star-line' :
+                      'ri-settings-line'
+                    } text-sm`}></i>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{getActionDisplayName(log.action, log)}</p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      {log.user && (
+                        <span className="text-xs text-gray-600 bg-white px-2 py-0.5 rounded border">
+                          {log.user.first_name} {log.user.last_name}
+                        </span>
+                      )}
+                      {log.resource_type && (
+                        <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200">
+                          {getResourceTypeDisplayName(log.resource_type)}
+                        </span>
+                      )}
+                      {log.resource_id && (
+                        <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                          #{log.resource_id}
+                        </span>
+                      )}
+                      {log.ip_address && (
+                        <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-200">
+                          {log.ip_address}
+                        </span>
+                      )}
+                    </div>
+                    {log.details && (
+                      <p className="text-xs text-gray-500 mt-1 truncate">
+                        {formatDetails(log.details, log)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <span className="text-xs text-gray-500">{getTimeAgo(log.created_at)}</span>
+                    <div className="text-xs text-gray-400 mt-1">{formatDateTime(log.created_at).split(' ')[1]}</div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-center py-8">
+              <i className="ri-time-line text-3xl text-gray-300 mb-3"></i>
+              <p className="text-gray-500 font-medium">No activities found</p>
+              <p className="text-xs text-gray-400 mt-1">Activities will appear here as they happen</p>
+            </div>
+          )}
+        </div>
+        {auditLogs.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-gray-100">
+            <div className="flex items-center justify-between">
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center"
+              >
+                {showFilters ? 'Hide' : 'Show'} detailed view
+                <i className={`ri-arrow-${showFilters ? 'up' : 'down'}-line ml-1`}></i>
+              </button>
+              <span className="text-xs text-gray-500">
+                Click any activity for details
+              </span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Audit Logs - Mobile Cards */}
-      <div className="xl:hidden space-y-4">
-        {auditLogs.map((log) => (
-          <div key={log.id} className="bg-white rounded-lg shadow-md p-4 space-y-3">
-            {/* Action Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className={`w-10 h-10 ${getActionColor(log.action)} rounded-full flex items-center justify-center`}>
-                  <i className={`${getActionIcon(log.action)} text-white text-lg`}></i>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900 break-words">{getActionDisplayName(log.action)}</div>
-                  <div className="text-sm text-gray-500 break-words">{log.action}</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-gray-500 break-words">{formatDateTime(log.created_at)}</div>
-              </div>
-            </div>
-
-            {/* User Info */}
-            <div className="border-t pt-3">
-              <div className="text-sm">
-                <span className="font-medium text-gray-700">User:</span>
-                <span className="ml-2 text-gray-900 break-words">
-                  {log.user ? `${log.user.first_name} ${log.user.last_name}` : 'System'}
-                </span>
-              </div>
-              {log.user && (
-                <div className="text-sm text-gray-500 mt-1 break-words">{log.user.email}</div>
-              )}
-            </div>
-
-            {/* Resource Info */}
-            <div className="border-t pt-3">
-              <div className="text-sm">
-                <span className="font-medium text-gray-700">Resource:</span>
-                <span className="ml-2 text-gray-900 break-words">{getResourceTypeDisplayName(log.resource_type || '')}</span>
-              </div>
-              {log.resource_id && (
-                <div className="text-sm text-gray-500 mt-1 break-words">ID: {log.resource_id}</div>
-              )}
-            </div>
-
-            {/* IP Address */}
-            <div className="border-t pt-3">
-              <div className="text-sm">
-                <span className="font-medium text-gray-700">IP Address:</span>
-                <span className="ml-2 text-gray-900 break-words">{log.ip_address || 'N/A'}</span>
-              </div>
-            </div>
-
-            {/* Details */}
-            {log.details && (
-              <div className="border-t pt-3">
-                <div className="text-sm">
-                  <span className="font-medium text-gray-700">Details:</span>
-                  <div className="mt-1 text-gray-900 break-words" title={formatDetails(log.details)}>
-                    {formatDetails(log.details)}
-                  </div>
-                  <button
-                    onClick={() => handleViewDetails(log)}
-                    className="mt-2 text-blue-600 hover:text-blue-800 text-xs font-medium whitespace-nowrap"
-                  >
-                    View Full Details
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Audit Logs - Desktop Table */}
-      <div className="hidden xl:block bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Action
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  User
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Resource
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  IP Address
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Timestamp
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Details
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {auditLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-gray-50 transition-colors duration-200">
-                  <td className="px-4 py-4">
-                    <div className="flex items-center">
-                      <div className={`w-8 h-8 ${getActionColor(log.action)} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}>
-                        <i className={`${getActionIcon(log.action)} text-white text-sm`}></i>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium text-gray-900 break-words">{getActionDisplayName(log.action)}</span>
-                        <div className="text-xs text-gray-500 break-words">{log.action}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-gray-900 break-words">
-                        {log.user ? `${log.user.first_name} ${log.user.last_name}` : 'System'}
-                      </div>
-                      {log.user && (
-                        <div className="text-sm text-gray-500 break-words">{log.user.email}</div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-gray-900 break-words">
-                        {getResourceTypeDisplayName(log.resource_type || '')}
-                      </div>
-                      {log.resource_id && (
-                        <div className="text-sm text-gray-500 break-words">ID: {log.resource_id}</div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="text-sm text-gray-500 break-words">
-                      {log.ip_address || 'N/A'}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="text-sm text-gray-500 break-words">
-                      {formatDateTime(log.created_at)}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="text-sm text-gray-900 break-words" title={formatDetails(log.details)}>
-                        {formatDetails(log.details)}
-                      </div>
-                      {log.details && (
-                        <button
-                          onClick={() => handleViewDetails(log)}
-                          className="text-blue-600 hover:text-blue-800 text-xs font-medium whitespace-nowrap"
-                          title="View full details"
-                        >
-                          View
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Detailed View Toggle */}
+      <div className="bg-white rounded-lg shadow-md p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">Detailed View</h3>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center space-x-2 px-3 py-2 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors"
+          >
+            <i className="ri-table-line"></i>
+            <span>Toggle Table View</span>
+          </button>
         </div>
+        
+        {showFilters && (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Activity
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Resource
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Location
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    When
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {auditLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-gray-50 transition-colors duration-200">
+                    <td className="px-4 py-4">
+                      <div className="flex items-center">
+                        <div className={`w-8 h-8 ${getActionColor(log.action)} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}>
+                          <i className={`${getActionIcon(log.action)} text-sm`}></i>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium text-gray-900">{getActionDisplayName(log.action, log)}</span>
+                          <div className="text-xs text-gray-500">{log.action}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      {log.user ? (
+                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-200">
+                          {log.user.first_name} {log.user.last_name}
+                        </span>
+                      ) : (
+                        <span className="text-xs bg-gray-50 text-gray-700 px-2 py-1 rounded border border-gray-200">
+                          System
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap items-center gap-1">
+                        {log.resource_type && (
+                          <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded border border-green-200">
+                            {getResourceTypeDisplayName(log.resource_type)}
+                          </span>
+                        )}
+                        {log.resource_id && (
+                          <span className="text-xs bg-gray-50 text-gray-700 px-2 py-1 rounded border border-gray-200">
+                            #{log.resource_id}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      {log.ip_address && (
+                        <span className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-200">
+                          {log.ip_address}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="text-sm text-gray-700">
+                        {getTimeAgo(log.created_at)}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatDateTime(log.created_at)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <button
+                        onClick={() => handleViewDetails(log)}
+                        className="text-blue-600 hover:text-blue-800 text-xs font-medium flex items-center"
+                      >
+                        <i className="ri-eye-line mr-1"></i>
+                        View Details
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Pagination */}
       <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
           <div className="text-sm text-gray-700 text-center sm:text-left">
-            Showing {auditLogs.length} of {totalLogs} audit logs
+            Showing {auditLogs.length} of {totalLogs} activities
           </div>
           <div className="flex items-center justify-center sm:justify-end space-x-2">
             <button 
@@ -677,12 +724,7 @@ export default function AuditLog() {
         </div>
       </div>
 
-      {auditLogs.length === 0 && (
-        <div className="bg-white rounded-lg shadow-md p-8 sm:p-12 text-center">
-          <i className="ri-file-list-line text-4xl text-gray-400 mb-4"></i>
-          <p className="text-gray-600">No audit logs found matching the current filters</p>
-        </div>
-      )}
+
 
       {/* Details Modal */}
       {showDetailsModal && selectedLogDetails && (
@@ -690,7 +732,7 @@ export default function AuditLog() {
           <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900">Audit Log Details</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900">Activity Details</h3>
                 <button
                   onClick={() => setShowDetailsModal(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -703,9 +745,9 @@ export default function AuditLog() {
                 {/* Basic Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Basic Information</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">Activity Summary</h4>
                     <div className="space-y-2 text-sm">
-                      <div><span className="font-medium">Action:</span> {getActionDisplayName(selectedLogDetails.action)}</div>
+                      <div><span className="font-medium">What happened:</span> {getActionDisplayName(selectedLogDetails.action, selectedLogDetails)}</div>
                       <div><span className="font-medium">User:</span> {selectedLogDetails.user ? `${selectedLogDetails.user.first_name} ${selectedLogDetails.user.last_name}` : 'System'}</div>
                       <div><span className="font-medium">Resource Type:</span> {getResourceTypeDisplayName(selectedLogDetails.resource_type || '')}</div>
                       <div><span className="font-medium">Resource ID:</span> {selectedLogDetails.resource_id || 'N/A'}</div>
@@ -713,7 +755,7 @@ export default function AuditLog() {
                     </div>
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Technical Information</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">Technical Details</h4>
                     <div className="space-y-2 text-sm">
                       <div><span className="font-medium">IP Address:</span> {selectedLogDetails.ip_address || 'N/A'}</div>
                       <div><span className="font-medium">User Agent:</span> {selectedLogDetails.user_agent || 'N/A'}</div>

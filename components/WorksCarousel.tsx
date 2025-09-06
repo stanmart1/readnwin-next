@@ -32,6 +32,35 @@ export default function WorksCarousel() {
 
   useEffect(() => {
     fetchWorks();
+    
+    // Listen for admin updates via localStorage events
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'works_updated' && e.newValue) {
+        console.log('🔄 Works updated from admin, refreshing...');
+        fetchWorks();
+        // Clear the flag
+        localStorage.removeItem('works_updated');
+      }
+    };
+    
+    // Refresh when page becomes visible (user returns from admin)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Check if there were any updates while away
+        if (localStorage.getItem('works_updated')) {
+          fetchWorks();
+          localStorage.removeItem('works_updated');
+        }
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // Initialize infinite scroll position

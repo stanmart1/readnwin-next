@@ -90,26 +90,47 @@ export default function AboutPage() {
 
     fetchContent();
 
-    // Listen for admin content updates
+    // Comprehensive sync listener for admin updates
     const handleContentUpdate = (event?: Event) => {
       const customEvent = event as CustomEvent;
       console.log('About content update event received', customEvent?.detail);
       fetchContent();
     };
 
-    // Listen for both custom event and storage events
-    window.addEventListener('about-content-updated', handleContentUpdate);
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'about-content-updated') {
-        handleContentUpdate();
+    const handleStorageUpdate = (e: StorageEvent) => {
+      if (e.key === 'about-content-updated' || e.key === 'about-content-version') {
+        console.log('Storage-based content update detected');
+        fetchContent();
       }
-    });
+    };
 
-    // Removed aggressive auto-refresh that was causing navigation issues
+    const handleBroadcastUpdate = (event: MessageEvent) => {
+      if (event.data.type === 'content-updated' && event.data.source === 'admin') {
+        console.log('Broadcast-based content update detected');
+        fetchContent();
+      }
+    };
+
+    // Set up multiple sync listeners
+    window.addEventListener('about-content-updated', handleContentUpdate);
+    window.addEventListener('storage', handleStorageUpdate);
+    
+    // BroadcastChannel for better cross-tab communication
+    let broadcastChannel: BroadcastChannel | null = null;
+    try {
+      broadcastChannel = new BroadcastChannel('about-page-updates');
+      broadcastChannel.addEventListener('message', handleBroadcastUpdate);
+    } catch (e) {
+      console.log('BroadcastChannel not supported');
+    }
 
     return () => {
       window.removeEventListener('about-content-updated', handleContentUpdate);
-      window.removeEventListener('storage', handleContentUpdate);
+      window.removeEventListener('storage', handleStorageUpdate);
+      if (broadcastChannel) {
+        broadcastChannel.removeEventListener('message', handleBroadcastUpdate);
+        broadcastChannel.close();
+      }
     };
   }, []);
 
@@ -131,39 +152,7 @@ export default function AboutPage() {
     <div className="min-h-screen bg-white">
       <Header />
       
-      {/* Debug refresh button - remove in production */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed top-20 right-4 z-50">
-          <button
-            onClick={() => {
-              setLoading(true);
-              const timestamp = Date.now();
-              const random = Math.random();
-              fetch(`/api/about?t=${timestamp}&v=${random}&cb=${timestamp}`, {
-                method: 'GET',
-                headers: {
-                  'Cache-Control': 'no-cache, no-store, must-revalidate',
-                  'Pragma': 'no-cache',
-                  'Expires': '0'
-                }
-              })
-                .then(res => res.json())
-                .then(data => {
-                  setContent(data);
-                  setLoading(false);
-                  console.log('Manual refresh successful:', data);
-                })
-                .catch(err => {
-                  console.error('Manual refresh failed:', err);
-                  setLoading(false);
-                });
-            }}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-blue-700"
-          >
-            🔄 Refresh Content
-          </button>
-        </div>
-      )}
+
       
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-20">
@@ -329,7 +318,7 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {team.map((member, index) => (
               <div key={index} className="text-center group">
-                <div className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 group-hover:-translate-y-2">
+                <div className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 group-hover:-translate-y-2 h-full flex flex-col">
                   <div className="relative">
                     <Image
                       src={member.image}
@@ -354,15 +343,15 @@ export default function AboutPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="p-6">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  <div className="p-6 flex-1 flex flex-col">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2 min-h-[2.5rem] flex items-center justify-center">
                       {member.name}
                     </h3>
-                    <p className="text-blue-600 font-medium mb-4">
+                    <p className="text-blue-600 font-medium mb-4 min-h-[1.5rem] flex items-center justify-center">
                       {member.role}
                     </p>
                     <div 
-                      className="text-gray-600 text-sm prose prose-sm max-w-none"
+                      className="text-gray-600 text-sm prose prose-sm max-w-none flex-1 flex items-start"
                       dangerouslySetInnerHTML={{ __html: member.bio }}
                     />
                   </div>

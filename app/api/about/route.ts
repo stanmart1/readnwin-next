@@ -44,11 +44,12 @@ export async function GET(request: NextRequest) {
             }
           ];
         }
-        // Add timestamp to content for cache busting
+        // Add timestamp and version for cache busting and sync verification
         const contentWithTimestamp = {
           ...content,
           _lastUpdated: new Date().toISOString(),
-          _version: Date.now()
+          _version: Date.now(),
+          _syncId: `about-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
         };
         
         return NextResponse.json(contentWithTimestamp, {

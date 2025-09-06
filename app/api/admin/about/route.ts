@@ -151,12 +151,11 @@ export async function GET() {
           twitter: '#'
         }
       ],
-      contact: {
-        title: 'Get in Touch',
-        description: 'Have questions or suggestions? We\'d love to hear from you.',
-        email: 'hello@readnwin.com',
-        phone: '+1 (555) 123-4567',
-        address: '123 Reading Street, Book City, BC 12345'
+      cta: {
+        title: 'Join the Reading Revolution',
+        description: 'Start your journey with ReadnWin and discover a world of knowledge, imagination, and growth.',
+        primaryButton: 'Get Started Free',
+        secondaryButton: 'Learn More'
       }
     });
   } catch (error) {
@@ -256,15 +255,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Return success response with cache-busting headers
+    // Return success response with cache-busting headers and sync trigger
     return NextResponse.json({ 
       message: 'About page content saved successfully',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      syncTrigger: true // Signal for frontend to trigger sync
     }, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
-        'Expires': '0'
+        'Expires': '0',
+        'X-Content-Updated': 'about-page',
+        'X-Update-Timestamp': Date.now().toString()
       }
     });
   } catch (error) {

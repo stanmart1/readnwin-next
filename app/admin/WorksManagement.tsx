@@ -23,6 +23,16 @@ export default function WorksManagement() {
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
 
+  // Notify frontend of works changes
+  const notifyWorksUpdate = () => {
+    const timestamp = Date.now().toString();
+    localStorage.setItem('works_updated', timestamp);
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'works_updated',
+      newValue: timestamp
+    }));
+  };
+
   // Form states
   const [formData, setFormData] = useState({
     title: '',
@@ -98,6 +108,7 @@ export default function WorksManagement() {
         setShowUploadForm(false);
         resetForm();
         fetchWorks();
+        notifyWorksUpdate();
       } else {
         toast.error(data.error || 'Failed to upload work image');
       }
@@ -140,6 +151,7 @@ export default function WorksManagement() {
         setEditingWork(null);
         resetForm();
         fetchWorks();
+        notifyWorksUpdate();
       } else {
         toast.error(data.error || 'Failed to update work image');
       }
@@ -164,6 +176,7 @@ export default function WorksManagement() {
       if (data.success) {
         toast.success('Work image deleted successfully!');
         fetchWorks();
+        notifyWorksUpdate();
       } else {
         toast.error(data.error || 'Failed to delete work image');
       }
@@ -214,6 +227,7 @@ export default function WorksManagement() {
       if (data.success) {
         toast.success(`Work image ${!currentStatus ? 'activated' : 'deactivated'} successfully!`);
         fetchWorks();
+        notifyWorksUpdate();
       } else {
         toast.error(data.error || 'Failed to update status');
       }

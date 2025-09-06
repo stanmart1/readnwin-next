@@ -282,17 +282,10 @@ export default function ModernAboutManagement() {
 
       if (response.ok) {
         const data = await response.json();
-        if (data && data.content) {
-          try {
-            const parsedContent =
-              typeof data.content === "string"
-                ? JSON.parse(data.content)
-                : data.content;
-            setContent({ ...defaultContent, ...parsedContent });
-          } catch (parseError) {
-            console.warn("Failed to parse content, using default");
-            setContent(defaultContent);
-          }
+        if (data) {
+          setContent({ ...defaultContent, ...data });
+        } else {
+          setContent(defaultContent);
         }
       } else {
         console.warn("Failed to load content, using default");
@@ -316,11 +309,7 @@ export default function ModernAboutManagement() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          setting_key: "about_page_content",
-          setting_value: JSON.stringify(content),
-          description: "About page content configuration",
-        }),
+        body: JSON.stringify(content),
       });
 
       if (response.ok) {
@@ -1281,65 +1270,174 @@ export default function ModernAboutManagement() {
                           </div>
 
                           <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <input
+                                type="text"
+                                placeholder="Name (max 25 chars)"
+                                value={member.name}
+                                maxLength={25}
+                                onChange={(e) => {
+                                  const newTeam = [...content.team];
+                                  newTeam[index] = {
+                                    ...member,
+                                    name: e.target.value,
+                                  };
+                                  updateContent("team", newTeam);
+                                }}
+                                className="px-3 py-2 border border-gray-300 rounded-lg"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">{member.name.length}/25</p>
+                            </div>
+                            <div>
+                              <input
+                                type="text"
+                                placeholder="Role (max 30 chars)"
+                                value={member.role}
+                                maxLength={30}
+                                onChange={(e) => {
+                                  const newTeam = [...content.team];
+                                  newTeam[index] = {
+                                    ...member,
+                                    role: e.target.value,
+                                  };
+                                  updateContent("team", newTeam);
+                                }}
+                                className="px-3 py-2 border border-gray-300 rounded-lg"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">{member.role.length}/30</p>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <label className="block text-sm font-medium text-gray-700">
+                              Team Member Image
+                            </label>
+                            
+                            {/* Image Preview */}
+                            <div className="flex items-center space-x-4">
+                              <div className="w-16 h-16 rounded-full overflow-hidden border border-gray-200 bg-gray-100">
+                                {member.image ? (
+                                  <img
+                                    src={member.image}
+                                    alt={member.name || 'Team member'}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0zMiAzN0MzNy41MjI4IDM3IDQyIDMyLjUyMjggNDIgMjdDNDIgMjEuNDc3MiAzNy41MjI4IDE3IDMyIDE3QzI2LjQ3NzIgMTcgMjIgMjEuNDc3MiAyMiAyN0MyMiAzMi41MjI4IDI2LjQ3NzIgMzcgMzIgMzdaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik0xNiA0N0MxNiA0MS40NzcyIDIzLjE2MzQgMzcgMzIgMzdDNDAuODM2NiAzNyA0OCA0MS40NzcyIDQ4IDQ3VjQ5SDE2VjQ3WiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4=';
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <i className="ri-user-line text-xl text-gray-400"></i>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex gap-2 mb-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => document.getElementById(`teamImageUpload-${index}`)?.click()}
+                                    disabled={saving}
+                                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
+                                  >
+                                    <i className="ri-upload-line mr-1"></i>
+                                    Upload
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newUrl = prompt('Enter image URL:', member.image || '');
+                                      if (newUrl) {
+                                        const newTeam = [...content.team];
+                                        newTeam[index] = { ...member, image: newUrl };
+                                        updateContent("team", newTeam);
+                                      }
+                                    }}
+                                    className="px-3 py-1 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700"
+                                  >
+                                    <i className="ri-link mr-1"></i>
+                                    URL
+                                  </button>
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                  {member.image ? member.image.split('/').pop() : 'No image'}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {/* Hidden file input */}
                             <input
-                              type="text"
-                              placeholder="Name"
-                              value={member.name}
-                              onChange={(e) => {
-                                const newTeam = [...content.team];
-                                newTeam[index] = {
-                                  ...member,
-                                  name: e.target.value,
-                                };
-                                updateContent("team", newTeam);
+                              id={`teamImageUpload-${index}`}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  try {
+                                    setSaving(true);
+                                    const formData = new FormData();
+                                    formData.append('image', file);
+
+                                    const response = await fetch('/api/admin/upload-team-image', {
+                                      method: 'POST',
+                                      body: formData,
+                                    });
+
+                                    if (response.ok) {
+                                      const result = await response.json();
+                                      const newTeam = [...content.team];
+                                      newTeam[index] = { ...member, image: result.url };
+                                      updateContent("team", newTeam);
+                                      toast.success('Image uploaded successfully!');
+                                    } else {
+                                      const error = await response.json();
+                                      toast.error(`Upload failed: ${error.error}`);
+                                    }
+                                  } catch (error) {
+                                    console.error('Upload error:', error);
+                                    toast.error('Failed to upload image');
+                                  } finally {
+                                    setSaving(false);
+                                  }
+                                }
                               }}
-                              className="px-3 py-2 border border-gray-300 rounded-lg"
                             />
+                            
+                            {/* Manual URL input */}
                             <input
                               type="text"
-                              placeholder="Role"
-                              value={member.role}
+                              placeholder="Or enter image URL"
+                              value={member.image}
                               onChange={(e) => {
                                 const newTeam = [...content.team];
                                 newTeam[index] = {
                                   ...member,
-                                  role: e.target.value,
+                                  image: e.target.value,
                                 };
                                 updateContent("team", newTeam);
                               }}
-                              className="px-3 py-2 border border-gray-300 rounded-lg"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                             />
                           </div>
 
-                          <input
-                            type="text"
-                            placeholder="Image URL"
-                            value={member.image}
-                            onChange={(e) => {
-                              const newTeam = [...content.team];
-                              newTeam[index] = {
-                                ...member,
-                                image: e.target.value,
-                              };
-                              updateContent("team", newTeam);
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                          />
-
-                          <textarea
-                            placeholder="Bio"
-                            value={member.bio}
-                            onChange={(e) => {
-                              const newTeam = [...content.team];
-                              newTeam[index] = {
-                                ...member,
-                                bio: e.target.value,
-                              };
-                              updateContent("team", newTeam);
-                            }}
-                            rows={3}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                          />
+                          <div>
+                            <textarea
+                              placeholder="Bio (max 120 characters)"
+                              value={member.bio}
+                              maxLength={120}
+                              onChange={(e) => {
+                                const newTeam = [...content.team];
+                                newTeam[index] = {
+                                  ...member,
+                                  bio: e.target.value,
+                                };
+                                updateContent("team", newTeam);
+                              }}
+                              rows={3}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">{member.bio.length}/120 characters</p>
+                          </div>
 
                           <div className="grid grid-cols-2 gap-3">
                             <input

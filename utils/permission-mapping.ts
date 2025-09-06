@@ -121,6 +121,13 @@ export const ADMIN_TAB_PERMISSIONS: TabPermission[] = [
     description: "Manage frequently asked questions",
   },
   {
+    id: "footer",
+    label: "Footer",
+    icon: "ri-layout-bottom-line",
+    requiredPermissions: ["content.update"],
+    description: "Manage footer content and links",
+  },
+  {
     id: "settings",
     label: "Settings",
     icon: "ri-settings-line",

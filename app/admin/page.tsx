@@ -28,6 +28,7 @@ const BlogManagement = lazy(() => import("./BlogManagement"));
 const WorksManagement = lazy(() => import("./WorksManagement"));
 const EnhancedAboutManagement = lazy(() => import("./EnhancedAboutManagement"));
 const ContactManagement = lazy(() => import("./ContactManagement"));
+const FooterManagement = lazy(() => import("./FooterManagement"));
 const SystemSettings = lazy(() => import("./SystemSettings"));
 const FAQManagement = lazy(() => import("./faq-management/page"));
 
@@ -231,6 +232,12 @@ export default function AdminDashboard() {
         return (
           <Suspense fallback={<ComponentLoader />}>
             <ContactManagement />
+          </Suspense>
+        );
+      case "footer":
+        return (
+          <Suspense fallback={<ComponentLoader />}>
+            <FooterManagement />
           </Suspense>
         );
       case "settings":

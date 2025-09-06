@@ -69,16 +69,35 @@ export async function GET(
       join(storageDir, 'books', bookId, `${bookId}_${filename}`)
     ];
     
-    // If filename contains book title, search for any file with that title
+    // Search for files that match the book ID or filename pattern
     try {
       const { readdirSync } = require('fs');
       const ebooksDir = join(storageDir, 'ebooks');
       if (existsSync(ebooksDir)) {
-        const titlePart = filename.replace(/^\d+_/, '').toLowerCase();
-        const matchingFiles = readdirSync(ebooksDir).filter(f => 
-          f.toLowerCase().includes(titlePart) || f.includes(bookId)
-        );
+        const allFiles = readdirSync(ebooksDir);
+        
+        // Look for files that contain the book ID or similar filename
+        const matchingFiles = allFiles.filter(f => {
+          const lowerFile = f.toLowerCase();
+          const lowerFilename = filename.toLowerCase();
+          
+          // Check if file contains book ID
+          if (f.includes(bookId) || f.includes(`${bookId}_`)) return true;
+          
+          // Check if filename parts match
+          const baseFilename = lowerFilename.replace(/^\d+_/, '');
+          if (lowerFile.includes(baseFilename.replace('.epub', ''))) return true;
+          
+          // Check for similar names (moby-dick vs mobydick)
+          const cleanBase = baseFilename.replace(/[-_]/g, '');
+          const cleanFile = lowerFile.replace(/[-_]/g, '');
+          if (cleanFile.includes(cleanBase.replace('.epub', ''))) return true;
+          
+          return false;
+        });
+        
         possiblePaths.push(...matchingFiles.map(f => join(ebooksDir, f)));
+        console.log('Found matching files:', matchingFiles);
       }
     } catch (searchError) {
       console.log('File search error:', SecurityUtils.sanitizeForLog(searchError));

@@ -151,19 +151,25 @@ export default function OverviewStats() {
           }
         ]);
 
-        // Update trend data with real monthly sales data
+        // Use ONLY real database data - no hardcoded months
         if (analytics.monthly_sales && analytics.monthly_sales.length > 0) {
-          const trendDataFromAPI = analytics.monthly_sales.map((item: any) => ({
+          const realTrendData = analytics.monthly_sales.map((item: any) => ({
             date: item.month,
+            users: parseInt(item.users) || 0,
             sales: parseFloat(item.sales) || 0,
             orders: parseInt(item.orders) || 0
           }));
-          setTrendData(trendDataFromAPI);
+          setTrendData(realTrendData);
+        } else {
+          // If no data, show empty array
+          setTrendData([]);
         }
         
-        // Update daily activity with real data
+        // Use ONLY real database data for daily activity
         if (analytics.dailyActivity && analytics.dailyActivity.length > 0) {
           setDailyActivity(analytics.dailyActivity);
+        } else {
+          setDailyActivity([]);
         }
         
         // Update recent activities with real data
@@ -190,24 +196,9 @@ export default function OverviewStats() {
     }
   };
 
-  const [trendData, setTrendData] = useState([
-    { date: 'Jan', users: 0, sales: 0, reviews: 0 },
-    { date: 'Feb', users: 0, sales: 0, reviews: 0 },
-    { date: 'Mar', users: 0, sales: 0, reviews: 0 },
-    { date: 'Apr', users: 0, sales: 0, reviews: 0 },
-    { date: 'May', users: 0, sales: 0, reviews: 0 },
-    { date: 'Jun', users: 0, sales: 0, reviews: 0 }
-  ]);
+  const [trendData, setTrendData] = useState<any[]>([]);
 
-  const [dailyActivity, setDailyActivity] = useState([
-    { day: 'Mon', active: 0, orders: 0 },
-    { day: 'Tue', active: 0, orders: 0 },
-    { day: 'Wed', active: 0, orders: 0 },
-    { day: 'Thu', active: 0, orders: 0 },
-    { day: 'Fri', active: 0, orders: 0 },
-    { day: 'Sat', active: 0, orders: 0 },
-    { day: 'Sun', active: 0, orders: 0 }
-  ]);
+  const [dailyActivity, setDailyActivity] = useState<any[]>([]);
 
   const [recentActivities, setRecentActivities] = useState([
     { action: 'Loading...', user: '', time: '', type: 'system', book: '', amount: '' }
@@ -327,21 +318,34 @@ export default function OverviewStats() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Growth Trends</h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value: any, name: any) => [
-                    name === 'sales' ? `₦${value.toLocaleString()}` : value.toLocaleString(),
-                    name === 'sales' ? 'Revenue' : name === 'orders' ? 'Orders' : 'Users'
-                  ]}
-                />
-                <Line type="monotone" dataKey="sales" stroke="#10B981" strokeWidth={2} name="sales" />
-                <Line type="monotone" dataKey="orders" stroke="#3B82F6" strokeWidth={2} name="orders" />
-              </LineChart>
-            </ResponsiveContainer>
+            {trendData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip 
+                    formatter={(value: any, name: any) => [
+                      name === 'sales' ? `₦${value.toLocaleString()}` : value.toLocaleString(),
+                      name === 'sales' ? 'Revenue' : name === 'orders' ? 'Orders' : name === 'users' ? 'New Users' : 'Value'
+                    ]}
+                    labelStyle={{ color: '#374151' }}
+                    contentStyle={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  />
+                  <Line type="monotone" dataKey="sales" stroke="#10B981" strokeWidth={3} name="sales" dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }} />
+                  <Line type="monotone" dataKey="orders" stroke="#3B82F6" strokeWidth={3} name="orders" dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }} />
+                  <Line type="monotone" dataKey="users" stroke="#8B5CF6" strokeWidth={2} name="users" dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="text-center">
+                  <i className="ri-line-chart-line text-4xl mb-2"></i>
+                  <p>No data available yet</p>
+                  <p className="text-sm">Growth trends will appear as data is collected</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -349,21 +353,31 @@ export default function OverviewStats() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Activity</h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailyActivity}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value: any, name: any) => [
-                    value.toLocaleString(),
-                    name === 'active' ? 'Active Users' : 'Orders'
-                  ]}
-                />
-                <Bar dataKey="active" fill="#3B82F6" name="active" />
-                <Bar dataKey="orders" fill="#10B981" name="orders" />
-              </BarChart>
-            </ResponsiveContainer>
+            {dailyActivity.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dailyActivity}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="day" />
+                  <YAxis />
+                  <Tooltip 
+                    formatter={(value: any, name: any) => [
+                      value.toLocaleString(),
+                      name === 'active' ? 'Active Users' : 'Orders'
+                    ]}
+                  />
+                  <Bar dataKey="active" fill="#3B82F6" name="active" stroke="#1E40AF" strokeWidth={2} />
+                  <Bar dataKey="orders" fill="#10B981" name="orders" stroke="#047857" strokeWidth={2} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="text-center">
+                  <i className="ri-bar-chart-line text-4xl mb-2"></i>
+                  <p>No daily activity data</p>
+                  <p className="text-sm">Activity data will appear as users interact</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -426,17 +440,7 @@ export default function OverviewStats() {
             </div>
           )}
         </div>
-        {recentActivities.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-gray-100">
-            <button 
-              onClick={() => handleTabChange('audit')}
-              className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center"
-            >
-              View all activities
-              <i className="ri-arrow-right-line ml-1"></i>
-            </button>
-          </div>
-        )}
+
       </div>
     </div>
   );

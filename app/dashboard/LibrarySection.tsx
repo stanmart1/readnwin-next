@@ -40,7 +40,12 @@ export default function LibrarySection() {
 
       try {
         // Fetch library books
-        const libraryResponse = await fetch('/api/dashboard/library');
+        const libraryResponse = await fetch('/api/dashboard/library', {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
         if (!libraryResponse.ok) {
           console.warn('Library API error:', libraryResponse.status);
           setBooks([]);
@@ -53,7 +58,12 @@ export default function LibrarySection() {
         // Fetch reading progress for each book
         if (libraryBooks.length > 0) {
           try {
-            const progressResponse = await fetch('/api/reading/progress');
+            const progressResponse = await fetch('/api/reading/progress', {
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
             if (progressResponse.ok) {
               const progressData = await progressResponse.json();
               const progressMap = new Map(progressData.progress?.map((p: any) => [p.book_id, p]) || []);

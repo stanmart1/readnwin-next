@@ -10,12 +10,12 @@ import WorksCarousel from '@/components/WorksCarousel';
 import BlogSection from '@/components/BlogSection';
 import ReviewSection from '@/components/ReviewSection';
 import Footer from '@/components/Footer';
-import NavigationTest from '@/components/NavigationTest';
+
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-white">
-      <NavigationTest />
+
       <Header />
       <HeroSection />
       <AboutSection />

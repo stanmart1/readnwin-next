@@ -77,12 +77,22 @@ export async function GET(
         contentType = 'application/octet-stream';
     }
 
+    // CORS security check
+    const origin = request.headers.get('origin');
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'https://readnwin.com',
+      'https://www.readnwin.com'
+    ];
+    const corsOrigin = allowedOrigins.includes(origin || '') ? origin : null;
+    
     // Return the file with appropriate headers
     return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable', // Cache for 1 year
-        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Access-Control-Allow-Origin': corsOrigin || 'null',
+        'Access-Control-Allow-Credentials': 'true',
       },
     });
   } catch (error) {

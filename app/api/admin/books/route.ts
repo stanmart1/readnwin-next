@@ -8,74 +8,6 @@ import { SecurityUtils } from '@/utils/security-utils';
 
 export const dynamic = 'force-dynamic';
 
-
-
-interface EbookMetadata {
-  title?: string;
-  creator?: string;
-  pageCount?: number;
-  wordCount?: number;
-}
-
-// Extract metadata without altering book structure
-async function extractEbookMetadata(buffer: Buffer, filename: string): Promise<EbookMetadata> {
-  const metadata: EbookMetadata = {};
-  
-  try {
-    if (filename.toLowerCase().endsWith('.epub')) {
-      // Basic EPUB metadata extraction without structure changes
-      const JSZip = (await import('jszip')).default;
-      const zip = await JSZip.loadAsync(buffer);
-      
-      // Read container.xml to find OPF file
-      const containerFile = zip.file('META-INF/container.xml');
-      if (containerFile) {
-        const containerXml = await containerFile.async('text');
-        const opfMatch = containerXml.match(/full-path="([^"]+)"/i);
-        
-        if (opfMatch) {
-          const opfFile = zip.file(opfMatch[1]);
-          if (opfFile) {
-            const opfXml = await opfFile.async('text');
-            
-            // Extract basic metadata
-            const titleMatch = opfXml.match(/<dc:title[^>]*>([^<]+)<\/dc:title>/i);
-            const creatorMatch = opfXml.match(/<dc:creator[^>]*>([^<]+)<\/dc:creator>/i);
-            
-            if (titleMatch) metadata.title = titleMatch[1];
-            if (creatorMatch) metadata.creator = creatorMatch[1];
-            
-            // Count spine items for rough page estimation
-            const spineMatches = opfXml.match(/<itemref[^>]*idref="[^"]+"/gi);
-            if (spineMatches) {
-              metadata.pageCount = Math.max(spineMatches.length * 2, 10);
-            }
-          }
-        }
-      }
-    } else if (filename.toLowerCase().endsWith('.html') || filename.toLowerCase().endsWith('.htm')) {
-      // Basic HTML metadata extraction
-      const htmlContent = buffer.toString('utf-8');
-      
-      const titleMatch = htmlContent.match(/<title[^>]*>([^<]+)<\/title>/i);
-      const authorMatch = htmlContent.match(/<meta[^>]*name=["']author["'][^>]*content=["']([^"']+)["']/i);
-      
-      if (titleMatch) metadata.title = titleMatch[1];
-      if (authorMatch) metadata.creator = authorMatch[1];
-      
-      // Rough word count for page estimation
-      const textContent = htmlContent.replace(/<[^>]*>/g, ' ');
-      const words = textContent.trim().split(/\s+/).filter(w => w.length > 0);
-      metadata.wordCount = words.length;
-      metadata.pageCount = Math.ceil(words.length / 250); // 250 words per page
-    }
-  } catch (error) {
-    console.warn('Metadata extraction failed:', error);
-  }
-  
-  return metadata;
-}
-
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -104,8 +36,6 @@ export async function POST(request: NextRequest) {
     const stock_quantity = formData.get('stock_quantity') as string;
     const cover_image = formData.get('cover_image') as File;
     const ebook_file = formData.get('ebook_file') as File;
-
-
 
     if (!title || !author_id || !category_id || !price) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -145,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     const bookId = bookResult.rows[0].id;
 
-    // Upload cover image to database
+    // Upload cover image
     let coverUrl = null;
     try {
       const buffer = Buffer.from(await cover_image.arrayBuffer());
@@ -171,69 +101,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to upload cover image' }, { status: 500 });
     }
 
-    // Handle e-book file if provided
+    // Store ebook file directly without processing
     let ebookUrl = null;
-    let extractedMetadata = {};
     if (ebook_file) {
       try {
         const ebookBuffer = Buffer.from(await ebook_file.arrayBuffer());
-        extractedMetadata = await extractEbookMetadata(ebookBuffer, ebook_file.name);
-        const safeFilename = SecurityUtils.sanitizeFilename(ebook_file.name);
-        ebookUrl = `/api/ebooks/${bookId}/${safeFilename}`;
-      } catch (ebookError) {
-        // Clean up uploaded cover image
-        if (coverUrl) {
-          try {
-            await imageStorageService.deleteImage(coverUrl);
-          } catch (cleanupError) {
-            console.error('Failed to cleanup cover image:', SecurityUtils.sanitizeForLog(cleanupError));
-          }
+        
+        const { writeFileSync, mkdirSync, existsSync } = require('fs');
+        const { join } = require('path');
+        
+        const storageDir = join(process.cwd(), 'storage', 'books', bookId.toString());
+        if (!existsSync(storageDir)) {
+          mkdirSync(storageDir, { recursive: true });
         }
+        
+        const timestamp = Date.now();
+        const safeFilename = SecurityUtils.sanitizeFilename(ebook_file.name);
+        const fileExtension = safeFilename.split('.').pop() || 'epub';
+        const filename = `book_${bookId}_${timestamp}.${fileExtension}`;
+        const filePath = join(storageDir, filename);
+        
+        writeFileSync(filePath, ebookBuffer);
+        ebookUrl = `/storage/books/${bookId}/${filename}`;
+        
+      } catch (ebookError) {
         await query('DELETE FROM books WHERE id = $1', [bookId]);
-        return NextResponse.json({ error: 'Failed to process e-book file' }, { status: 500 });
+        console.error('Ebook save error:', ebookError);
+        return NextResponse.json({ error: 'Failed to save e-book file' }, { status: 500 });
       }
     }
 
-    // Update book with file URLs and metadata
+    // Update book with file URLs
     await query(`
       UPDATE books SET 
         cover_image_url = $2,
-        ebook_file_url = $3,
-        word_count = $4,
-        pages = COALESCE($5, pages)
+        ebook_file_url = $3
       WHERE id = $1
-    `, [
-      bookId, 
-      coverUrl, 
-      ebookUrl,
-      extractedMetadata.wordCount || 0,
-      extractedMetadata.pageCount || sanitizeInt(pages)
-    ]);
-
-    // Get complete book data
-    const bookData = await query(`
-      SELECT b.*, a.name as author_name, c.name as category_name
-      FROM books b
-      LEFT JOIN authors a ON b.author_id = a.id
-      LEFT JOIN categories c ON b.category_id = c.id
-      WHERE b.id = $1
-    `, [bookId]);
-
-    const book = bookData.rows[0];
+    `, [bookId, coverUrl, ebookUrl]);
 
     return NextResponse.json({
       success: true,
-      message: 'Book created successfully',
-      book: {
-        id: book.id,
-        title: book.title,
-        author: book.author_name,
-        category: book.category_name,
-        price: book.price,
-        format: book.format,
-        cover_image_url: book.cover_image_url,
-        created_at: book.created_at
-      }
+      message: 'Book uploaded successfully',
+      bookId,
+      ebookUrl
     });
 
   } catch (error) {
@@ -343,35 +253,21 @@ export async function DELETE(request: NextRequest) {
     }
 
     let deletedCount = 0;
-    const failedIds: number[] = [];
-    const errors: string[] = [];
 
-    // Use transaction for better performance and consistency
     try {
       await query('BEGIN');
       
       for (const bookId of bookIdArray) {
-        try {
-          // Cascade delete from all related tables
-          await query('DELETE FROM cart_items WHERE book_id = $1', [bookId]);
-          await query('DELETE FROM order_items WHERE book_id = $1', [bookId]);
-          await query('DELETE FROM user_library WHERE book_id = $1', [bookId]);
-          await query('DELETE FROM book_reviews WHERE book_id = $1', [bookId]);
-          await query('DELETE FROM reading_progress WHERE book_id = $1', [bookId]);
-          
-          // Delete the book record itself
-          const deleteResult = await query('DELETE FROM books WHERE id = $1 RETURNING id', [bookId]);
-          
-          if (deleteResult.rows.length > 0) {
-            deletedCount++;
-          } else {
-            failedIds.push(bookId);
-            errors.push(`Book ${bookId}: Not found`);
-          }
-        } catch (error) {
-          console.error(`Error deleting book ${SecurityUtils.sanitizeForLog(bookId)}:`, SecurityUtils.sanitizeForLog(error));
-          failedIds.push(bookId);
-          errors.push(`Failed to delete book ${bookId}: ${error instanceof Error ? SecurityUtils.sanitizeHtml(error.message) : 'Unknown error'}`);
+        await query('DELETE FROM cart_items WHERE book_id = $1', [bookId]);
+        await query('DELETE FROM order_items WHERE book_id = $1', [bookId]);
+        await query('DELETE FROM user_library WHERE book_id = $1', [bookId]);
+        await query('DELETE FROM book_reviews WHERE book_id = $1', [bookId]);
+        await query('DELETE FROM reading_progress WHERE book_id = $1', [bookId]);
+        
+        const deleteResult = await query('DELETE FROM books WHERE id = $1 RETURNING id', [bookId]);
+        
+        if (deleteResult.rows.length > 0) {
+          deletedCount++;
         }
       }
       
@@ -384,10 +280,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `Successfully deleted ${deletedCount} books`,
-      deleted_count: deletedCount,
-      failed_ids: failedIds,
-      total_requested: bookIdArray.length,
-      errors: errors.length > 0 ? errors : undefined
+      deleted_count: deletedCount
     });
 
   } catch (error) {

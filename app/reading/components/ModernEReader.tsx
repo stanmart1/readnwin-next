@@ -3,7 +3,6 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useModernEReaderStore } from '@/stores/modernEReaderStore';
-import { EbookContentLoader } from '@/lib/services/EbookContentLoader';
 import { useSession } from 'next-auth/react';
 import { SecurityUtils } from '@/utils/security-utils';
 import {
@@ -11,33 +10,25 @@ import {
   Settings,
   X,
   BookOpen,
-  Bookmark,
-  Search,
-  Type,
-  Palette,
-  Volume2,
-  VolumeX,
-  Sun,
-  Moon,
-  Eye,
   ChevronLeft,
   ChevronRight,
-  MoreVertical,
+  Search,
+  Volume2,
+  VolumeX,
   Pen,
   StickyNote,
   Share,
-  Download,
 } from 'lucide-react';
 
-// Import drawer components
 import ModernLeftDrawer from './ModernLeftDrawer';
 import ModernRightDrawer from './ModernRightDrawer';
 import ModernProgressBar from './ModernProgressBar';
 import ModernHighlightRenderer from './ModernHighlightRenderer';
 import ModernTextToSpeech from './ModernTextToSpeech';
+import BookSearchInterface from './BookSearchInterface';
 
 interface ModernEReaderProps {
-  bookId: string;
+  bookId: string | null;
   onClose: () => void;
 }
 
@@ -50,7 +41,6 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
     settings,
     uiState,
     highlights,
-    notes,
     loadBook,
     unloadBook,
     updateProgress,
@@ -63,103 +53,161 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
     toggleFullscreen,
     startTextToSpeech,
     pauseTextToSpeech,
-    stopTextToSpeech,
     setError,
     clearError,
   } = useModernEReaderStore();
 
-  // Refs
   const contentRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const selectionTimeoutRef = useRef<NodeJS.Timeout>();
   const progressSyncTimeout = useRef<NodeJS.Timeout>();
 
-  // Local state
   const [isMenuVisible, setIsMenuVisible] = useState(true);
   const [lastInteraction, setLastInteraction] = useState(Date.now());
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // Sync reading progress to database
-  const syncProgressToDatabase = useCallback(async (bookId: string, userId: string, progressData: any) => {
+  // Load ebook directly from storage (EPUB or HTML)
+  const loadEbookFromStorage = useCallback(async (bookId: string, userId: string) => {
     try {
-      await fetch('/api/reading/progress', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          book_id: parseInt(bookId),
-          ...progressData
-        })
-      });
-    } catch (error) {
-      console.warn('Failed to sync progress:', error);
-    }
-  }, []);
-
-  const loadEbook = useCallback(async (bookId: string, userId: string) => {
-    try {
-      const response = await fetch(`/api/books/${bookId}/content`);
+      // Get book info from database
+      const response = await fetch(`/api/books/${bookId}`);
       if (!response.ok) {
-        throw new Error(`Failed to load book: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to load book info: ${response.status}`);
       }
       
       const data = await response.json();
-      if (data.error) {
-        throw new Error(data.error);
+      const bookInfo = data.book || data;
+      if (!bookInfo.ebook_file_url) {
+        throw new Error('No ebook file available');
       }
+
+      // Load ebook file directly
+      const ebookResponse = await fetch(bookInfo.ebook_file_url);
+      if (!ebookResponse.ok) {
+        throw new Error('Failed to load ebook file');
+      }
+
+      // Check file type by URL extension
+      const fileUrl = bookInfo.ebook_file_url.toLowerCase();
       
-      // Handle structure-preserved EPUB books
-      if (data.preservedFormat && data.contentType === 'epub' && data.structure) {
+      if (fileUrl.endsWith('.html') || fileUrl.endsWith('.htm')) {
+        // Handle HTML ebook
+        const htmlContent = await ebookResponse.text();
+        
         const bookData = {
           id: bookId,
-          title: data.title,
-          author: data.author,
-          format: 'epub',
-          contentUrl: `/api/books/${bookId}/content`,
-          structure: data.structure,
-          preservedFormat: true,
+          title: bookInfo.title,
+          author: bookInfo.author_name || 'Unknown Author',
+          format: 'html',
           metadata: {
-            wordCount: 0, // Will be calculated from chapters
-            estimatedReadingTime: 0,
-            pages: 0
+            wordCount: htmlContent.replace(/<[^>]*>/g, '').split(/\s+/).length,
+            estimatedReadingTime: Math.ceil(htmlContent.replace(/<[^>]*>/g, '').split(/\s+/).length / 200),
+            pages: 1
           },
-          chapters: await loadEpubChapters(bookId, data.structure)
+          chapters: [{
+            id: 'chapter-1',
+            chapter_number: 1,
+            chapter_title: bookInfo.title,
+            content_html: htmlContent,
+            reading_time_minutes: Math.ceil(htmlContent.replace(/<[^>]*>/g, '').split(/\s+/).length / 200)
+          }]
         };
         
         loadBook(bookId, userId, bookData);
         return;
       }
+
+      // Handle EPUB file
+      const ebookBuffer = await ebookResponse.arrayBuffer();
+      const JSZip = (await import('jszip')).default;
+      const zip = await JSZip.loadAsync(ebookBuffer);
+
+      // Parse EPUB structure
+      const containerFile = zip.file('META-INF/container.xml');
+      if (!containerFile) {
+        throw new Error('Invalid EPUB: missing container.xml');
+      }
+
+      const containerXml = await containerFile.async('text');
+      const opfMatch = containerXml.match(/full-path="([^"]+)"/i);
+      if (!opfMatch) {
+        throw new Error('Invalid EPUB: no OPF file found');
+      }
+
+      const opfFile = zip.file(opfMatch[1]);
+      if (!opfFile) {
+        throw new Error('Invalid EPUB: OPF file not found');
+      }
+
+      const opfXml = await opfFile.async('text');
       
-      // Handle structure-preserved HTML or regular books
+      // Get spine order
+      const spineMatches = opfXml.match(/<itemref[^>]*idref="([^"]+)"/gi) || [];
+      const spine = spineMatches.map(match => {
+        const idMatch = match.match(/idref="([^"]+)"/i);
+        return idMatch ? idMatch[1] : null;
+      }).filter(Boolean);
+      
+      // Get manifest
+      const manifestMatches = opfXml.match(/<item[^>]*id="([^"]+)"[^>]*href="([^"]+)"[^>]*media-type="([^"]+)"/gi) || [];
+      const manifest = {};
+      manifestMatches.forEach(match => {
+        const idMatch = match.match(/id="([^"]+)"/i);
+        const hrefMatch = match.match(/href="([^"]+)"/i);
+        const typeMatch = match.match(/media-type="([^"]+)"/i);
+        if (idMatch && hrefMatch && typeMatch) {
+          manifest[idMatch[1]] = { href: hrefMatch[1], mediaType: typeMatch[1] };
+        }
+      });
+
+      // Build chapters
+      const chapters = [];
+      const opfDir = opfMatch[1].split('/').slice(0, -1).join('/');
+      
+      for (let i = 0; i < spine.length; i++) {
+        const spineId = spine[i];
+        const manifestItem = manifest[spineId];
+        
+        if (manifestItem && manifestItem.mediaType === 'application/xhtml+xml') {
+          const chapterPath = opfDir ? `${opfDir}/${manifestItem.href}` : manifestItem.href;
+          const chapterFile = zip.file(chapterPath);
+          
+          if (chapterFile) {
+            const chapterContent = await chapterFile.async('text');
+            
+            // Extract title
+            const titleMatch = chapterContent.match(/<title>([^<]+)<\/title>/i) || 
+                              chapterContent.match(/<h[1-6][^>]*>([^<]+)<\/h[1-6]>/i);
+            const title = titleMatch?.[1]?.trim() || `Chapter ${i + 1}`;
+            
+            chapters.push({
+              id: spineId,
+              chapter_number: i + 1,
+              chapter_title: title,
+              content_html: chapterContent,
+              reading_time_minutes: Math.ceil(chapterContent.replace(/<[^>]*>/g, '').split(/\s+/).length / 200)
+            });
+          }
+        }
+      }
+
       const bookData = {
         id: bookId,
-        title: data.title,
-        author: data.author,
-        format: data.contentType || 'html',
-        contentUrl: `/api/books/${bookId}/content`,
-        structure: data.structure,
-        preservedFormat: data.preservedFormat || false,
+        title: bookInfo.title,
+        author: bookInfo.author_name || 'Unknown Author',
+        format: 'epub',
         metadata: {
-          wordCount: data.wordCount || 0,
-          estimatedReadingTime: Math.ceil((data.wordCount || 0) / 200),
-          pages: Math.ceil((data.wordCount || 0) / 250)
+          wordCount: chapters.length * 1000,
+          estimatedReadingTime: chapters.length * 5,
+          pages: chapters.length * 2
         },
-        chapters: data.chapters && data.chapters.length > 0 ? 
-          data.chapters.map((ch: { id?: string; order?: number; title?: string }, index: number) => ({
-            id: ch.id || `chapter-${index + 1}`,
-            chapter_number: ch.order || index + 1,
-            chapter_title: ch.title || `Chapter ${index + 1}`,
-            content_html: data.content,
-            reading_time_minutes: Math.ceil((data.wordCount || 0) / (200 * data.chapters.length))
-          })) : 
-          [{
-            id: 'chapter-1',
-            chapter_number: 1,
-            chapter_title: data.title,
-            content_html: data.content,
-            reading_time_minutes: Math.ceil((data.wordCount || 0) / 200)
-          }]
+        chapters: chapters.length > 0 ? chapters : [{
+          id: 'chapter-1',
+          chapter_number: 1,
+          chapter_title: bookInfo.title,
+          content_html: '<p>No content available</p>',
+          reading_time_minutes: 1
+        }]
       };
       
       loadBook(bookId, userId, bookData);
@@ -167,71 +215,23 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
       setError(error instanceof Error ? error.message : 'Failed to load book');
     }
   }, [loadBook, setError]);
-  
-  // Load EPUB chapters from preserved structure
-  const loadEpubChapters = useCallback(async (bookId: string, structure: { spine?: string[]; manifest?: Record<string, { href: string; mediaType: string }> }) => {
-    try {
-      const chapters = [];
-      const spine = structure.spine || [];
-      const manifest = structure.manifest || {};
-      
-      for (let i = 0; i < spine.length; i++) {
-        const spineItem = spine[i];
-        const manifestItem = manifest[spineItem];
-        
-        if (manifestItem && manifestItem.mediaType === 'application/xhtml+xml') {
-          // Load chapter content from preserved EPUB structure
-          const chapterResponse = await fetch(`/api/ebooks/${bookId}/extracted/${manifestItem.href}`);
-          if (chapterResponse.ok) {
-            const chapterContent = await chapterResponse.text();
-            
-            // Extract title from content
-            const titleMatch = chapterContent.match(/<title>([^<]+)<\/title>/i) || 
-                              chapterContent.match(/<h[1-6][^>]*>([^<]+)<\/h[1-6]>/i);
-            const title = titleMatch?.[1] || `Chapter ${i + 1}`;
-            
-            chapters.push({
-              id: spineItem,
-              chapter_number: i + 1,
-              chapter_title: title.trim(),
-              content_html: chapterContent,
-              reading_time_minutes: Math.ceil(chapterContent.replace(/<[^>]*>/g, '').split(/\s+/).length / 200)
-            });
-          }
-        }
-      }
-      
-      return chapters.length > 0 ? chapters : [{
-        id: 'chapter-1',
-        chapter_number: 1,
-        chapter_title: 'Content',
-        content_html: '<p>EPUB structure preserved but content could not be loaded.</p>',
-        reading_time_minutes: 1
-      }];
-    } catch (error) {
-      console.error('Failed to load EPUB chapters:', error);
-      return [{
-        id: 'chapter-1',
-        chapter_number: 1,
-        chapter_title: 'Error',
-        content_html: '<p>Failed to load EPUB content.</p>',
-        reading_time_minutes: 1
-      }];
-    }
-  }, []);
 
   // Load book on mount
   useEffect(() => {
     if (bookId && session?.user?.id) {
-      loadEbook(bookId, session.user.id);
+      loadEbookFromStorage(bookId, session.user.id);
+    } else if (!bookId) {
+      unloadBook();
     }
 
     return () => {
-      unloadBook();
+      if (bookId) {
+        unloadBook();
+      }
     };
-  }, [bookId, session?.user?.id, loadEbook, unloadBook]);
+  }, [bookId, session?.user?.id, loadEbookFromStorage, unloadBook]);
 
-  // Auto-hide menu after inactivity
+  // Auto-hide menu
   useEffect(() => {
     const hideMenuTimeout = setTimeout(() => {
       if (Date.now() - lastInteraction > 3000) {
@@ -242,7 +242,6 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
     return () => clearTimeout(hideMenuTimeout);
   }, [lastInteraction]);
 
-  // Handle user interaction
   const handleInteraction = useCallback(() => {
     setLastInteraction(Date.now());
     setIsMenuVisible(true);
@@ -263,27 +262,13 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
       : 100;
     setScrollProgress(progress);
 
-    // Update reading progress in store
     updateProgress({
       current_position: scrollTop,
       progress_percentage: progress,
     });
 
-    // Sync with database (throttled)
-    if (session?.user?.id) {
-      clearTimeout(progressSyncTimeout.current);
-      progressSyncTimeout.current = setTimeout(() => {
-        syncProgressToDatabase(bookId, session.user.id, {
-          chapter_id: currentChapter.id,
-          current_position: scrollTop,
-          progress_percentage: progress,
-          chapter_number: currentChapter.chapter_number
-        });
-      }, 2000); // Sync every 2 seconds of inactivity
-    }
-
     handleInteraction();
-  }, [currentChapter, updateProgress, handleInteraction, bookId, session]);
+  }, [currentChapter, updateProgress, handleInteraction, bookId]);
 
   // Handle text selection
   const handleTextSelection = useCallback(() => {
@@ -295,7 +280,6 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
         const selectedText = selection.toString().trim();
         const range = selection.getRangeAt(0);
         
-        // Calculate offsets
         const startOffset = getTextOffset(contentRef.current!, range.startContainer, range.startOffset);
         const endOffset = getTextOffset(contentRef.current!, range.endContainer, range.endOffset);
         
@@ -306,7 +290,6 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
     }, 100);
   }, [setSelectedText]);
 
-  // Helper function to calculate text offset
   const getTextOffset = (container: Node, node: Node, offset: number): number => {
     let textOffset = 0;
     const walker = document.createTreeWalker(
@@ -328,7 +311,7 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (uiState.noteModalOpen || uiState.highlightModalOpen || uiState.searchModalOpen) {
-      return; // Don't handle shortcuts when modals are open
+      return;
     }
 
     switch (e.key) {
@@ -355,25 +338,6 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
           toggleRightDrawer();
         }
         break;
-      case 'f':
-      case 'F':
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          // Open search modal
-          // setSearchModalOpen(true);
-        }
-        break;
-      case 't':
-      case 'T':
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          if (uiState.isTextToSpeechPlaying) {
-            pauseTextToSpeech();
-          } else {
-            startTextToSpeech();
-          }
-        }
-        break;
       case 'F11':
         e.preventDefault();
         toggleFullscreen();
@@ -387,17 +351,14 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
     nextChapter,
     toggleLeftDrawer,
     toggleRightDrawer,
-    startTextToSpeech,
-    pauseTextToSpeech,
   ]);
 
-  // Add keyboard event listeners
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // Handle swipe gestures for mobile
+  // Handle swipe gestures
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -413,17 +374,14 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
     const deltaY = touch.clientY - touchStart.y;
     const minSwipeDistance = 50;
 
-    // Check if it's a horizontal swipe
     if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
       if (deltaX > 0) {
-        // Swipe right - previous chapter or open left drawer
         if (Math.abs(deltaX) > 100) {
           previousChapter();
         } else {
           toggleLeftDrawer();
         }
       } else {
-        // Swipe left - next chapter or open right drawer
         if (Math.abs(deltaX) > 100) {
           nextChapter();
         } else {
@@ -459,8 +417,8 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
             <button
               onClick={() => {
                 clearError();
-                if (session?.user?.id) {
-                  loadEbook(bookId, session.user.id).catch(console.error);
+                if (session?.user?.id && bookId) {
+                  loadEbookFromStorage(bookId, session.user.id);
                 }
               }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -481,20 +439,33 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
 
   // No book loaded
   if (!currentBook || !currentChapter) {
-    return (
-      <div className="fixed inset-0 bg-white dark:bg-gray-900 flex items-center justify-center z-50">
-        <div className="text-center">
-          <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">No book content available</p>
-          <button
-            onClick={onClose}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Close
-          </button>
+    if (!bookId) {
+      return (
+        <BookSearchInterface 
+          onClose={onClose}
+          onBookSelect={(selectedBookId) => {
+            if (session?.user?.id) {
+              loadEbookFromStorage(selectedBookId, session.user.id);
+            }
+          }}
+        />
+      );
+    } else {
+      return (
+        <div className="fixed inset-0 bg-white dark:bg-gray-900 flex items-center justify-center z-50">
+          <div className="text-center">
+            <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600 dark:text-gray-400">No book content available</p>
+            <button
+              onClick={onClose}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Close
+            </button>
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
   }
 
   // Apply theme styles
@@ -541,7 +512,6 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
             }}
           >
             <div className="flex items-center justify-between px-4 py-3">
-              {/* Left side */}
               <div className="flex items-center space-x-3">
                 <button
                   onClick={() => toggleLeftDrawer()}
@@ -560,7 +530,6 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
                 </div>
               </div>
 
-              {/* Center - Progress */}
               {settings.showProgressBar && readingProgress && (
                 <div className="hidden sm:flex items-center space-x-2 text-xs opacity-70">
                   <span>{Math.round(readingProgress.progress_percentage)}%</span>
@@ -573,11 +542,9 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
                 </div>
               )}
 
-              {/* Right side */}
               <div className="flex items-center space-x-2">
-                {/* Quick actions */}
                 <button
-                  onClick={() => {/* Open search */}}
+                  onClick={() => {}}
                   className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   title="Search"
                 >
@@ -622,7 +589,6 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
               </div>
             </div>
 
-            {/* Progress Bar */}
             {settings.showProgressBar && (
               <ModernProgressBar 
                 progress={scrollProgress}
@@ -713,14 +679,14 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
             className="fixed bottom-4 right-4 flex flex-col space-y-2 z-50"
           >
             <button
-              onClick={() => {/* Open highlight modal */}}
+              onClick={() => {}}
               className="p-3 bg-yellow-500 text-white rounded-full shadow-lg hover:bg-yellow-600 transition-colors"
               title="Highlight"
             >
               <Pen className="w-5 h-5" />
             </button>
             <button
-              onClick={() => {/* Open note modal */}}
+              onClick={() => {}}
               className="p-3 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 transition-colors"
               title="Add Note"
             >
@@ -742,24 +708,18 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
         )}
       </AnimatePresence>
 
-      {/* Highlight Renderer */}
       <ModernHighlightRenderer
         highlights={highlights}
         contentRef={contentRef}
         onHighlightClick={(highlight) => {
-          // Handle highlight click
           console.log('Highlight clicked:', SecurityUtils.sanitizeForLog(JSON.stringify(highlight)));
         }}
       />
 
-      {/* Drawers */}
       <ModernLeftDrawer />
       <ModernRightDrawer />
 
-      {/* Text-to-Speech */}
       {settings.textToSpeech.enabled && <ModernTextToSpeech />}
-
-      {/* Modals - TODO: Implement when needed */}
     </div>
   );
 }

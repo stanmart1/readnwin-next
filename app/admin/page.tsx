@@ -82,7 +82,7 @@ export default function AdminDashboard() {
     if (!isAdmin && permissionsLoading) return;
 
     const tabParam = searchParams.get("tab");
-    if (tabParam && tabParam !== activeTab) {
+    if (tabParam) {
       // Admin users can access any tab
       if (isAdmin || canAccessTab(tabParam, permissions)) {
         setActiveTab(tabParam);
@@ -91,12 +91,12 @@ export default function AdminDashboard() {
         setActiveTab("overview");
         router.replace(`/admin?tab=overview`);
       }
-    } else if (!tabParam && !activeTab) {
-      // Only default to overview if no tab is set (initial load without tab param)
+    } else if (!activeTab) {
+      // Only default to overview if no tab is set and no active tab exists
       setActiveTab("overview");
       router.replace(`/admin?tab=overview`, { scroll: false });
     }
-  }, [searchParams, permissions, permissionsLoading, router, isAdmin]);
+  }, [searchParams, permissions, permissionsLoading, router, isAdmin, activeTab]);
 
   // Handle tab changes and update URL
   const handleTabChange = (tab: string) => {

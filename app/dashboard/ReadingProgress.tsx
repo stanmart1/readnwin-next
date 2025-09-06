@@ -12,7 +12,7 @@ interface CurrentlyReading {
   author_name: string;
   cover_image_url?: string;
   progress_percentage: number;
-  current_chapter_id?: string;
+  current_page?: number;
   total_reading_time_seconds: number;
   last_read_at: string;
 }
@@ -31,10 +31,17 @@ export default function ReadingProgress() {
       }
 
       try {
-        const response = await fetch('/api/dashboard/currently-reading');
+        const response = await fetch('/api/dashboard/currently-reading', {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
         if (response.ok) {
           const data = await response.json();
           setCurrentlyReading(data.books || []);
+        } else {
+          console.error('Failed to fetch currently reading:', response.status, response.statusText);
         }
       } catch (error) {
         console.error('Error fetching currently reading:', error);

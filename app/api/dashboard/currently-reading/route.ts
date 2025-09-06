@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
           b.title,
           b.cover_image_url,
           COALESCE(rp.progress_percentage, 0) as progress_percentage,
-          rp.current_chapter_id,
+          rp.current_page,
           COALESCE(rp.total_reading_time_seconds, 0) as total_reading_time_seconds,
           rp.last_read_at,
           COALESCE(a.name, 'Unknown Author') as author_name
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
         author_name: row.author_name,
         cover_image_url: row.cover_image_url,
         progress_percentage: parseFloat(row.progress_percentage) || 0,
-        current_chapter_id: row.current_chapter_id,
+        current_page: row.current_page,
         total_reading_time_seconds: parseInt(row.total_reading_time_seconds) || 0,
         last_read_at: row.last_read_at
       }));

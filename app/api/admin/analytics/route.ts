@@ -87,16 +87,59 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Simplified daily activity with default data for faster loading
-    const dailyActivity = [
-      { day: 'Mon', active: Math.floor(userCount * 0.1), orders: Math.floor(orderCount * 0.15) },
-      { day: 'Tue', active: Math.floor(userCount * 0.12), orders: Math.floor(orderCount * 0.18) },
-      { day: 'Wed', active: Math.floor(userCount * 0.14), orders: Math.floor(orderCount * 0.16) },
-      { day: 'Thu', active: Math.floor(userCount * 0.13), orders: Math.floor(orderCount * 0.14) },
-      { day: 'Fri', active: Math.floor(userCount * 0.16), orders: Math.floor(orderCount * 0.20) },
-      { day: 'Sat', active: Math.floor(userCount * 0.11), orders: Math.floor(orderCount * 0.12) },
-      { day: 'Sun', active: Math.floor(userCount * 0.09), orders: Math.floor(orderCount * 0.10) }
-    ];
+    // Get real daily activity from last 7 days
+    let dailyActivity = [];
+    try {
+      const dailyActivityResult = await secureQuery(`
+        WITH daily_dates AS (
+          SELECT 
+            date_trunc('day', generate_series(
+              CURRENT_DATE - INTERVAL '6 days',
+              CURRENT_DATE,
+              '1 day'
+            )) as day_date,
+            TO_CHAR(generate_series(
+              CURRENT_DATE - INTERVAL '6 days',
+              CURRENT_DATE,
+              '1 day'
+            ), 'Dy') as day
+        ),
+        daily_users AS (
+          SELECT 
+            DATE(created_at) as activity_date,
+            COUNT(DISTINCT id) as new_users
+          FROM users 
+          WHERE created_at >= CURRENT_DATE - INTERVAL '6 days'
+          GROUP BY DATE(created_at)
+        ),
+        daily_orders AS (
+          SELECT 
+            DATE(created_at) as order_date,
+            COUNT(id) as order_count
+          FROM orders 
+          WHERE created_at >= CURRENT_DATE - INTERVAL '6 days'
+          GROUP BY DATE(created_at)
+        )
+        SELECT 
+          dd.day,
+          COALESCE(du.new_users, 0) as active,
+          COALESCE(do.order_count, 0) as orders
+        FROM daily_dates dd
+        LEFT JOIN daily_users du ON DATE(dd.day_date) = du.activity_date
+        LEFT JOIN daily_orders do ON DATE(dd.day_date) = do.order_date
+        ORDER BY dd.day_date
+      `);
+      
+      dailyActivity = dailyActivityResult.rows.map((row: any) => ({
+        day: row.day,
+        active: parseInt(row.active) || 0,
+        orders: parseInt(row.orders) || 0
+      }));
+      
+    } catch (e) {
+      console.error('❌ Error fetching daily activity:', e);
+      dailyActivity = [];
+    }
     
     // Fetch real recent activities from multiple sources
     let recentActivities = [];
@@ -228,15 +271,53 @@ export async function GET(request: NextRequest) {
       return date.toLocaleDateString();
     }
     
-    // Simplified monthly sales data for faster loading
-    const monthly_sales = [
-      { month: 'Jan', sales: revenue * 0.15, orders: orderCount * 0.15 },
-      { month: 'Feb', sales: revenue * 0.18, orders: orderCount * 0.18 },
-      { month: 'Mar', sales: revenue * 0.16, orders: orderCount * 0.16 },
-      { month: 'Apr', sales: revenue * 0.14, orders: orderCount * 0.14 },
-      { month: 'May', sales: revenue * 0.20, orders: orderCount * 0.20 },
-      { month: 'Jun', sales: revenue * 0.17, orders: orderCount * 0.17 }
-    ];
+    // Get real monthly data from database
+    let monthly_sales = [];
+    try {
+      const monthlyDataResult = await secureQuery(`
+        WITH monthly_stats AS (
+          SELECT 
+            TO_CHAR(date_trunc('month', generate_series(
+              CURRENT_DATE - INTERVAL '11 months',
+              CURRENT_DATE,
+              '1 month'
+            )), 'Mon') as month,
+            date_trunc('month', generate_series(
+              CURRENT_DATE - INTERVAL '11 months',
+              CURRENT_DATE,
+              '1 month'
+            )) as month_date
+        )
+        SELECT 
+          ms.month,
+          COALESCE(SUM(o.total_amount), 0) as sales,
+          COALESCE(COUNT(o.id), 0) as orders,
+          COALESCE(COUNT(DISTINCT u.id), 0) as users
+        FROM monthly_stats ms
+        LEFT JOIN orders o ON date_trunc('month', o.created_at) = ms.month_date
+        LEFT JOIN users u ON date_trunc('month', u.created_at) = ms.month_date
+        GROUP BY ms.month, ms.month_date
+        ORDER BY ms.month_date
+      `);
+      
+      monthly_sales = monthlyDataResult.rows.map((row: any) => ({
+        month: row.month,
+        sales: parseFloat(row.sales) || 0,
+        orders: parseInt(row.orders) || 0,
+        users: parseInt(row.users) || 0
+      }));
+      
+    } catch (e) {
+      console.error('❌ Error fetching monthly data:', e);
+      // Fallback to current month only
+      const currentMonth = new Date().toLocaleDateString('en', { month: 'short' });
+      monthly_sales = [{
+        month: currentMonth,
+        sales: revenue,
+        orders: orderCount,
+        users: userCount
+      }];
+    }
 
     const response = {
       success: true,
@@ -246,7 +327,7 @@ export async function GET(request: NextRequest) {
         total_revenue: revenue,
         total_orders: orderCount,
         average_order_value: orderCount > 0 ? revenue / orderCount : 0,
-        monthly_sales,
+        monthly_sales: monthly_sales,
         top_books: [],
         category_sales: [],
         recentOrders: [],

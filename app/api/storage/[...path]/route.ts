@@ -8,6 +8,17 @@ export async function GET(
   { params }: { params: { path: string[] } }
 ) {
   try {
+    // Security check - only allow access to non-book files or through proper authentication
+    const pathString = params.path.join('/');
+    
+    // If this is a book file request, deny direct access
+    if (pathString.includes('/books/') && (pathString.includes('.epub') || pathString.includes('.pdf') || pathString.includes('.mobi'))) {
+      return NextResponse.json(
+        { error: 'Direct access to book files not allowed. Use proper API endpoints.' },
+        { status: 403 }
+      );
+    }
+    
     // Construct the file path using the storage location
     const basePath = process.env.NODE_ENV === 'production' ? '/app/storage' : join(process.cwd(), 'storage');
     const filePath = join(basePath, ...params.path);
@@ -54,12 +65,22 @@ export async function GET(
         contentType = 'application/octet-stream';
     }
 
+    // CORS security check
+    const origin = request.headers.get('origin');
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'https://readnwin.com',
+      'https://www.readnwin.com'
+    ];
+    const corsOrigin = allowedOrigins.includes(origin || '') ? origin : null;
+    
     // Return the file with appropriate headers
     return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000, immutable',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': corsOrigin || 'null',
+        'Access-Control-Allow-Credentials': 'true',
       },
     });
   } catch (error) {

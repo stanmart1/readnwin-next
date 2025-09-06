@@ -22,12 +22,6 @@ const TABS: TabConfig[] = [
     description:
       "Modern unified about page content management with real-time sync",
   },
-  {
-    id: "sections",
-    label: "About Sections",
-    icon: "ri-list-check-line",
-    description: "Manage individual about us sections (Legacy)",
-  },
 ];
 
 export default function EnhancedAboutManagement() {
@@ -109,11 +103,6 @@ export default function EnhancedAboutManagement() {
               >
                 <i className={`${tab.icon} text-lg`}></i>
                 <span>{tab.label}</span>
-                {tab.id === "sections" && (
-                  <span className="ml-1 px-2 py-0.5 text-xs bg-gray-200 text-gray-600 rounded-full">
-                    Legacy
-                  </span>
-                )}
               </button>
             ))}
           </nav>
@@ -128,31 +117,16 @@ export default function EnhancedAboutManagement() {
 
         {/* Tab Content */}
         <div className="p-6">
-          {activeTab === "modern" && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">
-                <i className="ri-sparkle-line"></i>
-                <span>
-                  Modern unified about page management with real-time preview
-                  and auto-save functionality.
-                </span>
-              </div>
-              <ModernAboutManagement />
+          <div className="space-y-6">
+            <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">
+              <i className="ri-sparkle-line"></i>
+              <span>
+                Modern unified about page management with real-time preview
+                and auto-save functionality.
+              </span>
             </div>
-          )}
-
-          {activeTab === "sections" && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
-                <i className="ri-information-line"></i>
-                <span>
-                  Legacy sections management. Consider using the modern About
-                  Page tab for better experience.
-                </span>
-              </div>
-              <AboutUsSectionsManagement />
-            </div>
-          )}
+            <ModernAboutManagement />
+          </div>
         </div>
       </div>
 

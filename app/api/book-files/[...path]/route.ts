@@ -21,13 +21,23 @@ export async function OPTIONS(
   request: NextRequest,
   { params }: { params: { path: string[] } }
 ) {
+  const origin = request.headers.get('origin');
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'https://readnwin.com',
+    'https://www.readnwin.com'
+  ];
+  
+  const corsOrigin = allowedOrigins.includes(origin || '') ? origin : null;
+  
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': corsOrigin || 'null',
       'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Range, Authorization',
-      'Access-Control-Max-Age': '86400', // Cache preflight for 24 hours
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Max-Age': '86400',
     },
   });
 }
@@ -149,6 +159,15 @@ async function serveBookFile(
       isHead
     });
     
+    // CORS security check
+    const origin = request.headers.get('origin');
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'https://readnwin.com',
+      'https://www.readnwin.com'
+    ];
+    const corsOrigin = allowedOrigins.includes(origin || '') ? origin : null;
+    
     // For HEAD requests, return headers only
     if (isHead) {
       return new NextResponse(null, {
@@ -158,9 +177,10 @@ async function serveBookFile(
           'Content-Length': fileBuffer.length.toString(),
           'Accept-Ranges': 'bytes',
           'Cache-Control': 'public, max-age=31536000',
-          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Origin': corsOrigin || 'null',
           'Access-Control-Allow-Methods': 'GET, HEAD',
           'Access-Control-Allow-Headers': 'Content-Type, Range',
+          'Access-Control-Allow-Credentials': 'true',
         },
       });
     }
@@ -173,9 +193,10 @@ async function serveBookFile(
         'Content-Length': fileBuffer.length.toString(),
         'Accept-Ranges': 'bytes',
         'Cache-Control': 'public, max-age=31536000',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': corsOrigin || 'null',
         'Access-Control-Allow-Methods': 'GET, HEAD',
         'Access-Control-Allow-Headers': 'Content-Type, Range',
+        'Access-Control-Allow-Credentials': 'true',
         ...rangeHeaders,
       },
     });

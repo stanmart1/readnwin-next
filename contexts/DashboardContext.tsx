@@ -183,7 +183,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('🔍 DashboardContext - Fetching user stats...');
       dispatch({ type: 'SET_LOADING', payload: true });
-      const response = await fetch('/api/dashboard/stats');
+      const response = await fetch('/api/dashboard/stats', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       console.log('🔍 DashboardContext - Stats response status:', response.status);
       
       const data = await response.json();
@@ -215,7 +220,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     
     try {
       console.log('🔍 DashboardContext - Fetching reading progress...');
-      const response = await fetch('/api/dashboard/reading-progress');
+      const response = await fetch('/api/dashboard/reading-progress', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       console.log('🔍 DashboardContext - Reading progress response status:', response.status);
       
       const data = await response.json();
@@ -232,7 +242,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     
     try {
       console.log('🔍 DashboardContext - Fetching library items...');
-      const response = await fetch('/api/user/library');
+      const response = await fetch('/api/user/library', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       const data = await response.json();
       dispatch({ type: 'SET_LIBRARY_ITEMS', payload: data.libraryItems || [] });
     } catch (error) {
@@ -245,7 +260,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     
     try {
       console.log('🔍 DashboardContext - Fetching notifications...');
-      const response = await fetch('/api/dashboard/notifications');
+      const response = await fetch('/api/dashboard/notifications', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       const data = await response.json();
       dispatch({ type: 'SET_NOTIFICATIONS', payload: data.notifications || [] });
     } catch (error) {
@@ -258,7 +278,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     
     try {
       console.log('🔍 DashboardContext - Fetching activities...');
-      const response = await fetch('/api/dashboard/activity');
+      const response = await fetch('/api/dashboard/activity', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       const data = await response.json();
       dispatch({ type: 'SET_ACTIVITIES', payload: data.activities || [] });
     } catch (error) {
@@ -271,7 +296,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     
     try {
       console.log('🔍 DashboardContext - Fetching goals...');
-      const response = await fetch('/api/dashboard/goals');
+      const response = await fetch('/api/dashboard/goals', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       console.log('🔍 DashboardContext - Goals response status:', response.status);
       
       const data = await response.json();

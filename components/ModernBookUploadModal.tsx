@@ -85,37 +85,9 @@ export default function ModernBookUploadModal({
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
-    
-    // Parse ebook file to extract pages
-    if (field === 'ebook_file' && file.type === 'application/epub+zip') {
-      await parseEbookFile(file);
-    }
   };
 
-  const parseEbookFile = async (file: File) => {
-    setIsParsingEbook(true);
-    try {
-      const formData = new FormData();
-      formData.append('ebook_file', file);
-      
-      const response = await fetch('/api/admin/books/parse-ebook', {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        if (result.pages) {
-          setFormData(prev => ({ ...prev, pages: result.pages.toString() }));
-          toast.success(`Extracted ${result.pages} pages from ebook`);
-        }
-      }
-    } catch (error) {
-      console.error('Error parsing ebook:', error);
-    } finally {
-      setIsParsingEbook(false);
-    }
-  };
+  // Ebook parsing disabled - files stored as-is
 
   const handleDrag = (e: React.DragEvent, type: 'cover' | 'ebook') => {
     e.preventDefault();
@@ -796,32 +768,19 @@ export default function ModernBookUploadModal({
                 </div>
               )}
 
-              {/* Pages Field - Auto-populated from ebook */}
+              {/* Pages Field */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Pages {isParsingEbook && <span className="text-blue-600">(Auto-detecting...)</span>}
+                  Pages
                 </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="1"
-                    value={formData.pages}
-                    onChange={(e) => handleInputChange('pages', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={formData.format === 'ebook' ? 'Will be auto-detected from ebook file' : 'Number of pages'}
-                    disabled={isParsingEbook}
-                  />
-                  {isParsingEbook && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    </div>
-                  )}
-                </div>
-                {formData.format === 'ebook' && !formData.ebook_file && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    Upload an ebook file to automatically detect page count
-                  </p>
-                )}
+                <input
+                  type="number"
+                  min="1"
+                  value={formData.pages}
+                  onChange={(e) => handleInputChange('pages', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Number of pages"
+                />
               </div>
 
               {/* Upload Progress */}

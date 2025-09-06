@@ -79,10 +79,10 @@ export class FlutterwaveService {
     encryptionKey?: string,
     testMode?: boolean
   ) {
-    this.clientSecret = clientSecret || process.env.FLUTTERWAVE_SECRET_KEY || '';
-    this.clientId = clientId || process.env.FLUTTERWAVE_PUBLIC_KEY || '';
-    this.encryptionKey = encryptionKey || process.env.FLUTTERWAVE_HASH || '';
-    this.testMode = testMode !== undefined ? testMode : process.env.NODE_ENV !== 'production';
+    this.clientSecret = clientSecret || '';
+    this.clientId = clientId || '';
+    this.encryptionKey = encryptionKey || '';
+    this.testMode = testMode !== undefined ? testMode : false;
     
     this.baseUrl = 'https://api.flutterwave.com/v3';
 
@@ -163,8 +163,38 @@ export class FlutterwaveService {
   initializeInlinePayment(data: FlutterwaveInlinePaymentData): void {
     // Check if Flutterwave script is loaded
     if (typeof window !== 'undefined' && (window as any).FlutterwaveCheckout) {
+      const originalCallback = data.callback;
+      const originalOnClose = data.onClose;
+      
       const config = {
         ...data,
+        // Wrap the callback to ensure proper data handling
+        callback: (response: any) => {
+          console.log('🔍 Flutterwave raw callback response:', response);
+          
+          // Normalize the response to ensure consistent format
+          const normalizedResponse = {
+            status: response.status || response.data?.status || 'unknown',
+            tx_ref: response.tx_ref || response.data?.tx_ref,
+            transaction_id: response.transaction_id || response.data?.id,
+            data: response.data || response,
+            transaction: response.transaction || response.data,
+            meta: response.meta || data.meta || {},
+            ...response
+          };
+          
+          console.log('🔍 Normalized Flutterwave response:', normalizedResponse);
+          
+          if (originalCallback) {
+            originalCallback(normalizedResponse);
+          }
+        },
+        onclose: () => {
+          console.log('🔍 Flutterwave modal closed');
+          if (originalOnClose) {
+            originalOnClose();
+          }
+        },
         // Add comprehensive internal service configuration to prevent 400 errors
         meta: {
           ...data.meta,
@@ -189,9 +219,11 @@ export class FlutterwaveService {
         }
       };
       
+      console.log('🔍 Flutterwave config being sent:', config);
       (window as any).FlutterwaveCheckout(config);
     } else {
       console.error('Flutterwave script not loaded');
+      throw new Error('Flutterwave script not loaded');
     }
   }
 
@@ -199,7 +231,7 @@ export class FlutterwaveService {
    * Prepare inline payment data
    */
   prepareInlinePaymentData(data: FlutterwavePaymentData): FlutterwaveInlinePaymentData {
-    return {
+    const inlineData = {
       public_key: this.clientId,
       tx_ref: data.tx_ref,
       amount: Number(data.amount),
@@ -218,11 +250,18 @@ export class FlutterwaveService {
       meta: {
         ...data.meta,
         source: 'readnwin_web',
-        integration: 'flutterwave_v3'
+        integration: 'flutterwave_v3',
+        // Ensure order metadata is preserved for callback
+        order_id: data.meta?.order_id,
+        order_number: data.meta?.order_number,
+        user_id: data.meta?.user_id
       },
       callback: () => {},
       onClose: () => {},
     };
+    
+    console.log('🔍 Prepared inline payment data:', inlineData);
+    return inlineData;
   }
 
   /**
@@ -230,6 +269,8 @@ export class FlutterwaveService {
    */
   async verifyPayment(transactionId: string): Promise<any> {
     try {
+      console.log('🔍 Verifying payment with Flutterwave:', transactionId);
+      
       const response = await fetch(`${this.baseUrl}/transactions/${transactionId}/verify`, {
         method: 'GET',
         headers: {
@@ -238,13 +279,26 @@ export class FlutterwaveService {
         },
       });
 
+      console.log('🔍 Flutterwave verify response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('❌ Flutterwave verify error:', errorData);
         throw new Error(errorData.message || 'Failed to verify payment');
       }
 
       const result = await response.json();
-      return result;
+      console.log('✅ Flutterwave verify result:', result);
+      
+      // Normalize the response format
+      return {
+        status: result.status,
+        data: result.data,
+        message: result.message,
+        // Extract the actual payment status from the nested data
+        payment_status: result.data?.status || result.status,
+        transaction_data: result.data
+      };
     } catch (error) {
       console.error('Error verifying Flutterwave payment:', error);
       throw new Error(`Failed to verify payment: ${error instanceof Error ? error.message : 'Unknown error'}`);

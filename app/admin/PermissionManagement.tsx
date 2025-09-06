@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { formatDate } from '@/utils/dateUtils';
+import toast from 'react-hot-toast';
 
 interface Permission {
   id: number;
@@ -23,6 +24,8 @@ export default function PermissionManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingPermission, setEditingPermission] = useState<Permission | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [creatingPermission, setCreatingPermission] = useState({
     name: '',
     display_name: '',
@@ -59,14 +62,38 @@ export default function PermissionManagement() {
   }, []);
 
   const handleCreatePermission = async () => {
+    // Validate required fields
+    if (!creatingPermission.name?.trim() || !creatingPermission.display_name?.trim() || !creatingPermission.resource?.trim() || !creatingPermission.action?.trim()) {
+      const errorMsg = 'Name, display name, resource, and action are required';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      return;
+    }
+    
+    setCreating(true);
+    setError('');
+    
     try {
       const response = await fetch('/api/admin/permissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(creatingPermission)
+        body: JSON.stringify({
+          ...creatingPermission,
+          name: creatingPermission.name.trim(),
+          display_name: creatingPermission.display_name.trim(),
+          description: creatingPermission.description?.trim() || '',
+          resource: creatingPermission.resource.trim(),
+          action: creatingPermission.action.trim()
+        })
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       if (data.success) {
+        toast.success('Permission created successfully!');
         setShowCreateModal(false);
         setCreatingPermission({
           name: '',
@@ -76,40 +103,73 @@ export default function PermissionManagement() {
           action: '',
           scope: 'global'
         });
-        fetchPermissions();
+        setError('');
+        await fetchPermissions();
       } else {
-        setError(data.error || 'Failed to create permission');
+        const errorMsg = data.error || 'Failed to create permission';
+        setError(errorMsg);
+        toast.error(errorMsg);
       }
     } catch (error) {
-      setError('Error creating permission');
+      console.error('Create permission error:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Network error occurred';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setCreating(false);
     }
   };
 
   const handleEditPermission = async () => {
     if (!editingPermission) return;
     
+    // Validate required fields
+    if (!editingPermission.display_name?.trim() || !editingPermission.resource?.trim() || !editingPermission.action?.trim()) {
+      const errorMsg = 'Display name, resource, and action are required';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      return;
+    }
+    
+    setSaving(true);
+    setError('');
+    
     try {
       const response = await fetch(`/api/admin/permissions/${editingPermission.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          display_name: editingPermission.display_name,
-          description: editingPermission.description,
-          resource: editingPermission.resource,
-          action: editingPermission.action,
+          display_name: editingPermission.display_name.trim(),
+          description: editingPermission.description?.trim() || '',
+          resource: editingPermission.resource.trim(),
+          action: editingPermission.action.trim(),
           scope: editingPermission.scope
         })
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       if (data.success) {
+        toast.success('Permission updated successfully!');
         setShowEditModal(false);
         setEditingPermission(null);
-        fetchPermissions();
+        setError('');
+        await fetchPermissions();
       } else {
-        setError(data.error || 'Failed to update permission');
+        const errorMsg = data.error || 'Failed to update permission';
+        setError(errorMsg);
+        toast.error(errorMsg);
       }
     } catch (error) {
-      setError('Error updating permission');
+      console.error('Edit permission error:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Network error occurred';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -122,12 +182,17 @@ export default function PermissionManagement() {
       });
       const data = await response.json();
       if (data.success) {
+        toast.success('Permission deleted successfully!');
         fetchPermissions();
       } else {
-        setError('Failed to delete permission');
+        const errorMsg = 'Failed to delete permission';
+        setError(errorMsg);
+        toast.error(errorMsg);
       }
     } catch (error) {
-      setError('Error deleting permission');
+      const errorMsg = 'Error deleting permission';
+      setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
@@ -316,12 +381,24 @@ export default function PermissionManagement() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900">Create New Permission</h2>
                 <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="text-gray-400 hover:text-gray-600 cursor-pointer transition-colors duration-200"
+                  onClick={() => {
+                    if (!creating) {
+                      setShowCreateModal(false);
+                      setError('');
+                    }
+                  }}
+                  disabled={creating}
+                  className="text-gray-400 hover:text-gray-600 cursor-pointer transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <i className="ri-close-line text-xl"></i>
                 </button>
               </div>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
 
               <form className="space-y-4">
                 <div>
@@ -329,7 +406,10 @@ export default function PermissionManagement() {
                   <input
                     type="text"
                     value={creatingPermission.name}
-                    onChange={(e) => setCreatingPermission({...creatingPermission, name: e.target.value})}
+                    onChange={(e) => {
+                      setCreatingPermission({...creatingPermission, name: e.target.value});
+                      if (error) setError('');
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., users.create"
                     required
@@ -341,7 +421,10 @@ export default function PermissionManagement() {
                   <input
                     type="text"
                     value={creatingPermission.display_name}
-                    onChange={(e) => setCreatingPermission({...creatingPermission, display_name: e.target.value})}
+                    onChange={(e) => {
+                      setCreatingPermission({...creatingPermission, display_name: e.target.value});
+                      if (error) setError('');
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., Create Users"
                     required
@@ -352,7 +435,10 @@ export default function PermissionManagement() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <textarea
                     value={creatingPermission.description}
-                    onChange={(e) => setCreatingPermission({...creatingPermission, description: e.target.value})}
+                    onChange={(e) => {
+                      setCreatingPermission({...creatingPermission, description: e.target.value});
+                      if (error) setError('');
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     rows={3}
                     placeholder="Describe what this permission allows"
@@ -364,7 +450,10 @@ export default function PermissionManagement() {
                   <input
                     type="text"
                     value={creatingPermission.resource}
-                    onChange={(e) => setCreatingPermission({...creatingPermission, resource: e.target.value})}
+                    onChange={(e) => {
+                      setCreatingPermission({...creatingPermission, resource: e.target.value});
+                      if (error) setError('');
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., users"
                     required
@@ -376,7 +465,10 @@ export default function PermissionManagement() {
                   <input
                     type="text"
                     value={creatingPermission.action}
-                    onChange={(e) => setCreatingPermission({...creatingPermission, action: e.target.value})}
+                    onChange={(e) => {
+                      setCreatingPermission({...creatingPermission, action: e.target.value});
+                      if (error) setError('');
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., create"
                     required
@@ -400,14 +492,28 @@ export default function PermissionManagement() {
                   <button
                     type="button"
                     onClick={handleCreatePermission}
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
+                    disabled={creating}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full hover:from-blue-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   >
-                    Create Permission
+                    {creating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Creating...
+                      </>
+                    ) : (
+                      'Create Permission'
+                    )}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors duration-200"
+                    onClick={() => {
+                      if (!creating) {
+                        setShowCreateModal(false);
+                        setError('');
+                      }
+                    }}
+                    disabled={creating}
+                    className="px-4 py-2 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
@@ -426,12 +532,24 @@ export default function PermissionManagement() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900">Edit Permission</h2>
                 <button
-                  onClick={() => setShowEditModal(false)}
-                  className="text-gray-400 hover:text-gray-600 cursor-pointer transition-colors duration-200"
+                  onClick={() => {
+                    if (!saving) {
+                      setShowEditModal(false);
+                      setError('');
+                    }
+                  }}
+                  disabled={saving}
+                  className="text-gray-400 hover:text-gray-600 cursor-pointer transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <i className="ri-close-line text-xl"></i>
                 </button>
               </div>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
 
               <form className="space-y-4">
                 <div>
@@ -439,7 +557,10 @@ export default function PermissionManagement() {
                   <input
                     type="text"
                     value={editingPermission.display_name}
-                    onChange={(e) => setEditingPermission({...editingPermission, display_name: e.target.value})}
+                    onChange={(e) => {
+                      setEditingPermission({...editingPermission, display_name: e.target.value});
+                      if (error) setError('');
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
@@ -449,7 +570,10 @@ export default function PermissionManagement() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <textarea
                     value={editingPermission.description || ''}
-                    onChange={(e) => setEditingPermission({...editingPermission, description: e.target.value})}
+                    onChange={(e) => {
+                      setEditingPermission({...editingPermission, description: e.target.value});
+                      if (error) setError('');
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     rows={3}
                   />
@@ -460,7 +584,10 @@ export default function PermissionManagement() {
                   <input
                     type="text"
                     value={editingPermission.resource}
-                    onChange={(e) => setEditingPermission({...editingPermission, resource: e.target.value})}
+                    onChange={(e) => {
+                      setEditingPermission({...editingPermission, resource: e.target.value});
+                      if (error) setError('');
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
@@ -471,7 +598,10 @@ export default function PermissionManagement() {
                   <input
                     type="text"
                     value={editingPermission.action}
-                    onChange={(e) => setEditingPermission({...editingPermission, action: e.target.value})}
+                    onChange={(e) => {
+                      setEditingPermission({...editingPermission, action: e.target.value});
+                      if (error) setError('');
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
@@ -494,14 +624,28 @@ export default function PermissionManagement() {
                   <button
                     type="button"
                     onClick={handleEditPermission}
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
+                    disabled={saving}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full hover:from-blue-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   >
-                    Save Changes
+                    {saving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Changes'
+                    )}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowEditModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors duration-200"
+                    onClick={() => {
+                      if (!saving) {
+                        setShowEditModal(false);
+                        setError('');
+                      }
+                    }}
+                    disabled={saving}
+                    className="px-4 py-2 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>

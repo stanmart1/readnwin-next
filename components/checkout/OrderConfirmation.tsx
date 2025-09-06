@@ -43,13 +43,72 @@ export default function OrderConfirmation({
 
   // Flutterwave inline payment hook
   const { initializePayment } = useFlutterwaveInline({
-    onSuccess: (response) => {
-      console.log('Payment successful:', sanitizeLogInput(response));
-      if (response.status === 'successful') {
-        router.push(`/order-confirmation/${response.meta?.order_id || 'success'}`);
+    onSuccess: async (response) => {
+      console.log('🔍 Flutterwave payment callback received:', sanitizeLogInput(response));
+      
+      // Check for various success status formats that Flutterwave might return
+      const isSuccessful = 
+        response.status === 'successful' || 
+        response.status === 'success' ||
+        response.status === 'completed' ||
+        (response.data && response.data.status === 'successful') ||
+        (response.transaction && response.transaction.status === 'successful');
+      
+      console.log('🔍 Payment status check:', {
+        originalStatus: response.status,
+        dataStatus: response.data?.status,
+        transactionStatus: response.transaction?.status,
+        isSuccessful
+      });
+      
+      if (isSuccessful) {
+        console.log('✅ Payment confirmed as successful, redirecting to success page');
+        
+        // Get order ID from response metadata
+        const orderId = response.meta?.order_id || 
+                       response.data?.meta?.order_id || 
+                       response.transaction?.meta?.order_id ||
+                       'success';
+        
+        router.push(`/order-confirmation/${orderId}`);
       } else {
-        // Payment was not successful
-        const orderNumber = response.meta?.order_number || 'unknown';
+        console.log('⚠️ Payment status unclear, verifying with backend...');
+        
+        // If status is unclear, verify with backend before redirecting
+        try {
+          const txRef = response.tx_ref || response.data?.tx_ref || response.transaction?.tx_ref;
+          
+          if (txRef) {
+            const verifyResponse = await fetch('/api/payment/flutterwave/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                tx_ref: txRef,
+                transaction_id: response.transaction_id || response.data?.id,
+                status: response.status
+              })
+            });
+            
+            const verifyData = await verifyResponse.json();
+            console.log('🔍 Backend verification result:', sanitizeLogInput(verifyData));
+            
+            if (verifyData.success && verifyData.payment_status === 'successful') {
+              console.log('✅ Backend confirmed payment success');
+              const orderId = response.meta?.order_id || 'success';
+              router.push(`/order-confirmation/${orderId}`);
+              return;
+            }
+          }
+        } catch (verifyError) {
+          console.error('❌ Backend verification failed:', sanitizeLogInput(verifyError));
+        }
+        
+        // If we reach here, payment was not successful or verification failed
+        console.log('❌ Payment failed or could not be verified');
+        const orderNumber = response.meta?.order_number || 
+                           response.data?.meta?.order_number ||
+                           'unknown';
         router.push(`/payment/failed?order=${orderNumber}&reason=payment_failed`);
       }
     },

@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -5,6 +8,11 @@ import { query } from '@/utils/database';
 
 // GET - Retrieve email gateway settings
 export async function GET() {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const session = await getServerSession(authOptions);
     
@@ -258,7 +266,7 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error('Error fetching email gateway settings:', error);
+    logger.error('Error fetching email gateway settings:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -271,7 +279,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     
-    console.log('Session data:', { 
+    logger.info('Session data:', { 
       hasSession: !!session, 
       hasUser: !!session?.user, 
       userRole: session?.user?.role,
@@ -303,7 +311,7 @@ export async function POST(request: NextRequest) {
         DO UPDATE SET setting_value = $2, updated_at = NOW()
       `, ['email_gateway_active', activeGateway]);
     } catch (error) {
-      console.error('Error updating active gateway:', error);
+      logger.error('Error updating active gateway:', error);
       return NextResponse.json({ error: 'Failed to update active gateway' }, { status: 500 });
     }
 
@@ -437,7 +445,7 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (error) {
-      console.error('Error updating gateway configurations:', error);
+      logger.error('Error updating gateway configurations:', error);
       return NextResponse.json({ error: 'Failed to update gateway configurations' }, { status: 500 });
     }
 
@@ -454,7 +462,7 @@ export async function POST(request: NextRequest) {
         request.headers.get('user-agent') || 'unknown'
       ]);
     } catch (auditError) {
-      console.error('Warning: Failed to log audit entry:', auditError);
+      logger.error('Warning: Failed to log audit entry:', auditError);
       // Don't fail the entire request if audit logging fails
     }
 
@@ -465,7 +473,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error updating email gateway settings:', error);
+    logger.error('Error updating email gateway settings:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

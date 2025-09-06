@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+
+// Force dynamic rendering to prevent prerender errors
+export const dynamic = 'force-dynamic';
 import { CheckCircle, AlertCircle, CreditCard, Banknote, Globe } from 'lucide-react';
 import { useGuestCart } from '@/contexts/GuestCartContext';
 import { useFlutterwaveInline } from '@/hooks/useFlutterwaveInline';
@@ -78,7 +81,7 @@ export default function CheckoutPage() {
   // Add beforeunload event listener to warn users when leaving with unsaved data
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      const hasCheckoutData = localStorage.getItem('checkout-form-data');
+      const hasCheckoutData = typeof window !== 'undefined' ? localStorage.getItem('checkout-form-data') : null;
       if (hasCheckoutData) {
         e.preventDefault();
         e.returnValue = 'You have unsaved checkout data. Are you sure you want to leave?';

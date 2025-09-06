@@ -691,156 +691,272 @@ function PostModal({
   onClose: () => void;
   quillModules: any;
 }) {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-900">{title}</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-              <i className="ri-close-line text-2xl"></i>
-            </button>
-          </div>
+  const [activeTab, setActiveTab] = useState('content');
+  const [uploadedImages, setUploadedImages] = useState<File[]>([]);
+  const [imageUploading, setImageUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    setUploadedImages([...uploadedImages, ...files]);
+  };
+
+  const removeImage = (index: number) => {
+    setUploadedImages(uploadedImages.filter((_, i) => i !== index));
+  };
+
+  const tabs = [
+    { id: 'content', label: 'Content', icon: 'ri-file-text-line' },
+    { id: 'settings', label: 'Settings', icon: 'ri-settings-3-line' },
+    { id: 'images', label: 'Images', icon: 'ri-image-line' },
+    { id: 'seo', label: 'SEO', icon: 'ri-search-eye-line' }
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+            <i className="ri-close-line text-xl sm:text-2xl"></i>
+          </button>
+        </div>
+
+        {/* Mobile Tab Navigation */}
+        <div className="flex overflow-x-auto border-b border-gray-200 bg-gray-50">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center space-x-2 px-3 sm:px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                activeTab === tab.id
+                  ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <i className={`${tab.icon} text-base`}></i>
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* Content Tab */}
+          {activeTab === 'content' && (
+            <div className="space-y-4 sm:space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                   placeholder="Enter post title"
                 />
               </div>
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Slug</label>
                 <input
                   type="text"
                   value={formData.slug}
                   onChange={(e) => setFormData({...formData, slug: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                   placeholder="post-slug"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Excerpt</label>
-              <textarea
-                value={formData.excerpt}
-                onChange={(e) => setFormData({...formData, excerpt: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={3}
-                placeholder="Brief description of the post..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
-              <SecureQuill
-                value={formData.content}
-                onChange={(content) => setFormData({...formData, content})}
-                className="h-64"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Excerpt</label>
+                <textarea
+                  value={formData.excerpt}
+                  onChange={(e) => setFormData({...formData, excerpt: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                  rows={3}
+                  placeholder="Brief description of the post..."
+                />
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {categories.map(category => (
-                    <option key={category.name} value={category.name}>{category.name}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Content *</label>
+                <div className="h-48 sm:h-64">
+                  <SecureQuill
+                    value={formData.content}
+                    onChange={(content) => setFormData({...formData, content})}
+                    className="h-full"
+                  />
+                </div>
               </div>
+            </div>
+          )}
+
+          {/* Settings Tab */}
+          {activeTab === 'settings' && (
+            <div className="space-y-4 sm:space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({...formData, status: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                  >
+                    {categories.map(category => (
+                      <option key={category.name} value={category.name}>{category.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Featured</label>
-                <div className="flex items-center mt-2">
+                <label className="flex items-center space-x-3">
                   <input
                     type="checkbox"
                     checked={formData.featured}
                     onChange={(e) => setFormData({...formData, featured: e.target.checked})}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <label className="ml-2 text-sm text-gray-700">Mark as featured</label>
-                </div>
+                  <span className="text-sm font-medium text-gray-700">Mark as featured post</span>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+                <input
+                  type="text"
+                  value={formData.tags.join(', ')}
+                  onChange={(e) => setFormData({...formData, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                  placeholder="tag1, tag2, tag3"
+                />
+                <p className="text-xs text-gray-500 mt-1">Separate tags with commas</p>
               </div>
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
-              <input
-                type="text"
-                value={formData.tags.join(', ')}
-                onChange={(e) => setFormData({...formData, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="tag1, tag2, tag3"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Images Tab */}
+          {activeTab === 'images' && (
+            <div className="space-y-4 sm:space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">SEO Title</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Upload Images</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">Supported: JPEG, PNG, GIF, WebP (max 5MB each)</p>
+              </div>
+
+              {uploadedImages.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Selected Images ({uploadedImages.length})</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {uploadedImages.map((file, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={file.name}
+                          className="w-full h-20 sm:h-24 object-cover rounded-lg border border-gray-200"
+                        />
+                        <button
+                          onClick={() => removeImage(index)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                        >
+                          ×
+                        </button>
+                        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 rounded-b-lg">
+                          <p className="truncate">{file.name}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {uploadedImages.length === 0 && (
+                <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                  <i className="ri-image-line text-4xl text-gray-400 mb-2"></i>
+                  <p className="text-gray-500 text-sm">No images selected</p>
+                  <p className="text-gray-400 text-xs">Upload images to enhance your blog post</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SEO Tab */}
+          {activeTab === 'seo' && (
+            <div className="space-y-4 sm:space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">SEO Title</label>
                 <input
                   type="text"
                   value={formData.seo_title}
                   onChange={(e) => setFormData({...formData, seo_title: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                   placeholder="SEO optimized title"
                 />
+                <p className="text-xs text-gray-500 mt-1">Recommended: 50-60 characters</p>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">SEO Keywords</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">SEO Description</label>
+                <textarea
+                  value={formData.seo_description}
+                  onChange={(e) => setFormData({...formData, seo_description: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                  rows={3}
+                  placeholder="SEO meta description..."
+                />
+                <p className="text-xs text-gray-500 mt-1">Recommended: 150-160 characters</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">SEO Keywords</label>
                 <input
                   type="text"
                   value={formData.seo_keywords.join(', ')}
                   onChange={(e) => setFormData({...formData, seo_keywords: e.target.value.split(',').map(keyword => keyword.trim()).filter(keyword => keyword)})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                   placeholder="keyword1, keyword2, keyword3"
                 />
+                <p className="text-xs text-gray-500 mt-1">Separate keywords with commas</p>
               </div>
             </div>
+          )}
+        </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">SEO Description</label>
-              <textarea
-                value={formData.seo_description}
-                onChange={(e) => setFormData({...formData, seo_description: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={3}
-                placeholder="SEO meta description..."
-              />
-            </div>
+        {/* Footer */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 p-4 sm:p-6 border-t border-gray-200 bg-gray-50">
+          <div className="text-xs text-gray-500 order-2 sm:order-1">
+            * Required fields
           </div>
-
-          <div className="mt-6 flex justify-end space-x-3">
+          <div className="flex space-x-3 order-1 sm:order-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-medium"
             >
               Cancel
             </button>
             <button
               onClick={onSubmit}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
             >
               {title.includes('Create') ? 'Create Post' : 'Update Post'}
             </button>

@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -5,6 +8,11 @@ import { rbacService } from '@/utils/rbac-service';
 import { emailTemplateService } from '@/utils/email-template-service';
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -26,7 +34,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching email template stats:', error);
+    logger.error('Error fetching email template stats:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

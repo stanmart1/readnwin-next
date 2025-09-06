@@ -1,9 +1,17 @@
+import { sanitizeInput } from '@/lib/security';
+import { requireAdmin } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
 export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const formData = await request.formData();
     const file = formData.get('image') as File;
@@ -26,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Create unique filename
     const timestamp = Date.now();
-    const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const originalName = sanitizeInput(file.name).replace(/[^a-zA-Z0-9.-]/g, '_');
     const filename = `team_${timestamp}_${originalName}`;
     
     // Ensure upload directory exists
@@ -53,7 +61,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Upload error:', error);
+    logger.error('Upload error:', error);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 }

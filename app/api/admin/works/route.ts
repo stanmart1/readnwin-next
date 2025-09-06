@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -25,10 +28,10 @@ async function ensureUploadDir() {
   try {
     if (!existsSync(uploadDir)) {
       await mkdir(uploadDir, { recursive: true });
-      console.log(`✅ Created upload directory: ${uploadDir}`);
+      logger.info(`✅ Created upload directory: ${uploadDir}`);
     }
   } catch (error) {
-    console.error(`❌ Error creating upload directory: ${uploadDir}`, error);
+    logger.error(`❌ Error creating upload directory: ${uploadDir}`, error);
     throw error;
   }
   
@@ -44,6 +47,11 @@ function generateFilename(originalName: string): string {
 }
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -93,7 +101,7 @@ export async function GET(request: NextRequest) {
     });
     
   } catch (error) {
-    console.error('Error fetching works:', error);
+    logger.error('Error fetching works:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch works' },
       { status: 500 }
@@ -187,7 +195,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error uploading work:', error);
+    logger.error('Error uploading work:', error);
     
     // Enhanced error categorization
     let errorCode = 'SERVER_ERROR';

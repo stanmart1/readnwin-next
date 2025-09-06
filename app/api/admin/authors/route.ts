@@ -1,9 +1,17 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { ecommerceService } from '@/utils/ecommerce-service';
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -42,7 +50,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Authors API error:', error);
+    logger.error('Authors API error:', error);
     return NextResponse.json({
       success: true,
       authors: [],
@@ -58,16 +66,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
     
-    if (!body.name || !body.name.trim()) {
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
+    
+    if (!sanitizedBody.name || !sanitizedBody.name.trim()) {
       return NextResponse.json({ error: 'Author name is required' }, { status: 400 });
     }
 
     const authorData = {
-      name: body.name.trim(),
-      bio: body.bio || '',
-      website_url: body.website || '',
+      name: sanitizedBody.name.trim(),
+      bio: sanitizedBody.bio || '',
+      website_url: sanitizedBody.website || '',
       status: 'active' as const
     };
 
@@ -80,7 +97,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error creating author:', error);
+    logger.error('Error creating author:', error);
     return NextResponse.json({ error: 'Failed to create author' }, { status: 500 });
   }
 } 

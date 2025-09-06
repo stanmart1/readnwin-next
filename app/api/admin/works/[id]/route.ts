@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -28,6 +31,14 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -123,7 +134,7 @@ export async function PUT(
         try {
           await unlink(oldImagePath);
         } catch (error) {
-          console.error('Error deleting old image:', error);
+          logger.error('Error deleting old image:', error);
         }
       }
 
@@ -167,7 +178,7 @@ export async function PUT(
     });
 
   } catch (error) {
-    console.error('Error updating work:', error);
+    logger.error('Error updating work:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update work image' },
       { status: 500 }
@@ -237,7 +248,7 @@ export async function DELETE(
       try {
         await unlink(imagePath);
       } catch (error) {
-        console.error('Error deleting image file:', error);
+        logger.error('Error deleting image file:', error);
       }
     }
 
@@ -251,7 +262,7 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('Error deleting work:', error);
+    logger.error('Error deleting work:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to delete work image' },
       { status: 500 }

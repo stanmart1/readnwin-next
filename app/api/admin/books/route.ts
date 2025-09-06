@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -9,6 +12,11 @@ import { SecurityUtils } from '@/utils/security-utils';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -97,7 +105,7 @@ export async function POST(request: NextRequest) {
       coverUrl = `/api/images/covers/${filename}`;
     } catch (uploadError) {
       await query('DELETE FROM books WHERE id = $1', [bookId]);
-      console.error('Cover upload failed:', SecurityUtils.sanitizeForLog(uploadError));
+      logger.error('Cover upload failed:', SecurityUtils.sanitizeForLog(uploadError));
       return NextResponse.json({ error: 'Failed to upload cover image' }, { status: 500 });
     }
 
@@ -121,12 +129,17 @@ export async function POST(request: NextRequest) {
         const filename = `book_${bookId}_${timestamp}.${fileExtension}`;
         const filePath = join(storageDir, filename);
         
+        // Validate path to prevent traversal attacks
+        if (!SecurityUtils.isPathSafe(filePath, storageDir)) {
+          throw new Error('Invalid file path detected');
+        }
+        
         writeFileSync(filePath, ebookBuffer);
         ebookUrl = `/storage/books/${bookId}/${filename}`;
         
       } catch (ebookError) {
         await query('DELETE FROM books WHERE id = $1', [bookId]);
-        console.error('Ebook save error:', ebookError);
+        logger.error('Ebook save error:', ebookError);
         return NextResponse.json({ error: 'Failed to save e-book file' }, { status: 500 });
       }
     }
@@ -147,7 +160,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Book creation error:', error);
+    logger.error('Book creation error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -222,7 +235,7 @@ export const GET = async (request: NextRequest) => {
     });
 
   } catch (error) {
-    console.error('Error fetching books:', error);
+    logger.error('Error fetching books:', error);
     return NextResponse.json({ error: 'Failed to fetch books' }, { status: 500 });
   }
 };
@@ -284,7 +297,7 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error in DELETE /api/admin/books:', error);
+    logger.error('Error in DELETE /api/admin/books:', error);
     return NextResponse.json({ error: 'Failed to delete books' }, { status: 500 });
   }
 }

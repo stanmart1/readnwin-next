@@ -6,6 +6,9 @@ import { useRouter, useParams } from 'next/navigation';
 import Header from '@/components/Header';
 import { CheckCircle, Download, BookOpen, ArrowRight } from 'lucide-react';
 
+// Force dynamic rendering to prevent prerender errors
+export const dynamic = 'force-dynamic';
+
 interface OrderData {
   id: number;
   order_number: string;
@@ -90,7 +93,7 @@ export default function OrderSuccessPage() {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.downloadUrl) {
+        if (data.downloadUrl && typeof window !== 'undefined') {
           window.open(data.downloadUrl, '_blank');
         }
       } else {

@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -17,6 +20,11 @@ interface EmailGatewayConfig {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  try {
     const session = await getServerSession(authOptions) as any;
     
     if (!session || !session.user) {
@@ -32,7 +40,7 @@ export async function POST(request: NextRequest) {
     try {
       ({ gatewayId, config, testEmail } = await request.json());
     } catch (parseError) {
-      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid JSON in request sanitizedBody' }, { status: 400 });
     }
 
     if (!gatewayId || !config || !testEmail) {
@@ -80,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     } catch (testError: unknown) {
       const errorMessage = testError instanceof Error ? testError.message : 'Gateway test failed';
-      console.error('Gateway test error:', testError);
+      logger.error('Gateway test error:', testError);
       return NextResponse.json({
         success: false,
         message: errorMessage
@@ -88,7 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error testing email gateway:', error);
+    logger.error('Error testing email gateway:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -110,7 +118,7 @@ async function testResendGateway(config: EmailGatewayConfig, testEmail: string) 
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
+      sanitizedBody: JSON.stringify({
         from: `${config.fromName} <${config.fromEmail}>`,
         to: [testEmail],
         subject: 'Email Gateway Test - Resend',

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { formatDate } from '@/utils/dateUtils';
 import { useNotifications } from '@/components/ui/Notification';
+import toast from 'react-hot-toast';
 import { LoadingSpinner, LoadingButton } from '@/components/ui/LoadingSpinner';
 import Modal from '@/components/ui/Modal';
 import UserReadingAnalytics from './UserReadingAnalytics';
@@ -92,6 +93,8 @@ export default function UserManagement() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, feedback: '' });
   
   // Loading states for different actions
   const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({});
@@ -99,11 +102,15 @@ export default function UserManagement() {
   const [createUserLoading, setCreateUserLoading] = useState(false);
   const [editUserLoading, setEditUserLoading] = useState(false);
   const [passwordUpdateLoading, setPasswordUpdateLoading] = useState(false);
+  const [fetchingUsers, setFetchingUsers] = useState(false);
+  const [progressMessage, setProgressMessage] = useState('');
 
   // Fetch users
   const fetchUsers = async (page: number = 1) => {
     try {
       setLoading(true);
+      setFetchingUsers(true);
+      setProgressMessage('Loading users...');
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '10'
@@ -171,17 +178,22 @@ export default function UserManagement() {
         setTotalUsers(data.pagination.total);
         setCurrentPage(data.pagination.page);
         setError('');
+        toast.success(`Loaded ${usersWithRoles.length} users successfully`);
       } else {
-        setError('Failed to fetch users');
+        const errorMsg = data.error || 'Failed to fetch users';
+        setError(errorMsg);
+        toast.error(errorMsg);
         addNotification({
           type: 'error',
           title: 'Error',
-          message: data.error || 'Failed to fetch users'
+          message: errorMsg
         });
       }
     } catch (error) {
-      setError('Error fetching users');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to fetch users';
+      setError(errorMsg);
       console.error('Error:', error);
+      toast.error(errorMsg);
       addNotification({
         type: 'error',
         title: 'Error',
@@ -189,6 +201,8 @@ export default function UserManagement() {
       });
     } finally {
       setLoading(false);
+      setFetchingUsers(false);
+      setProgressMessage('');
     }
   };
 
@@ -235,32 +249,44 @@ export default function UserManagement() {
         try {
           setActionLoading(prev => ({ ...prev, [actionKey]: true }));
           setError('');
+          setProgressMessage(`Deleting user ${user?.first_name || user?.username}...`);
           
           const response = await fetch(`/api/admin/users/${userId}`, {
             method: 'DELETE'
           });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
           const data = await response.json();
           
           if (data.success) {
+            const successMsg = `User ${user?.first_name || user?.username || 'Unknown'} has been deleted successfully.`;
             await fetchUsers(currentPage);
             setSelectedUsers(selectedUsers.filter(id => id !== userId));
             setError('');
+            toast.success(successMsg);
             addNotification({
               type: 'success',
               title: 'Success',
-              message: `User ${user?.first_name || user?.username || 'Unknown'} has been deleted successfully.`
+              message: successMsg
             });
           } else {
-            setError(`Failed to delete user: ${data.error || 'Unknown error'}`);
+            const errorMsg = `Failed to delete user: ${data.error || 'Unknown error'}`;
+            setError(errorMsg);
+            toast.error(errorMsg);
             addNotification({
               type: 'error',
               title: 'Error',
-              message: `Failed to delete user: ${data.error || 'Unknown error'}`
+              message: errorMsg
             });
           }
         } catch (error) {
           console.error('Error deleting user:', error);
-          setError(`Error deleting user: ${error instanceof Error ? error.message : 'Network error'}`);
+          const errorMsg = `Error deleting user: ${error instanceof Error ? error.message : 'Network error'}`;
+          setError(errorMsg);
+          toast.error(errorMsg);
           addNotification({
             type: 'error',
             title: 'Error',
@@ -268,6 +294,7 @@ export default function UserManagement() {
           });
         } finally {
           setActionLoading(prev => ({ ...prev, [actionKey]: false }));
+          setProgressMessage('');
         }
       }
     } else if (action === 'reading-analytics') {
@@ -280,6 +307,9 @@ export default function UserManagement() {
     } else if (action === 'password' && user) {
       setPasswordUser(user);
       setNewPassword('');
+      setConfirmPassword('');
+      setPasswordStrength({ score: 0, feedback: '' });
+      setError('');
       setShowPasswordModal(true);
     } else if (action === 'suspend' || action === 'activate') {
       const newStatus = action === 'suspend' ? 'suspended' : 'active';
@@ -326,18 +356,33 @@ export default function UserManagement() {
   };
 
   const handleCreateUser = async () => {
+    // Validate required fields
+    if (!creatingUser.email || !creatingUser.username || !creatingUser.password || !creatingUser.first_name || !creatingUser.last_name) {
+      const errorMsg = 'Please fill in all required fields';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      return;
+    }
+    
     try {
       setCreateUserLoading(true);
       setError('');
+      setProgressMessage(`Creating user ${creatingUser.first_name} ${creatingUser.last_name}...`);
       
       const response = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(creatingUser)
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       
       if (data.success) {
+        const successMsg = `User ${creatingUser.first_name || creatingUser.username} has been created successfully.`;
         setShowCreateModal(false);
         setCreatingUser({
           email: '',
@@ -348,21 +393,26 @@ export default function UserManagement() {
           role_id: ''
         });
         await fetchUsers(currentPage);
+        toast.success(successMsg);
         addNotification({
           type: 'success',
           title: 'Success',
-          message: `User ${creatingUser.first_name || creatingUser.username} has been created successfully.`
+          message: successMsg
         });
       } else {
-        setError(data.error || 'Failed to create user');
+        const errorMsg = data.error || 'Failed to create user';
+        setError(errorMsg);
+        toast.error(errorMsg);
         addNotification({
           type: 'error',
           title: 'Error',
-          message: data.error || 'Failed to create user'
+          message: errorMsg
         });
       }
     } catch (error) {
-      setError('Error creating user');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to create user';
+      setError(errorMsg);
+      toast.error(errorMsg);
       addNotification({
         type: 'error',
         title: 'Error',
@@ -370,6 +420,7 @@ export default function UserManagement() {
       });
     } finally {
       setCreateUserLoading(false);
+      setProgressMessage('');
     }
   };
 
@@ -379,6 +430,7 @@ export default function UserManagement() {
     try {
       setEditUserLoading(true);
       setError('');
+      setProgressMessage(`Updating user ${editingUser.first_name} ${editingUser.last_name}...`);
       
       console.log('🔍 Saving user:', editingUser.id, 'with roles:', editingUserRoles);
       
@@ -424,15 +476,17 @@ export default function UserManagement() {
         }
         
         console.log('✅ User and roles updated successfully');
+        const successMsg = `User ${editingUser.first_name || editingUser.username} has been updated successfully.`;
         setError('');
         setShowEditModal(false);
         setEditingUser(null);
         setEditingUserRoles([]);
         await fetchUsers(currentPage);
+        toast.success(successMsg);
         addNotification({
           type: 'success',
           title: 'Success',
-          message: `User ${editingUser.first_name || editingUser.username} has been updated successfully.`
+          message: successMsg
         });
       } else {
         setError(userData.error || 'Failed to update user');
@@ -452,6 +506,7 @@ export default function UserManagement() {
       });
     } finally {
       setEditUserLoading(false);
+      setProgressMessage('');
     }
   };
 
@@ -479,52 +534,134 @@ export default function UserManagement() {
     setShowEditModal(true);
   };
 
-  const handlePasswordUpdate = async () => {
-    if (!passwordUser || !newPassword) return;
+  const checkPasswordStrength = (password: string) => {
+    let score = 0;
+    let feedback = '';
     
+    if (password.length >= 8) score += 1;
+    if (/[a-z]/.test(password)) score += 1;
+    if (/[A-Z]/.test(password)) score += 1;
+    if (/[0-9]/.test(password)) score += 1;
+    if (/[^A-Za-z0-9]/.test(password)) score += 1;
+    
+    switch (score) {
+      case 0:
+      case 1:
+        feedback = 'Very weak';
+        break;
+      case 2:
+        feedback = 'Weak';
+        break;
+      case 3:
+        feedback = 'Fair';
+        break;
+      case 4:
+        feedback = 'Good';
+        break;
+      case 5:
+        feedback = 'Strong';
+        break;
+    }
+    
+    return { score, feedback };
+  };
+
+  const handlePasswordUpdate = async () => {
+    if (!passwordUser || !newPassword) {
+      toast.error('Please enter a password');
+      return;
+    }
+    
+    // Validation
     if (newPassword.length < 6) {
+      const errorMsg = 'Password must be at least 6 characters long';
+      setError(errorMsg);
+      toast.error(errorMsg);
       addNotification({
         type: 'error',
-        title: 'Error',
-        message: 'Password must be at least 6 characters long'
+        title: 'Validation Error',
+        message: errorMsg
+      });
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      const errorMsg = 'Passwords do not match';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      addNotification({
+        type: 'error',
+        title: 'Validation Error',
+        message: errorMsg
+      });
+      return;
+    }
+    
+    if (passwordStrength.score < 2) {
+      const errorMsg = 'Password is too weak. Please use a stronger password.';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      addNotification({
+        type: 'warning',
+        title: 'Weak Password',
+        message: 'Please choose a stronger password with uppercase, lowercase, numbers, and special characters.'
       });
       return;
     }
     
     try {
       setPasswordUpdateLoading(true);
+      setError('');
+      setProgressMessage(`Updating password for ${passwordUser.first_name || passwordUser.username}...`);
       
       const response = await fetch(`/api/admin/users/${passwordUser.id}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: newPassword })
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       
       if (data.success) {
+        const successMsg = `Password updated successfully for ${passwordUser.first_name || passwordUser.username}`;
         setShowPasswordModal(false);
         setPasswordUser(null);
         setNewPassword('');
+        setConfirmPassword('');
+        setPasswordStrength({ score: 0, feedback: '' });
+        setError('');
+        toast.success(successMsg);
         addNotification({
           type: 'success',
-          title: 'Success',
-          message: `Password updated successfully for ${passwordUser.first_name || passwordUser.username}`
+          title: 'Password Updated',
+          message: successMsg
         });
       } else {
+        const errorMsg = data.error || 'Failed to update password';
+        setError(errorMsg);
+        toast.error(errorMsg);
         addNotification({
           type: 'error',
-          title: 'Error',
-          message: data.error || 'Failed to update password'
+          title: 'Update Failed',
+          message: errorMsg
         });
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to update password';
+      setError(errorMsg);
+      toast.error(errorMsg);
       addNotification({
         type: 'error',
-        title: 'Error',
-        message: 'Failed to update password. Please try again.'
+        title: 'Network Error',
+        message: 'Failed to update password. Please check your connection and try again.'
       });
     } finally {
       setPasswordUpdateLoading(false);
+      setProgressMessage('');
     }
   };
 
@@ -647,6 +784,18 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Progress Indicator */}
+      {progressMessage && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+            <div className="flex-1">
+              <p className="text-sm text-blue-800 font-medium">{progressMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Error Display */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -672,14 +821,19 @@ export default function UserManagement() {
           <div className="flex-1 min-w-64">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <i className="ri-search-line text-gray-400"></i>
+                {fetchingUsers ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                ) : (
+                  <i className="ri-search-line text-gray-400"></i>
+                )}
               </div>
               <input
                 type="text"
-                placeholder="Search users..."
+                placeholder={fetchingUsers ? "Searching..." : "Search users..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={fetchingUsers}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -1074,58 +1228,101 @@ export default function UserManagement() {
             <h2 className="text-xl font-bold text-gray-900">Create New User</h2>
           </div>
 
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
+              
               <form className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
                   <input
                     type="text"
                     value={creatingUser.first_name}
-                    onChange={(e) => setCreatingUser({...creatingUser, first_name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => {
+                      setCreatingUser({...creatingUser, first_name: e.target.value});
+                      if (error) setError('');
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                      !creatingUser.first_name && error 
+                        ? 'border-red-300 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-blue-500'
+                    }`}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
                   <input
                     type="text"
                     value={creatingUser.last_name}
-                    onChange={(e) => setCreatingUser({...creatingUser, last_name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => {
+                      setCreatingUser({...creatingUser, last_name: e.target.value});
+                      if (error) setError('');
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                      !creatingUser.last_name && error 
+                        ? 'border-red-300 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-blue-500'
+                    }`}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                   <input
                     type="email"
                     value={creatingUser.email}
-                    onChange={(e) => setCreatingUser({...creatingUser, email: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => {
+                      setCreatingUser({...creatingUser, email: e.target.value});
+                      if (error) setError('');
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                      !creatingUser.email && error 
+                        ? 'border-red-300 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-blue-500'
+                    }`}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
                   <input
                     type="text"
                     value={creatingUser.username}
-                    onChange={(e) => setCreatingUser({...creatingUser, username: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => {
+                      setCreatingUser({...creatingUser, username: e.target.value});
+                      if (error) setError('');
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                      !creatingUser.username && error 
+                        ? 'border-red-300 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-blue-500'
+                    }`}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
                   <input
                     type="password"
                     value={creatingUser.password}
-                    onChange={(e) => setCreatingUser({...creatingUser, password: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => {
+                      setCreatingUser({...creatingUser, password: e.target.value});
+                      if (error) setError('');
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                      !creatingUser.password && error 
+                        ? 'border-red-300 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-blue-500'
+                    }`}
+                    placeholder="Minimum 6 characters"
+                    minLength={6}
                     required
                   />
                 </div>
@@ -1552,8 +1749,11 @@ export default function UserManagement() {
             setShowPasswordModal(false);
             setPasswordUser(null);
             setNewPassword('');
+            setConfirmPassword('');
+            setPasswordStrength({ score: 0, feedback: '' });
+            setError('');
           }}
-          className="max-w-md w-full mx-4"
+          className="max-w-lg w-full mx-4"
         >
           {passwordUser && (
             <div className="p-6">
@@ -1564,18 +1764,137 @@ export default function UserManagement() {
                 </p>
               </div>
 
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
+
               <form className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
                   <input
                     type="password"
                     value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => {
+                      const password = e.target.value;
+                      setNewPassword(password);
+                      setPasswordStrength(checkPasswordStrength(password));
+                      if (error) setError('');
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                      newPassword && passwordStrength.score < 2
+                        ? 'border-red-300 focus:ring-red-500'
+                        : newPassword && passwordStrength.score >= 4
+                        ? 'border-green-300 focus:ring-green-500'
+                        : 'border-gray-300 focus:ring-blue-500'
+                    }`}
                     placeholder="Enter new password (min 6 characters)"
                     minLength={6}
                     required
                   />
+                  
+                  {/* Password Strength Indicator */}
+                  {newPassword && (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-600">Password Strength:</span>
+                        <span className={`text-xs font-medium ${
+                          passwordStrength.score < 2 ? 'text-red-600' :
+                          passwordStrength.score < 4 ? 'text-yellow-600' : 'text-green-600'
+                        }`}>
+                          {passwordStrength.feedback}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            passwordStrength.score < 2 ? 'bg-red-500' :
+                            passwordStrength.score < 4 ? 'bg-yellow-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${(passwordStrength.score / 5) * 100}%` }}
+                        ></div>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        Use uppercase, lowercase, numbers, and special characters for a stronger password
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (error) setError('');
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                      confirmPassword && newPassword !== confirmPassword
+                        ? 'border-red-300 focus:ring-red-500'
+                        : confirmPassword && newPassword === confirmPassword
+                        ? 'border-green-300 focus:ring-green-500'
+                        : 'border-gray-300 focus:ring-blue-500'
+                    }`}
+                    placeholder="Confirm new password"
+                    required
+                  />
+                  
+                  {/* Password Match Indicator */}
+                  {confirmPassword && (
+                    <div className="mt-1 flex items-center">
+                      {newPassword === confirmPassword ? (
+                        <div className="flex items-center text-green-600">
+                          <i className="ri-check-line mr-1"></i>
+                          <span className="text-xs">Passwords match</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center text-red-600">
+                          <i className="ri-close-line mr-1"></i>
+                          <span className="text-xs">Passwords do not match</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Password Requirements */}
+                <div className="bg-blue-50 p-3 rounded-md">
+                  <h4 className="text-sm font-medium text-blue-900 mb-2">Password Requirements:</h4>
+                  <ul className="text-xs text-blue-800 space-y-1">
+                    <li className={`flex items-center ${
+                      newPassword.length >= 6 ? 'text-green-600' : 'text-gray-600'
+                    }`}>
+                      <i className={`ri-${newPassword.length >= 6 ? 'check' : 'close'}-line mr-1`}></i>
+                      At least 6 characters
+                    </li>
+                    <li className={`flex items-center ${
+                      /[a-z]/.test(newPassword) ? 'text-green-600' : 'text-gray-600'
+                    }`}>
+                      <i className={`ri-${/[a-z]/.test(newPassword) ? 'check' : 'close'}-line mr-1`}></i>
+                      Lowercase letter
+                    </li>
+                    <li className={`flex items-center ${
+                      /[A-Z]/.test(newPassword) ? 'text-green-600' : 'text-gray-600'
+                    }`}>
+                      <i className={`ri-${/[A-Z]/.test(newPassword) ? 'check' : 'close'}-line mr-1`}></i>
+                      Uppercase letter
+                    </li>
+                    <li className={`flex items-center ${
+                      /[0-9]/.test(newPassword) ? 'text-green-600' : 'text-gray-600'
+                    }`}>
+                      <i className={`ri-${/[0-9]/.test(newPassword) ? 'check' : 'close'}-line mr-1`}></i>
+                      Number
+                    </li>
+                    <li className={`flex items-center ${
+                      /[^A-Za-z0-9]/.test(newPassword) ? 'text-green-600' : 'text-gray-600'
+                    }`}>
+                      <i className={`ri-${/[^A-Za-z0-9]/.test(newPassword) ? 'check' : 'close'}-line mr-1`}></i>
+                      Special character
+                    </li>
+                  </ul>
                 </div>
 
                 <div className="flex space-x-3 pt-4">
@@ -1583,8 +1902,10 @@ export default function UserManagement() {
                     loading={passwordUpdateLoading}
                     type="button"
                     onClick={handlePasswordUpdate}
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-full hover:from-orange-700 hover:to-red-700 transition-all duration-300"
+                    disabled={!newPassword || !confirmPassword || newPassword !== confirmPassword || passwordStrength.score < 2}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-full hover:from-orange-700 hover:to-red-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
+                    <i className="ri-lock-line mr-2"></i>
                     Update Password
                   </LoadingButton>
                   <button
@@ -1593,6 +1914,9 @@ export default function UserManagement() {
                       setShowPasswordModal(false);
                       setPasswordUser(null);
                       setNewPassword('');
+                      setConfirmPassword('');
+                      setPasswordStrength({ score: 0, feedback: '' });
+                      setError('');
                     }}
                     className="px-4 py-2 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors duration-200"
                   >

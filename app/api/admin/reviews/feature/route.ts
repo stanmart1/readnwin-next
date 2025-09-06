@@ -1,9 +1,17 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 
 export async function PATCH(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     // Get admin session
     const session = await getServerSession(authOptions);
@@ -15,8 +23,17 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { reviewId, isFeatured } = body;
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
+    const { reviewId, isFeatured } = sanitizedBody;
 
     if (!reviewId || typeof isFeatured !== 'boolean') {
       return NextResponse.json(
@@ -71,7 +88,7 @@ export async function PATCH(request: NextRequest) {
         ]
       );
     } catch (auditError) {
-      console.error('Audit logging failed:', auditError);
+      logger.error('Audit logging failed:', auditError);
       // Don't fail the request if audit logging fails
     }
 
@@ -81,7 +98,7 @@ export async function PATCH(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error updating review featured status:', error);
+    logger.error('Error updating review featured status:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

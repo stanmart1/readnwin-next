@@ -1,7 +1,11 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { Pool } from 'pg';
+import { SecurityUtils } from '@/utils/security-utils';
 
 // Database configuration - No fallbacks, environment variables only
 const pool = new Pool({
@@ -16,11 +20,16 @@ const pool = new Pool({
 // POST - Save individual gateway settings
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔍 Gateway API: Starting request processing...');
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  try {
+    logger.info('🔍 Gateway API: Starting request processing...');
 
     // Check authentication
-    const session = await getServerSession(authOptions);
-    console.log('🔍 Gateway API: Session check result:', {
+    const session = await getServerSession(authOptions) as any;
+    logger.info('🔍 Gateway API: Session check result:', {
       hasSession: !!session,
       hasUserId: !!session?.user?.id,
       userId: session?.user?.id,
@@ -28,7 +37,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!session?.user?.id) {
-      console.log('❌ Gateway API: Authentication failed - no session or user ID');
+      logger.info('❌ Gateway API: Authentication failed - no session or user ID');
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -38,7 +47,7 @@ export async function POST(request: NextRequest) {
     // Check if user is admin
     const client = await pool.connect();
     try {
-      console.log('🔍 Gateway API: Checking user role...');
+      logger.info('🔍 Gateway API: Checking user role...');
       const userResult = await client.query(`
         SELECT r.name as role_name
         FROM users u
@@ -49,26 +58,35 @@ export async function POST(request: NextRequest) {
         LIMIT 1
       `, [session.user.id]);
 
-      console.log('🔍 Gateway API: User query result:', {
+      logger.info('🔍 Gateway API: User query result:', {
         rowsFound: userResult.rows.length,
         userRole: userResult.rows[0]?.role_name
       });
 
       if (userResult.rows.length === 0 || 
           (userResult.rows[0].role_name !== 'admin' && userResult.rows[0].role_name !== 'super_admin')) {
-        console.log('❌ Gateway API: Admin access denied');
+        logger.info('❌ Gateway API: Admin access denied');
         return NextResponse.json(
           { error: 'Admin access required' },
           { status: 403 }
         );
       }
 
-      // Parse request body
-      console.log('🔍 Gateway API: Parsing request body...');
-      const body = await request.json();
-      const { gateway } = body;
+      // Parse request sanitizedBody
+      logger.info('🔍 Gateway API: Parsing request sanitizedBody...');
       
-      console.log('🔍 Gateway API: Request body parsed:', {
+  const body = await request.json();
+  const sanitizedBody: any = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
+      const { gateway } = sanitizedBody;
+      
+      logger.info('🔍 Gateway API: Request sanitizedBody parsed:', {
         hasGateway: !!gateway,
         gatewayId: gateway?.id,
         gatewayName: gateway?.name
@@ -76,7 +94,7 @@ export async function POST(request: NextRequest) {
 
       // Validate required fields
       if (!gateway || !gateway.id) {
-        console.log('❌ Gateway API: Missing gateway data');
+        logger.info('❌ Gateway API: Missing gateway data');
         return NextResponse.json(
           { error: 'Gateway data is required' },
           { status: 400 }
@@ -102,7 +120,7 @@ export async function POST(request: NextRequest) {
         updated_at: new Date(),
       };
 
-      console.log('🔍 Gateway API: Prepared gateway data:', {
+      logger.info('🔍 Gateway API: Prepared gateway data:', {
         gatewayId: gatewayData.gateway_id,
         name: gatewayData.name,
         enabled: gatewayData.enabled,
@@ -111,7 +129,7 @@ export async function POST(request: NextRequest) {
 
       // For bank transfer gateway, also save bank account information
       if (gateway.id === 'bank_transfer' && gateway.bankAccount) {
-        console.log('🔍 Gateway API: Processing bank transfer gateway...');
+        logger.info('🔍 Gateway API: Processing bank transfer gateway...');
         
         // Save bank account information to a separate table or as JSON in config field
         const bankAccountConfig = {
@@ -122,7 +140,7 @@ export async function POST(request: NextRequest) {
           instructions: gateway.bankAccount.instructions || '',
         };
 
-        console.log('🔍 Gateway API: Bank account config:', bankAccountConfig);
+        logger.info('🔍 Gateway API: Bank account config:', bankAccountConfig);
 
         // Update the gateway with bank account config
         await client.query(
@@ -156,9 +174,9 @@ export async function POST(request: NextRequest) {
           ]
         );
         
-        console.log('✅ Gateway API: Bank transfer gateway updated successfully');
+        logger.info('✅ Gateway API: Bank transfer gateway updated successfully');
       } else {
-        console.log('🔍 Gateway API: Processing regular gateway...');
+        logger.info('🔍 Gateway API: Processing regular gateway...');
         
         // For other gateways, save with v3 config
         await client.query(
@@ -192,10 +210,10 @@ export async function POST(request: NextRequest) {
           ]
         );
         
-        console.log('✅ Gateway API: Regular gateway updated successfully');
+        logger.info('✅ Gateway API: Regular gateway updated successfully');
       }
 
-      console.log('✅ Gateway API: Request completed successfully');
+      logger.info('✅ Gateway API: Request completed successfully');
       return NextResponse.json({
         success: true,
         message: `${gateway.name} settings saved successfully`,
@@ -206,12 +224,12 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('❌ Gateway API: Error occurred:', error);
-    console.error('❌ Gateway API: Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    console.error('❌ Gateway API: Error details:', {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : String(error),
-      code: (error as any)?.code || 'Unknown'
+    logger.error('❌ Gateway API: Error occurred:', SecurityUtils.sanitizeForLog(error));
+    logger.error('❌ Gateway API: Error stack:', SecurityUtils.sanitizeForLog(error instanceof Error ? error.stack : 'No stack trace'));
+    logger.error('❌ Gateway API: Error details:', {
+      name: SecurityUtils.sanitizeForLog(error instanceof Error ? error.name : 'Unknown'),
+      message: SecurityUtils.sanitizeForLog(error instanceof Error ? error.message : String(error)),
+      code: SecurityUtils.sanitizeForLog((error as any)?.code || 'Unknown')
     });
     
     return NextResponse.json(

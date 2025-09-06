@@ -1,9 +1,17 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { rbacService } from "@/utils/rbac-service";
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -36,7 +44,7 @@ export async function GET(request: NextRequest) {
       permissions,
     });
   } catch (error) {
-    console.error("Error fetching permissions:", error);
+    logger.error("Error fetching permissions:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -45,6 +53,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -58,9 +71,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Get request body
+    // Get request body and sanitize
     const body = await request.json();
-    const { name, display_name, description, resource, action, scope } = body;
+    const sanitizedBody = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (typeof value === 'string') {
+        sanitizedBody[key] = sanitizeInput(value);
+      } else {
+        sanitizedBody[key] = value;
+      }
+    }
+    const { name, display_name, description, resource, action, scope } = sanitizedBody;
 
     // Validate required fields
     if (!name || !display_name || !resource || !action) {
@@ -97,10 +118,7 @@ export async function POST(request: NextRequest) {
       message: "Permission created successfully",
     });
   } catch (error) {
-    console.error("Error creating permission:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    logger.error('API Error', { error: error.message, endpoint: request.url });
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

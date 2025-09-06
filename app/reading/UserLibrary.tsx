@@ -223,15 +223,17 @@ export default function UserLibrary() {
 
   // Check for book in sessionStorage (from BookCard)
   useEffect(() => {
-    const storedBook = sessionStorage.getItem("selectedBook");
-    if (storedBook) {
-      try {
-        const bookData = JSON.parse(storedBook);
-        setSelectedBook(bookData);
-        sessionStorage.removeItem("selectedBook"); // Clear after reading
-      } catch (error) {
-        console.error("Error parsing stored book:", error);
-        sessionStorage.removeItem("selectedBook");
+    if (typeof window !== 'undefined') {
+      const storedBook = sessionStorage.getItem("selectedBook");
+      if (storedBook) {
+        try {
+          const bookData = JSON.parse(storedBook);
+          setSelectedBook(bookData);
+          sessionStorage.removeItem("selectedBook"); // Clear after reading
+        } catch (error) {
+          console.error("Error parsing stored book:", error);
+          sessionStorage.removeItem("selectedBook");
+        }
       }
     }
   }, []);
@@ -261,7 +263,11 @@ export default function UserLibrary() {
           </h3>
           <p className="text-gray-600">{error}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.location.reload();
+              }
+            }}
             className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
           >
             Try Again

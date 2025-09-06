@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -7,6 +10,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const roleId = parseInt(params.id);
+  if (isNaN(roleId)) {
+    return Response.json({ error: 'Invalid role ID' }, { status: 400 });
+  }
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -22,11 +34,6 @@ export async function GET(
     
     if (!hasPermission) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    const roleId = parseInt(params.id);
-    if (isNaN(roleId)) {
-      return NextResponse.json({ error: 'Invalid role ID' }, { status: 400 });
     }
 
     // Get role permissions
@@ -49,7 +56,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Error fetching role permissions:', error);
+    logger.error('Error fetching role permissions:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -83,9 +90,18 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid role ID' }, { status: 400 });
     }
 
-    // Get request body
-    const body = await request.json();
-    const { permission_id } = body;
+    // Get request sanitizedBody
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
+    const { permission_id } = sanitizedBody;
 
     if (!permission_id) {
       return NextResponse.json({ error: 'Permission ID is required' }, { status: 400 });
@@ -119,7 +135,7 @@ export async function POST(
     });
 
   } catch (error) {
-    console.error('Error assigning permission to role:', error);
+    logger.error('Error assigning permission to role:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -188,7 +204,7 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('Error removing permission from role:', error);
+    logger.error('Error removing permission from role:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

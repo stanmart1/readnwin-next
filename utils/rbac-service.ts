@@ -521,6 +521,41 @@ class RBACService {
     }
   }
 
+  // Optimized batch permission update
+  async updateRolePermissionsBatch(roleId: number, permissionIds: number[], grantedBy?: number): Promise<boolean> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Remove all existing permissions for this role
+      await client.query('DELETE FROM role_permissions WHERE role_id = $1', [roleId]);
+      
+      // Insert new permissions in batch if any are provided
+      if (permissionIds.length > 0) {
+        const values = permissionIds.map((permissionId, index) => 
+          `($1, $${index + 2}, $${permissionIds.length + 2})`
+        ).join(', ');
+        
+        await client.query(
+          `INSERT INTO role_permissions (role_id, permission_id, granted_by) VALUES ${values}`,
+          [roleId, ...permissionIds, grantedBy]
+        );
+      }
+      
+      await client.query('COMMIT');
+      
+      // Refresh permission cache once at the end
+      await this.refreshRolePermissionCache(roleId);
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error updating role permissions batch:', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
   // Permission Checking
   async hasPermission(userId: number, permissionName: string): Promise<boolean> {
     try {

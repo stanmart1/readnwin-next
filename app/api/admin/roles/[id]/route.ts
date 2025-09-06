@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -7,6 +10,14 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -56,7 +67,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Error fetching role:', error);
+    logger.error('Error fetching role:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -90,9 +101,18 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid role ID' }, { status: 400 });
     }
 
-    // Get request body
-    const body = await request.json();
-    const { display_name, description, priority } = body;
+    // Get request sanitizedBody
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
+    const { display_name, description, priority } = sanitizedBody;
 
     // Update role
     const updatedRole = await rbacService.updateRole(roleId, {
@@ -123,7 +143,7 @@ export async function PUT(
     });
 
   } catch (error) {
-    console.error('Error updating role:', error);
+    logger.error('Error updating role:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -180,7 +200,7 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('Error deleting role:', error);
+    logger.error('Error deleting role:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

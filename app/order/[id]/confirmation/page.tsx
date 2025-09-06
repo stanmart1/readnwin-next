@@ -6,6 +6,9 @@ import { useSession } from 'next-auth/react';
 // Remix Icons are already available globally
 import { toast } from 'react-hot-toast';
 
+// Force dynamic rendering to prevent prerender errors
+export const dynamic = 'force-dynamic';
+
 interface OrderItem {
   id: number;
   book_id: number;
@@ -148,7 +151,9 @@ export default function OrderConfirmationPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
   };
 
   const handleDownloadReceipt = async () => {
@@ -170,14 +175,16 @@ export default function OrderConfirmationPage() {
 
       // Create blob and download
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `receipt-${order?.order_number}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      if (typeof window !== 'undefined') {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `receipt-${order?.order_number}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
 
       // Show success message
       toast.success('Receipt downloaded successfully!');
@@ -214,14 +221,16 @@ export default function OrderConfirmationPage() {
 
       // Create blob and download
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `invoice-${order?.order_number}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      if (typeof window !== 'undefined') {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `invoice-${order?.order_number}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
 
       // Show success message
       toast.success('Invoice downloaded successfully!');

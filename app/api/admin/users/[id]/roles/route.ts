@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -7,6 +10,14 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -49,7 +60,7 @@ export async function GET(
         request.headers.get('user-agent') || undefined
       );
     } catch (auditError) {
-      console.error('Audit logging failed (non-critical):', auditError);
+      logger.error('Audit logging failed (non-critical):', auditError);
     }
 
     return NextResponse.json({
@@ -58,7 +69,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Error fetching user roles:', error);
+    logger.error('Error fetching user roles:', error);
     return NextResponse.json({
       success: false,
       error: 'Internal server error',
@@ -98,9 +109,17 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // Get request body
+    // Get request body and sanitize
     const body = await request.json();
-    const { role_id, expires_at } = body;
+    const sanitizedBody = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (typeof value === 'string') {
+        sanitizedBody[key] = sanitizeInput(value);
+      } else {
+        sanitizedBody[key] = value;
+      }
+    }
+    const { role_id, expires_at } = sanitizedBody;
 
     if (!role_id) {
       return NextResponse.json({ 
@@ -154,7 +173,7 @@ export async function POST(
         request.headers.get('user-agent') || undefined
       );
     } catch (auditError) {
-      console.error('Audit logging failed (non-critical):', auditError);
+      logger.error('Audit logging failed (non-critical):', auditError);
     }
 
     return NextResponse.json({
@@ -163,7 +182,7 @@ export async function POST(
     });
 
   } catch (error) {
-    console.error('Error assigning role to user:', error);
+    logger.error('Error assigning role to user:', error);
     return NextResponse.json({
       success: false,
       error: 'Internal server error',
@@ -265,7 +284,7 @@ export async function DELETE(
         request.headers.get('user-agent') || undefined
       );
     } catch (auditError) {
-      console.error('Audit logging failed (non-critical):', auditError);
+      logger.error('Audit logging failed (non-critical):', auditError);
     }
 
     return NextResponse.json({
@@ -274,7 +293,7 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('Error removing role from user:', error);
+    logger.error('Error removing role from user:', error);
     return NextResponse.json({
       success: false,
       error: 'Internal server error',
@@ -314,9 +333,17 @@ export async function PUT(
       }, { status: 400 });
     }
 
-    // Get request body
+    // Get request body and sanitize
     const body = await request.json();
-    const { role_ids } = body;
+    const sanitizedBody = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (typeof value === 'string') {
+        sanitizedBody[key] = sanitizeInput(value);
+      } else {
+        sanitizedBody[key] = value;
+      }
+    }
+    const { role_ids } = sanitizedBody;
 
     if (!Array.isArray(role_ids)) {
       return NextResponse.json({ 
@@ -338,13 +365,13 @@ export async function PUT(
     const currentRoles = await rbacService.getUserRoles(userId);
     const currentRoleIds = currentRoles.map(r => r.role_id || r.id);
 
-    console.log('🔍 Current role IDs:', currentRoleIds);
-    console.log('🔍 New role IDs:', role_ids);
+    logger.info('🔍 Current role IDs:', currentRoleIds);
+    logger.info('🔍 New role IDs:', role_ids);
     
     // Remove roles that are no longer selected
     for (const currentRoleId of currentRoleIds) {
       if (!role_ids.includes(currentRoleId)) {
-        console.log('🗑️ Removing role:', currentRoleId);
+        logger.info('🗑️ Removing role:', currentRoleId);
         await rbacService.removeRoleFromUser(userId, currentRoleId);
       }
     }
@@ -352,7 +379,7 @@ export async function PUT(
     // Add new roles
     for (const roleId of role_ids) {
       if (!currentRoleIds.includes(roleId)) {
-        console.log('➕ Adding role:', roleId);
+        logger.info('➕ Adding role:', roleId);
         await rbacService.assignRoleToUser(userId, roleId, parseInt(session.user.id));
       }
     }
@@ -369,7 +396,7 @@ export async function PUT(
         request.headers.get('user-agent') || undefined
       );
     } catch (auditError) {
-      console.error('Audit logging failed (non-critical):', auditError);
+      logger.error('Audit logging failed (non-critical):', auditError);
     }
 
     return NextResponse.json({
@@ -378,7 +405,7 @@ export async function PUT(
     });
 
   } catch (error) {
-    console.error('Error updating user roles:', error);
+    logger.error('Error updating user roles:', error);
     return NextResponse.json({
       success: false,
       error: 'Internal server error',

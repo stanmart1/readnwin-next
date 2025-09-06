@@ -1,9 +1,17 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const session = await getServerSession(authOptions);
     
@@ -33,7 +41,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching shipping methods:', error);
+    logger.error('Error fetching shipping methods:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -60,10 +68,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
     
     // Validate required fields
-    if (!body.name || !body.description) {
+    if (!sanitizedBody.name || !sanitizedBody.description) {
       return NextResponse.json(
         { error: 'Name and description are required' },
         { status: 400 }
@@ -85,15 +102,15 @@ export async function POST(request: NextRequest) {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `, [
-      body.name,
-      body.description,
-      body.base_cost || 0,
-      body.cost_per_item || 0,
-      body.free_shipping_threshold,
-      body.estimated_days_min || 1,
-      body.estimated_days_max || 7,
-      body.is_active !== false, // Default to true
-      body.sort_order || 0
+      sanitizedBody.name,
+      sanitizedBody.description,
+      sanitizedBody.base_cost || 0,
+      sanitizedBody.cost_per_item || 0,
+      sanitizedBody.free_shipping_threshold,
+      sanitizedBody.estimated_days_min || 1,
+      sanitizedBody.estimated_days_max || 7,
+      sanitizedBody.is_active !== false, // Default to true
+      sanitizedBody.sort_order || 0
     ]);
 
     return NextResponse.json({
@@ -102,7 +119,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error creating shipping method:', error);
+    logger.error('Error creating shipping method:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

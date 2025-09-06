@@ -1,6 +1,9 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { secureQuery } from '@/utils/secure-database';
-import { requireAuth, sanitizeInput } from '@/utils/security-middleware';
+import { requireAuth, sanitizeInput as oldSanitizeInput } from '@/utils/security-middleware';
 
 // Simple in-memory cache for analytics data
 let analyticsCache: any = null;
@@ -9,11 +12,12 @@ const CACHE_DURATION = 60000; // 1 minute cache
 
 export async function GET(request: NextRequest) {
   try {
-    // Authentication check
-    const auth = await requireAuth(request, ['admin', 'super_admin']);
-    if (!auth.authorized) {
-      return NextResponse.json({ error: auth.error }, { status: 401 });
-    }
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  try {
 
     // Check cache first
     const now = Date.now();
@@ -37,7 +41,7 @@ export async function GET(request: NextRequest) {
     
     // Get basic stats with improved error handling
     try {
-      console.log('🔍 Fetching basic stats from database...');
+      logger.info('Fetching basic stats from database');
       
       const basicStatsResult = await Promise.race([
         secureQuery(`
@@ -56,34 +60,34 @@ export async function GET(request: NextRequest) {
       orderCount = parseInt(stats.order_count) || 0;
       revenue = parseFloat(stats.revenue) || 0;
       
-      console.log('✅ Stats fetched successfully:', { userCount, bookCount, orderCount, revenue });
+      logger.info('Stats fetched successfully', { userCount, bookCount, orderCount, revenue });
     } catch (e) {
-      console.error('❌ Basic stats query failed:', e instanceof Error ? e.message : e);
+      logger.error('Basic stats query failed', { error: e instanceof Error ? e.message : e });
       
       // Try individual queries to identify which table is missing
       try {
         const userResult = await secureQuery('SELECT COUNT(*) as count FROM users');
         userCount = parseInt(userResult.rows[0].count) || 0;
-        console.log('✅ Users table accessible, count:', userCount);
+        logger.info('Users table accessible', { count: userCount });
       } catch (userError) {
-        console.error('❌ Users table error:', userError instanceof Error ? userError.message : userError);
+        logger.error('Users table error', { error: userError instanceof Error ? userError.message : userError });
       }
       
       try {
         const bookResult = await secureQuery('SELECT COUNT(*) as count FROM books');
         bookCount = parseInt(bookResult.rows[0].count) || 0;
-        console.log('✅ Books table accessible, count:', bookCount);
+        logger.info('Books table accessible', { count: bookCount });
       } catch (bookError) {
-        console.error('❌ Books table error:', bookError instanceof Error ? bookError.message : bookError);
+        logger.error('Books table error', { error: bookError instanceof Error ? bookError.message : bookError });
       }
       
       try {
         const orderResult = await secureQuery('SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL \'30 days\'');
         orderCount = parseInt(orderResult.rows[0].count) || 0;
         revenue = parseFloat(orderResult.rows[0].revenue) || 0;
-        console.log('✅ Orders table accessible, count:', orderCount, 'revenue:', revenue);
+        logger.info('Orders table accessible', { count: orderCount, revenue });
       } catch (orderError) {
-        console.error('❌ Orders table error:', orderError instanceof Error ? orderError.message : orderError);
+        logger.error('Orders table error', { error: orderError instanceof Error ? orderError.message : orderError });
       }
     }
 
@@ -137,7 +141,7 @@ export async function GET(request: NextRequest) {
       }));
       
     } catch (e) {
-      console.error('❌ Error fetching daily activity:', e);
+      logger.error('Error fetching daily activity', { error: e });
       dailyActivity = [];
     }
     
@@ -235,10 +239,10 @@ export async function GET(request: NextRequest) {
         })
         .slice(0, 5);
         
-      console.log('✅ Recent activities fetched:', recentActivities.length);
+      logger.info('Recent activities fetched', { count: recentActivities.length });
       
     } catch (activitiesError) {
-      console.error('❌ Error fetching recent activities:', activitiesError);
+      logger.error('Error fetching recent activities', { error: activitiesError });
       // Fallback to system activities
       recentActivities = [
         {
@@ -308,7 +312,7 @@ export async function GET(request: NextRequest) {
       }));
       
     } catch (e) {
-      console.error('❌ Error fetching monthly data:', e);
+      logger.error('Error fetching monthly data', { error: e });
       // Fallback to current month only
       const currentMonth = new Date().toLocaleDateString('en', { month: 'short' });
       monthly_sales = [{
@@ -341,12 +345,12 @@ export async function GET(request: NextRequest) {
     analyticsCache = response;
     cacheTimestamp = now;
     
-    console.log('📊 Returning cached analytics response');
+    logger.info('Returning cached analytics response');
     
     return NextResponse.json(response);
 
   } catch (error) {
-    console.error('❌ Error fetching analytics:', error);
+    logger.error('Error fetching analytics', { error });
     return NextResponse.json(
       { 
         success: false, 

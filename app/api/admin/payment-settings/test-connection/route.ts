@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -13,6 +16,11 @@ const pool = new Pool({
 });
 
 export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -70,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error testing gateway connection:', error);
+    logger.error('Error testing gateway connection:', error);
     return NextResponse.json(
       { error: 'Failed to test gateway connection' },
       { status: 500 }

@@ -83,6 +83,18 @@ export default function BlogPage() {
   const featuredPost = blogPosts.find(post => post.featured);
   const regularPosts = filteredPosts;
 
+  const getUniqueImageForCategory = (category: string) => {
+    const categoryImages: { [key: string]: string } = {
+      'reading-tips': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=400&fit=crop&auto=format',
+      'technology': 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&h=400&fit=crop&auto=format',
+      'self-improvement': 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=400&fit=crop&auto=format',
+      'psychology': 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=800&h=400&fit=crop&auto=format',
+      'literature': 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=400&fit=crop&auto=format',
+      'general': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=400&fit=crop&auto=format'
+    };
+    return categoryImages[category] || 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=400&fit=crop&auto=format';
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white">
@@ -191,8 +203,8 @@ export default function BlogPage() {
                   <div className="lg:w-2/3">
                     <div className="relative">
                       <img
-                        src={featuredPost.images && featuredPost.images.length > 0 ? featuredPost.images[0].file_path : `https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=400&fit=crop`}
-                        alt={featuredPost.title}
+                        src={featuredPost.images && featuredPost.images.length > 0 ? featuredPost.images[0].file_path : getUniqueImageForCategory(featuredPost.category)}
+                        alt={featuredPost.images && featuredPost.images.length > 0 ? featuredPost.images[0].alt_text || featuredPost.title : featuredPost.title}
                         className="w-full h-64 lg:h-full object-cover"
                       />
                       <div className="absolute top-4 left-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium">
@@ -263,8 +275,8 @@ export default function BlogPage() {
                   <article className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2">
                     <div className="relative">
                       <img
-                        src={post.images && post.images.length > 0 ? post.images[0].file_path : `https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=400&fit=crop`}
-                        alt={post.title}
+                        src={post.images && post.images.length > 0 ? post.images[0].file_path : getUniqueImageForCategory(post.category)}
+                        alt={post.images && post.images.length > 0 ? post.images[0].alt_text || post.title : post.title}
                         className="w-full h-48 object-cover"
                       />
                       <div className="absolute top-4 left-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">

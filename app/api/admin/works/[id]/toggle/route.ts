@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -17,6 +20,14 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -49,8 +60,17 @@ export async function PATCH(
       );
     }
 
-    const body = await request.json();
-    const { is_active } = body;
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
+    const { is_active } = sanitizedBody;
 
     if (typeof is_active !== 'boolean') {
       return NextResponse.json(
@@ -88,7 +108,7 @@ export async function PATCH(
     });
 
   } catch (error) {
-    console.error('Error toggling work status:', error);
+    logger.error('Error toggling work status:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update work status' },
       { status: 500 }

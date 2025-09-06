@@ -1,9 +1,17 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/utils/database';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 Database health check requested');
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  try {
+    logger.info('🔍 Database health check requested');
 
     // Test basic connection
     const connectionTest = await query('SELECT NOW() as current_time, version() as db_version');
@@ -52,7 +60,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ Database health check failed:', error);
+    logger.error('❌ Database health check failed:', error);
     
     return NextResponse.json({
       success: false,

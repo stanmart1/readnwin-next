@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { safeSystemSettingsQuery, safeSystemSettingsUpdate } from '@/utils/safe-query';
 import { query } from '@/utils/database';
@@ -29,11 +32,11 @@ export async function GET() {
       try {
         return NextResponse.json(JSON.parse(result.value));
       } catch (parseError) {
-        console.error('Error parsing about page content:', parseError);
+        logger.error('Error parsing about page content:', parseError);
         // Continue to return default content
       }
     } else {
-      console.log('About page content not found or error:', result.error);
+      logger.info('About page content not found or error:', result.error);
     }
     
     // Return default content if not found
@@ -159,7 +162,7 @@ export async function GET() {
       }
     });
   } catch (error) {
-    console.error('Error in admin about page API:', error);
+    logger.error('Error in admin about page API:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -186,7 +189,7 @@ export async function POST(request: NextRequest) {
     try {
       await safeSystemSettingsUpdate('about_page_content', JSON.stringify(content));
     } catch (dbError) {
-      console.error('Database error saving about content:', dbError);
+      logger.error('Database error saving about content:', dbError);
       // Try to create the table if it doesn't exist
       try {
         await query(`
@@ -203,7 +206,7 @@ export async function POST(request: NextRequest) {
         // Try the insert again
         await safeSystemSettingsUpdate('about_page_content', JSON.stringify(content));
       } catch (createError) {
-        console.error('Failed to create system_settings table:', createError);
+        logger.error('Failed to create system_settings table:', createError);
         throw new Error('Database setup failed');
       }
     }
@@ -221,7 +224,7 @@ export async function POST(request: NextRequest) {
         ]
       );
     } catch (auditError) {
-      console.error('Audit logging failed, but content was saved:', auditError);
+      logger.error('Audit logging failed, but content was saved:', auditError);
       // Try to create the audit_logs table if it doesn't exist
       try {
         await query(`
@@ -250,7 +253,7 @@ export async function POST(request: NextRequest) {
           ]
         );
       } catch (createAuditError) {
-        console.error('Failed to create audit_logs table:', createAuditError);
+        logger.error('Failed to create audit_logs table:', createAuditError);
         // Don't fail the entire request if audit logging fails
       }
     }
@@ -270,7 +273,7 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('Error saving about content:', error);
+    logger.error('Error saving about content:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

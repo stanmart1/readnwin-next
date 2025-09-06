@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -8,6 +11,14 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -30,8 +41,17 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
     }
 
+    
     const body = await request.json();
-    const { password } = body;
+    const sanitizedBody = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (typeof value === 'string') {
+        sanitizedBody[key] = sanitizeInput(value);
+      } else {
+        sanitizedBody[key] = value;
+      }
+    }
+    const { password } = sanitizedBody;
 
     if (!password || password.length < 6) {
       return NextResponse.json({ 
@@ -64,7 +84,7 @@ export async function PUT(
         request.headers.get('user-agent') || undefined
       );
     } catch (auditError) {
-      console.error('Audit logging failed (non-critical):', auditError);
+      logger.error('Audit logging failed (non-critical):', auditError);
     }
 
     return NextResponse.json({
@@ -73,7 +93,7 @@ export async function PUT(
     });
 
   } catch (error) {
-    console.error('Error updating password:', error);
+    logger.error('Error updating password:', error);
     return NextResponse.json({
       success: false,
       error: 'Internal server error',

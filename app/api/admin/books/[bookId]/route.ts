@@ -1,10 +1,21 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
-import { sanitizeInt, sanitizeHtml } from '@/utils/security';
+import { sanitizeInt } from '@/utils/security';
 
 export async function PUT(request: NextRequest, context: any) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -25,7 +36,16 @@ export async function PUT(request: NextRequest, context: any) {
       return NextResponse.json({ error: 'Invalid book ID' }, { status: 400 });
     }
 
-    const body = await request.json();
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
     const { 
       title, 
       author_id, 
@@ -39,7 +59,7 @@ export async function PUT(request: NextRequest, context: any) {
       language,
       pages,
       publisher
-    } = body;
+    } = sanitizedBody;
 
     // Build dynamic update query
     const updates: string[] = [];
@@ -163,7 +183,7 @@ export async function PUT(request: NextRequest, context: any) {
     });
 
   } catch (error) {
-    console.error('Error updating book:', error);
+    logger.error('Error updating book:', error);
     return NextResponse.json(
       { error: 'Failed to update book' },
       { status: 500 }

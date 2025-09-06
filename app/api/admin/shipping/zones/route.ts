@@ -1,7 +1,15 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/utils/database';
 
 export async function GET() {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const result = await query(`
       SELECT * FROM shipping_zones 
@@ -14,7 +22,7 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error('Error fetching shipping zones:', error);
+    logger.error('Error fetching shipping zones:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -24,14 +32,23 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
     const {
       name,
       description,
       countries,
       states,
       is_active
-    } = body;
+    } = sanitizedBody;
 
     // Validate required fields
     if (!name || !countries || countries.length === 0) {
@@ -61,7 +78,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error creating shipping zone:', error);
+    logger.error('Error creating shipping zone:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

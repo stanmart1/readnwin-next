@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -7,6 +10,14 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -52,7 +63,7 @@ export async function GET(
         request.headers.get('user-agent') || undefined
       );
     } catch (auditError) {
-      console.error('Audit logging failed (non-critical):', auditError);
+      logger.error('Audit logging failed (non-critical):', auditError);
     }
 
     // Remove password hash from response
@@ -64,7 +75,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Error fetching user:', error);
+    logger.error('Error fetching user:', error);
     return NextResponse.json({
       success: false,
       error: 'Internal server error',
@@ -78,24 +89,24 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log('🔍 Users PUT - Starting request for user:', params.id);
+    logger.info('🔍 Users PUT - Starting request for user:', params.id);
     
     // Verify authentication
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      console.log('❌ Users PUT - No session found');
+      logger.info('❌ Users PUT - No session found');
       return NextResponse.json({ 
         success: false, 
         error: 'Unauthorized' 
       }, { status: 401 });
     }
 
-    console.log('✅ Users PUT - Session found:', session.user.id, session.user.role);
+    logger.info('✅ Users PUT - Session found:', session.user.id, session.user.role);
 
     // Check if user is admin (skip complex permission checks for now)
     const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
     if (!isAdmin) {
-      console.log('❌ Users PUT - User is not admin:', session.user.role);
+      logger.info('❌ Users PUT - User is not admin:', session.user.role);
       return NextResponse.json({ 
         success: false, 
         error: 'Access denied. Admin privileges required.' 
@@ -110,11 +121,20 @@ export async function PUT(
     // Skip complex role checking for now to prevent errors
     // TODO: Re-implement role-based access control after fixing core functionality
 
-    // Get request body
-    const body = await request.json();
-    const { first_name, last_name, email, username, status } = body;
+    // Get request sanitizedBody
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
+    const { first_name, last_name, email, username, status } = sanitizedBody;
 
-    console.log('🔍 Users PUT - Updating user with data:', { first_name, last_name, email, username, status });
+    logger.info('🔍 Users PUT - Updating user with data:', { first_name, last_name, email, username, status });
     
     // Update user with error handling
     let updatedUser;
@@ -126,9 +146,9 @@ export async function PUT(
         username,
         status
       });
-      console.log('✅ Users PUT - rbacService.updateUser success');
+      logger.info('✅ Users PUT - rbacService.updateUser success');
     } catch (updateError) {
-      console.error('❌ Users PUT - rbacService.updateUser error:', updateError);
+      logger.error('❌ Users PUT - rbacService.updateUser error:', updateError);
       return NextResponse.json({
         success: false,
         error: 'Failed to update user in database',
@@ -137,7 +157,7 @@ export async function PUT(
     }
 
     if (!updatedUser) {
-      console.log('❌ Users PUT - User not found after update');
+      logger.info('❌ Users PUT - User not found after update');
       return NextResponse.json({ 
         success: false, 
         error: 'User not found' 
@@ -156,13 +176,13 @@ export async function PUT(
         request.headers.get('user-agent') || undefined
       );
     } catch (auditError) {
-      console.error('⚠️ Users PUT - Audit logging failed (non-critical):', auditError);
+      logger.error('⚠️ Users PUT - Audit logging failed (non-critical):', auditError);
     }
 
     // Remove password hash from response
     const { password_hash: _, ...userResponse } = updatedUser;
 
-    console.log('✅ Users PUT - Returning success response');
+    logger.info('✅ Users PUT - Returning success response');
     return NextResponse.json({
       success: true,
       user: userResponse,
@@ -170,7 +190,7 @@ export async function PUT(
     });
 
   } catch (error) {
-    console.error('❌ Users PUT - Unexpected error:', error);
+    logger.error('❌ Users PUT - Unexpected error:', error);
     return NextResponse.json({
       success: false,
       error: 'Internal server error',
@@ -236,7 +256,7 @@ export async function DELETE(
         request.headers.get('user-agent') || undefined
       );
     } catch (auditError) {
-      console.error('Audit logging failed (non-critical):', auditError);
+      logger.error('Audit logging failed (non-critical):', auditError);
     }
 
     return NextResponse.json({
@@ -245,7 +265,7 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('Error deleting user:', error);
+    logger.error('Error deleting user:', error);
     
     // Provide more detailed error messages
     let errorMessage = 'Internal server error';

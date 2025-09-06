@@ -20,6 +20,16 @@ export async function GET(request: NextRequest) {
       offset
     });
 
+    // Include images if requested
+    const includeImages = searchParams.get('include_images') === 'true';
+    if (includeImages) {
+      for (const post of posts) {
+        if (post.id) {
+          post.images = await blogService.getPostImages(post.id);
+        }
+      }
+    }
+
     // Get total count for pagination
     const totalPosts = await blogService.getPosts({
       status: 'published',

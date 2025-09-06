@@ -304,27 +304,13 @@ export async function POST(request: NextRequest) {
         let gateway = await getPaymentGateway('flutterwave');
         console.log('🔍 Payment gateway:', gateway ? 'Found' : 'Not found');
         
-        // Fallback to environment variables if gateway not found in database
+        // Gateway must be configured in database
         if (!gateway) {
-          const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
-          const publicKey = process.env.FLUTTERWAVE_PUBLIC_KEY;
-          
-          console.log('🔍 Environment variables check:', {
-            hasSecretKey: !!secretKey,
-            hasPublicKey: !!publicKey,
-            secretKeyPrefix: secretKey ? secretKey.substring(0, 10) + '...' : 'NOT SET'
-          });
-          
-          gateway = {
-            gateway_id: 'flutterwave',
-            name: 'Flutterwave',
-            enabled: !!secretKey,
-            secret_key: secretKey,
-            public_key: publicKey,
-            hash: process.env.FLUTTERWAVE_HASH,
-            test_mode: process.env.NODE_ENV !== 'production'
-          };
-          console.log('🔍 Using fallback Flutterwave configuration from environment');
+          console.log('❌ Flutterwave gateway not found in database');
+          return NextResponse.json(
+            { error: 'Flutterwave payment gateway is not configured. Please contact support.' },
+            { status: 400 }
+          );
         }
         
         if (!gateway.enabled || !gateway.secret_key) {
@@ -355,7 +341,7 @@ export async function POST(request: NextRequest) {
           email: shippingAddress.email,
           phone_number: shippingAddress.phone || '',
           tx_ref: transactionId,
-          redirect_url: `${process.env.NEXTAUTH_URL || 'https://readnwin.com'}/payment/verify`,
+          redirect_url: `${process.env.NEXTAUTH_URL || 'https://readnwin.com'}/payment/verify?order_id=${order.id}&order_number=${order.order_number}`,
           customer: {
             email: shippingAddress.email,
             phone_number: shippingAddress.phone || '',

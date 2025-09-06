@@ -85,9 +85,14 @@ export const useFlutterwaveInline = (options: UseFlutterwaveInlineOptions = {}) 
 
       // Check if Flutterwave script is loaded
       if (typeof window !== 'undefined' && (window as any).FlutterwaveCheckout) {
-        (window as any).FlutterwaveCheckout(inlineData);
+        console.log('🔍 Initializing Flutterwave checkout with data:', inlineData);
+        
+        // Use the FlutterwaveService to initialize inline payment for better handling
+        const flutterwaveService = new (await import('@/utils/flutterwave-service')).FlutterwaveService();
+        flutterwaveService.initializeInlinePayment(inlineData);
       } else {
-        throw new Error('Flutterwave script not loaded');
+        console.error('❌ Flutterwave script not loaded');
+        throw new Error('Flutterwave script not loaded. Please refresh the page and try again.');
       }
 
     } catch (err) {

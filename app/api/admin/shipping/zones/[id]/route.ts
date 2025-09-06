@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/utils/database';
 
@@ -5,6 +8,14 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
   try {
     const zoneId = Number(params.id);
 
@@ -15,14 +26,23 @@ export async function PUT(
       );
     }
 
-    const body = await request.json();
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
     const {
       name,
       description,
       countries,
       states,
       is_active
-    } = body;
+    } = sanitizedBody;
 
     // Validate required fields
     if (!name || !countries || countries.length === 0) {
@@ -55,7 +75,7 @@ export async function PUT(
     });
 
   } catch (error) {
-    console.error('Error updating shipping zone:', error);
+    logger.error('Error updating shipping zone:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -105,7 +125,7 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('Error deleting shipping zone:', error);
+    logger.error('Error deleting shipping zone:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

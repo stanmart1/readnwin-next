@@ -364,11 +364,11 @@ export default function OrderConfirmationPage() {
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
               <div className="space-y-3">
                 <button
-                  onClick={() => router.push('/library')}
+                  onClick={() => router.push('/dashboard?tab=library')}
                   className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Go to Library</span>
+                  <span>View Your Library</span>
                 </button>
                 
                 <button

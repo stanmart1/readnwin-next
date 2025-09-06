@@ -1,3 +1,6 @@
+import { sanitizeInput } from '@/lib/security';
+import { requireAdmin } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
@@ -7,6 +10,11 @@ import ImagePathResolver from '@/utils/image-path-resolver';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const formData = await request.formData();
     const file = formData.get('cover') as File;
@@ -27,8 +35,8 @@ export async function POST(request: NextRequest) {
     // Generate unique filename
     const timestamp = Date.now();
     const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const extension = file.name.split('.').pop();
-    const filename = `${bookId || 'book'}_${timestamp}_${randomSuffix}.${extension}`;
+    const extension = sanitizeInput(file.name).split('.').pop();
+    const filename = `${sanitizeInput(bookId) || 'book'}_${timestamp}_${randomSuffix}.${extension}`;
 
     // Use centralized path resolver for consistent storage
     const targetPath = ImagePathResolver.getUploadTargetPath(filename);
@@ -55,10 +63,10 @@ export async function POST(request: NextRequest) {
     // Return standardized URL
     const coverUrl = ImagePathResolver.resolveCoverImageUrl(filename);
 
-    console.log(`✅ Cover uploaded successfully:`);
-    console.log(`  - Primary location: ${targetPath}`);
-    console.log(`  - Legacy location: ${legacyPath}`);
-    console.log(`  - Public URL: ${coverUrl}`);
+    logger.info(`✅ Cover uploaded successfully:`);
+    logger.info(`  - Primary location: ${targetPath}`);
+    logger.info(`  - Legacy location: ${legacyPath}`);
+    logger.info(`  - Public URL: ${coverUrl}`);
 
     return NextResponse.json({ 
       success: true, 
@@ -67,7 +75,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Cover upload error:', error);
+    logger.error('Cover upload error:', error);
     return NextResponse.json(
       { error: 'Failed to upload cover image' },
       { status: 500 }

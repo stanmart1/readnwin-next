@@ -1,9 +1,17 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { ecommerceService } from '@/utils/ecommerce-service';
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     // Get admin session
     const session = await getServerSession(authOptions);
@@ -24,7 +32,7 @@ export async function GET(request: NextRequest) {
         stats
       });
     } catch (dbError) {
-      console.error('Database error fetching review stats:', dbError);
+      logger.error('Database error fetching review stats:', dbError);
       
       // Return default stats if database query fails
       return NextResponse.json({
@@ -41,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error fetching review stats:', error);
+    logger.error('Error fetching review stats:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

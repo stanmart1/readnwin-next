@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -5,6 +8,11 @@ import { rbacService } from '@/utils/rbac-service';
 import { ecommerceService } from '@/utils/ecommerce-service';
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -40,7 +48,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching categories:', error);
+    logger.error('Error fetching categories:', error);
     // Return empty result instead of error to allow frontend to load
     return NextResponse.json({
       success: true,
@@ -67,10 +75,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    const body = await request.json();
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
     
     // Validate required fields
-    if (!body.name) {
+    if (!sanitizedBody.name) {
       return NextResponse.json(
         { error: 'Missing required fields: name' },
         { status: 400 }
@@ -78,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create category
-    const category = await ecommerceService.createCategory(body);
+    const category = await ecommerceService.createCategory(sanitizedBody);
 
     // Log audit event
     await rbacService.logAuditEvent(
@@ -98,7 +115,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error creating category:', error);
+    logger.error('Error creating category:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

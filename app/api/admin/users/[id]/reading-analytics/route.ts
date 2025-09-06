@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/utils/database';
 import { getServerSession } from 'next-auth';
@@ -7,6 +10,14 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -164,7 +175,7 @@ export async function GET(
     return NextResponse.json(userReadingData);
 
   } catch (error) {
-    console.error('Error fetching user reading analytics:', error);
+    logger.error('Error fetching user reading analytics:', error);
     return NextResponse.json(
       { error: 'Failed to fetch user reading analytics' },
       { status: 500 }

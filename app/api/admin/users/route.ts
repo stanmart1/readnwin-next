@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Force dynamic rendering
@@ -5,28 +8,34 @@ export const dynamic = 'force-dynamic';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { rbacService } from '@/utils/rbac-service';
-import { validateInput, sanitizeInput, requireAuth } from '@/utils/security-middleware';
+import { validateInput, sanitizeInput as oldSanitizeInput, requireAuth } from '@/utils/security-middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 Users API - Starting request');
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  try {
+    logger.info('Users API - Starting request');
     
     // Verify authentication
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      console.log('❌ Users API - No session found');
+      logger.error('Users API - No session found');
       return NextResponse.json({ 
         success: false, 
         error: 'Unauthorized' 
       }, { status: 401 });
     }
 
-    console.log('✅ Users API - Session found:', session.user.id, session.user.role);
+    logger.info('Users API - Session found', { userId: session.user.id, role: session.user.role });
 
     // Check if user is admin (skip complex permission checks for now)
     const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
     if (!isAdmin) {
-      console.log('❌ Users API - User is not admin:', session.user.role);
+      logger.error('Users API - User is not admin', { role: session.user.role });
       return NextResponse.json({ 
         success: false, 
         error: 'Access denied. Admin privileges required.' 
@@ -41,7 +50,7 @@ export async function GET(request: NextRequest) {
     const status = sanitizeInput(searchParams.get('status') || '');
     const role = sanitizeInput(searchParams.get('role') || '');
 
-    console.log('🔍 Users API - Query params:', { page, limit, search, status, role });
+    logger.info('Users API - Query params', { page, limit, search, status, role });
 
     // Build validated filters
     const filters: any = {};
@@ -49,15 +58,15 @@ export async function GET(request: NextRequest) {
     if (status && ['active', 'inactive', 'suspended'].includes(status)) filters.status = status;
     if (role && ['admin', 'super_admin', 'user'].includes(role)) filters.role = role;
 
-    console.log('🔍 Users API - Calling rbacService.getUsers');
+    logger.info('Users API - Calling rbacService.getUsers');
     
     // Get users with error handling
     let result;
     try {
       result = await rbacService.getUsers(page, limit, filters, session.user.role);
-      console.log('✅ Users API - rbacService.getUsers success:', result.users.length, 'users');
+      logger.info('Users API - rbacService.getUsers success', { userCount: result.users.length });
     } catch (rbacError) {
-      console.error('❌ Users API - rbacService.getUsers error:', rbacError);
+      logger.error('Users API - rbacService.getUsers error', { error: rbacError });
       return NextResponse.json({
         success: false,
         error: 'Failed to fetch users from database',
@@ -77,7 +86,7 @@ export async function GET(request: NextRequest) {
         request.headers.get('user-agent') || undefined
       );
     } catch (auditError) {
-      console.error('⚠️ Users API - Audit logging failed (non-critical):', auditError);
+      logger.warn('Users API - Audit logging failed (non-critical)', { error: auditError });
     }
 
     const response = {
@@ -91,22 +100,24 @@ export async function GET(request: NextRequest) {
       }
     };
 
-    console.log('✅ Users API - Returning response:', response.users.length, 'users');
+    logger.info('Users API - Returning response', { userCount: response.users.length });
     return NextResponse.json(response);
 
   } catch (error) {
-    console.error('❌ Users API - Unexpected error:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    logger.error('API Error', { error: error.message, endpoint: request.url });
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔍 Users API POST - Starting request');
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  try {
+    logger.info('Users API POST - Starting request');
     
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -191,7 +202,7 @@ export async function POST(request: NextRequest) {
         request.headers.get('user-agent') || undefined
       );
     } catch (auditError) {
-      console.error('⚠️ Users API POST - Audit logging failed (non-critical):', auditError);
+      logger.warn('Users API POST - Audit logging failed (non-critical)', { error: auditError });
     }
 
     // Remove password hash from response
@@ -204,11 +215,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ Users API POST - Error:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to create user',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    logger.error('API Error', { error: error.message, endpoint: request.url });
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}

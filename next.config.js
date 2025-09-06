@@ -6,40 +6,13 @@ const nextConfig = {
     unoptimized: true
   },
   experimental: {
-    serverComponentsExternalPackages: ['pg'],
-    missingSuspenseWithCSRBailout: false
+    serverComponentsExternalPackages: ['pg']
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
     ignoreBuildErrors: true,
-  },
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
-        ],
-      },
-    ];
-  },
-  webpack: (config) => {
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      net: false,
-      tls: false,
-    };
-    return config;
   }
 };
 

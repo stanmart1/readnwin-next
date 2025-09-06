@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -34,6 +37,14 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
+  try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -62,7 +73,7 @@ export async function GET(
     return NextResponse.json({ success: true, library: userLibrary });
 
   } catch (error) {
-    console.error('Error fetching user library:', error);
+    logger.error('Error fetching user library:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -132,7 +143,7 @@ export async function POST(
     }
 
   } catch (error) {
-    console.error('Error adding book to user library:', error);
+    logger.error('Error adding book to user library:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -202,7 +213,7 @@ export async function DELETE(
     }
 
   } catch (error) {
-    console.error('Error removing book from user library:', error);
+    logger.error('Error removing book from user library:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

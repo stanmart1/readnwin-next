@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -8,6 +11,14 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -31,8 +42,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
     }
 
-    const body = await request.json();
-    const { payment_status, notes } = body;
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
+    const { payment_status, notes } = sanitizedBody;
 
     if (!payment_status) {
       return NextResponse.json(
@@ -81,7 +101,7 @@ export async function PATCH(
           [orderId, parseInt(session.user.id), notes],
         );
       } catch (noteError) {
-        console.error("Error adding note (non-critical):", noteError);
+        logger.error("Error adding note (non-critical):", noteError);
       }
     }
 
@@ -95,11 +115,11 @@ export async function PATCH(
         await query("DELETE FROM cart_items WHERE user_id = $1", [
           order.user_id,
         ]);
-        console.log(
+        logger.info(
           "✅ Cart cleared for user after bank transfer payment confirmation",
         );
       } catch (cartError) {
-        console.error("❌ Error clearing cart (non-critical):", cartError);
+        logger.error("❌ Error clearing cart (non-critical):", cartError);
       }
     }
 
@@ -131,10 +151,10 @@ export async function PATCH(
               }
             }
           }
-          console.log("✅ Books added to user library");
+          logger.info("✅ Books added to user library");
         }
       } catch (libraryError) {
-        console.error(
+        logger.error(
           "❌ Error adding books to library (non-critical):",
           libraryError,
         );
@@ -168,9 +188,9 @@ export async function PATCH(
           orderDetails,
           userName,
         );
-        console.log("✅ Order status update email sent to user");
+        logger.info("✅ Order status update email sent to user");
       } catch (emailError) {
-        console.error(
+        logger.error(
           "❌ Error sending email notification (non-critical):",
           emailError,
         );
@@ -201,10 +221,10 @@ export async function PATCH(
         ],
       );
     } catch (auditError) {
-      console.error("Error logging audit (non-critical):", auditError);
+      logger.error("Error logging audit (non-critical):", auditError);
     }
 
-    console.log("✅ Payment status update successful:", {
+    logger.info("✅ Payment status update successful:", {
       orderId,
       oldPaymentStatus,
       newPaymentStatus: payment_status,
@@ -226,11 +246,11 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    console.error(
+    logger.error(
       "❌ Error in PATCH /api/admin/orders/[id]/payment-status:",
       error,
     );
-    console.error("Error details:", {
+    logger.error("Error details:", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });
@@ -316,7 +336,7 @@ export async function GET(
       history: auditResult.rows,
     });
   } catch (error) {
-    console.error(
+    logger.error(
       "❌ Error in GET /api/admin/orders/[id]/payment-status:",
       error,
     );

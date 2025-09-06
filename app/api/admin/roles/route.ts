@@ -1,9 +1,17 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { rbacService } from '@/utils/rbac-service';
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -37,7 +45,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching roles:', error);
+    logger.error('Error fetching roles:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -59,9 +67,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Get request body
+    // Get request body and sanitize
     const body = await request.json();
-    const { name, display_name, description, priority } = body;
+    const sanitizedBody = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (typeof value === 'string') {
+        sanitizedBody[key] = sanitizeInput(value);
+      } else {
+        sanitizedBody[key] = value;
+      }
+    }
+    const { name, display_name, description, priority } = sanitizedBody;
 
     // Validate required fields
     if (!name || !display_name) {
@@ -98,7 +114,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error creating role:', error);
+    logger.error('Error creating role:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

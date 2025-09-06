@@ -1246,14 +1246,14 @@ export default function ModernAboutManagement() {
                       </h2>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-6">
                       {content.team.map((member, index) => (
                         <div
                           key={index}
                           className="border border-gray-200 rounded-lg p-4 space-y-4"
                         >
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-medium text-gray-900">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-medium text-gray-900 text-lg">
                               Team Member {index + 1}
                             </h3>
                             <button
@@ -1263,59 +1263,20 @@ export default function ModernAboutManagement() {
                                 );
                                 updateContent("team", newTeam);
                               }}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
                             >
-                              <i className="ri-delete-bin-line"></i>
+                              <i className="ri-delete-bin-line text-lg"></i>
                             </button>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <input
-                                type="text"
-                                placeholder="Name (max 25 chars)"
-                                value={member.name}
-                                maxLength={25}
-                                onChange={(e) => {
-                                  const newTeam = [...content.team];
-                                  newTeam[index] = {
-                                    ...member,
-                                    name: e.target.value,
-                                  };
-                                  updateContent("team", newTeam);
-                                }}
-                                className="px-3 py-2 border border-gray-300 rounded-lg"
-                              />
-                              <p className="text-xs text-gray-500 mt-1">{member.name.length}/25</p>
-                            </div>
-                            <div>
-                              <input
-                                type="text"
-                                placeholder="Role (max 30 chars)"
-                                value={member.role}
-                                maxLength={30}
-                                onChange={(e) => {
-                                  const newTeam = [...content.team];
-                                  newTeam[index] = {
-                                    ...member,
-                                    role: e.target.value,
-                                  };
-                                  updateContent("team", newTeam);
-                                }}
-                                className="px-3 py-2 border border-gray-300 rounded-lg"
-                              />
-                              <p className="text-xs text-gray-500 mt-1">{member.role.length}/30</p>
-                            </div>
-                          </div>
-
+                          {/* Image Section */}
                           <div className="space-y-3">
                             <label className="block text-sm font-medium text-gray-700">
-                              Team Member Image
+                              Profile Image
                             </label>
                             
-                            {/* Image Preview */}
-                            <div className="flex items-center space-x-4">
-                              <div className="w-16 h-16 rounded-full overflow-hidden border border-gray-200 bg-gray-100">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100 flex-shrink-0">
                                 {member.image ? (
                                   <img
                                     src={member.image}
@@ -1327,44 +1288,26 @@ export default function ModernAboutManagement() {
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center">
-                                    <i className="ri-user-line text-xl text-gray-400"></i>
+                                    <i className="ri-user-line text-2xl text-gray-400"></i>
                                   </div>
                                 )}
                               </div>
-                              <div className="flex-1">
-                                <div className="flex gap-2 mb-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => document.getElementById(`teamImageUpload-${index}`)?.click()}
-                                    disabled={saving}
-                                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
-                                  >
-                                    <i className="ri-upload-line mr-1"></i>
-                                    Upload
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const newUrl = prompt('Enter image URL:', member.image || '');
-                                      if (newUrl) {
-                                        const newTeam = [...content.team];
-                                        newTeam[index] = { ...member, image: newUrl };
-                                        updateContent("team", newTeam);
-                                      }
-                                    }}
-                                    className="px-3 py-1 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700"
-                                  >
-                                    <i className="ri-link mr-1"></i>
-                                    URL
-                                  </button>
-                                </div>
-                                <p className="text-xs text-gray-500">
-                                  {member.image ? member.image.split('/').pop() : 'No image'}
+                              <div className="flex-1 w-full">
+                                <button
+                                  type="button"
+                                  onClick={() => document.getElementById(`teamImageUpload-${index}`)?.click()}
+                                  disabled={saving}
+                                  className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                                >
+                                  <i className="ri-upload-line mr-2"></i>
+                                  {member.image ? 'Change Image' : 'Upload Image'}
+                                </button>
+                                <p className="text-xs text-gray-500 mt-2">
+                                  {member.image ? `Current: ${member.image.split('/').pop()}` : 'No image uploaded'}
                                 </p>
                               </div>
                             </div>
                             
-                            {/* Hidden file input */}
                             <input
                               id={`teamImageUpload-${index}`}
                               type="file"
@@ -1402,27 +1345,62 @@ export default function ModernAboutManagement() {
                                 }
                               }}
                             />
-                            
-                            {/* Manual URL input */}
-                            <input
-                              type="text"
-                              placeholder="Or enter image URL"
-                              value={member.image}
-                              onChange={(e) => {
-                                const newTeam = [...content.team];
-                                newTeam[index] = {
-                                  ...member,
-                                  image: e.target.value,
-                                };
-                                updateContent("team", newTeam);
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                            />
                           </div>
 
+                          {/* Basic Info */}
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Full Name
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Enter full name (max 25 chars)"
+                                value={member.name}
+                                maxLength={25}
+                                onChange={(e) => {
+                                  const newTeam = [...content.team];
+                                  newTeam[index] = {
+                                    ...member,
+                                    name: e.target.value,
+                                  };
+                                  updateContent("team", newTeam);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">{member.name.length}/25 characters</p>
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Job Title/Role
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Enter job title (max 30 chars)"
+                                value={member.role}
+                                maxLength={30}
+                                onChange={(e) => {
+                                  const newTeam = [...content.team];
+                                  newTeam[index] = {
+                                    ...member,
+                                    role: e.target.value,
+                                  };
+                                  updateContent("team", newTeam);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">{member.role.length}/30 characters</p>
+                            </div>
+                          </div>
+
+                          {/* Bio */}
                           <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Bio/Description
+                            </label>
                             <textarea
-                              placeholder="Bio (max 120 characters)"
+                              placeholder="Enter a brief bio (max 120 characters)"
                               value={member.bio}
                               maxLength={120}
                               onChange={(e) => {
@@ -1434,40 +1412,56 @@ export default function ModernAboutManagement() {
                                 updateContent("team", newTeam);
                               }}
                               rows={3}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                             />
                             <p className="text-xs text-gray-500 mt-1">{member.bio.length}/120 characters</p>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3">
-                            <input
-                              type="text"
-                              placeholder="LinkedIn URL"
-                              value={member.linkedin}
-                              onChange={(e) => {
-                                const newTeam = [...content.team];
-                                newTeam[index] = {
-                                  ...member,
-                                  linkedin: e.target.value,
-                                };
-                                updateContent("team", newTeam);
-                              }}
-                              className="px-3 py-2 border border-gray-300 rounded-lg"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Twitter URL"
-                              value={member.twitter}
-                              onChange={(e) => {
-                                const newTeam = [...content.team];
-                                newTeam[index] = {
-                                  ...member,
-                                  twitter: e.target.value,
-                                };
-                                updateContent("team", newTeam);
-                              }}
-                              className="px-3 py-2 border border-gray-300 rounded-lg"
-                            />
+                          {/* Social Links */}
+                          <div className="space-y-3">
+                            <label className="block text-sm font-medium text-gray-700">
+                              Social Media Links
+                            </label>
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">
+                                  LinkedIn Profile
+                                </label>
+                                <input
+                                  type="url"
+                                  placeholder="https://linkedin.com/in/username"
+                                  value={member.linkedin}
+                                  onChange={(e) => {
+                                    const newTeam = [...content.team];
+                                    newTeam[index] = {
+                                      ...member,
+                                      linkedin: e.target.value,
+                                    };
+                                    updateContent("team", newTeam);
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">
+                                  Twitter/X Profile
+                                </label>
+                                <input
+                                  type="url"
+                                  placeholder="https://twitter.com/username"
+                                  value={member.twitter}
+                                  onChange={(e) => {
+                                    const newTeam = [...content.team];
+                                    newTeam[index] = {
+                                      ...member,
+                                      twitter: e.target.value,
+                                    };
+                                    updateContent("team", newTeam);
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                />
+                              </div>
+                            </div>
                           </div>
                         </div>
                       ))}

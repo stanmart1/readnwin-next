@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -37,8 +40,17 @@ async function handleOrderStatusUpdate(
       );
     }
 
-    const body = await request.json();
-    const { status } = body;
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
+    const { status } = sanitizedBody;
 
     if (!status) {
       return NextResponse.json(
@@ -79,7 +91,7 @@ async function handleOrderStatusUpdate(
         );
       }
     } catch (updateError) {
-      console.error('Error updating order status:', updateError);
+      logger.error('Error updating order status:', updateError);
       
       // Check if it's a constraint violation error
       if (updateError instanceof Error && updateError.message.includes('check constraint')) {
@@ -125,7 +137,7 @@ async function handleOrderStatusUpdate(
     });
 
   } catch (error) {
-    console.error('Error updating order status:', error);
+    logger.error('Error updating order status:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -137,6 +149,14 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
   return handleOrderStatusUpdate(request, params);
 }
 

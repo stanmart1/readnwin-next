@@ -8,6 +8,7 @@ import FeaturedBooks from '@/components/FeaturedBooks';
 import EReaderShowcase from '@/components/EReaderShowcase';
 import WorksCarousel from '@/components/WorksCarousel';
 import BlogSection from '@/components/BlogSection';
+import TeamSection from '@/components/TeamSection';
 import ReviewSection from '@/components/ReviewSection';
 import Footer from '@/components/Footer';
 
@@ -23,6 +24,7 @@ export default function Home() {
       <EReaderShowcase />
       <WorksCarousel />
       <BlogSection />
+      <TeamSection />
       <ReviewSection />
       <Footer />
     </div>

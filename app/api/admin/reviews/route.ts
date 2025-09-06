@@ -1,9 +1,17 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { ecommerceService } from '@/utils/ecommerce-service';
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     // Get admin session
     const session = await getServerSession(authOptions);
@@ -41,7 +49,7 @@ export async function GET(request: NextRequest) {
         ...reviews
       });
     } catch (dbError) {
-      console.error('Database error fetching reviews:', dbError);
+      logger.error('Database error fetching reviews:', dbError);
       
       // Return empty results if database query fails
       return NextResponse.json({
@@ -53,7 +61,7 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error fetching reviews:', error);
+    logger.error('Error fetching reviews:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -73,8 +81,17 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { reviewId, status, adminNotes } = body;
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
+    const { reviewId, status, adminNotes } = sanitizedBody;
 
     if (!reviewId || !status) {
       return NextResponse.json(
@@ -92,7 +109,7 @@ export async function PATCH(request: NextRequest) {
         review
       });
     } catch (dbError) {
-      console.error('Database error updating review:', dbError);
+      logger.error('Database error updating review:', dbError);
       return NextResponse.json(
         { error: 'Failed to update review. Please try again.' },
         { status: 500 }
@@ -100,7 +117,7 @@ export async function PATCH(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error updating review:', error);
+    logger.error('Error updating review:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -139,7 +156,7 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error deleting review:', error);
+    logger.error('Error deleting review:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

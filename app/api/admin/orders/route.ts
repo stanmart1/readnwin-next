@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Force dynamic rendering
@@ -9,6 +12,11 @@ import { rbacService } from '@/utils/rbac-service';
 import { query } from '@/utils/database';
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -22,7 +30,7 @@ export async function GET(request: NextRequest) {
     const userRole = session.user.role;
     const isAdmin = userRole === 'admin' || userRole === 'super_admin';
     
-    console.log('🔍 Orders API - User role:', userRole, 'Is Admin:', isAdmin);
+    logger.info('🔍 Orders API - User role:', userRole, 'Is Admin:', isAdmin);
     
     if (!isAdmin) {
       return NextResponse.json(
@@ -104,8 +112,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get orders with enhanced data
-    console.log('🔍 Orders API - Query params:', queryParams);
-    console.log('🔍 Orders API - Where conditions:', whereConditions);
+    logger.info('🔍 Orders API - Query params:', queryParams);
+    logger.info('🔍 Orders API - Where conditions:', whereConditions);
     
     // First try with order_items, if it fails, try without
     let result;
@@ -124,7 +132,7 @@ export async function GET(request: NextRequest) {
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
       `, [...queryParams, limit, (page - 1) * limit]);
     } catch (orderItemsError) {
-      console.log('🔍 Orders API - order_items table not found, trying without it');
+      logger.info('🔍 Orders API - order_items table not found, trying without it');
       // Fallback query without order_items
       result = await query(`
         SELECT 
@@ -139,7 +147,7 @@ export async function GET(request: NextRequest) {
       `, [...queryParams, limit, (page - 1) * limit]);
     }
 
-    console.log('🔍 Orders API - Query result count:', result.rows.length);
+    logger.info('🔍 Orders API - Query result count:', result.rows.length);
 
     // Get total count for pagination
     const countResult = await query(`
@@ -152,7 +160,7 @@ export async function GET(request: NextRequest) {
     const total = parseInt(countResult.rows[0]?.total || '0');
     const pages = Math.ceil(total / limit);
     
-    console.log('🔍 Orders API - Total orders:', total, 'Pages:', pages);
+    logger.info('🔍 Orders API - Total orders:', total, 'Pages:', pages);
 
     return NextResponse.json({
       success: true,
@@ -164,7 +172,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error in GET /api/admin/orders:', error);
+    logger.error('Error in GET /api/admin/orders:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -249,7 +257,7 @@ export async function DELETE(request: NextRequest) {
           failedIds.push(orderId);
         }
       } catch (error) {
-        console.error(`Error deleting order ${orderId}:`, error);
+        logger.error(`Error deleting order ${orderId}:`, error);
         failedIds.push(orderId);
       }
     }
@@ -263,7 +271,7 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error in bulk delete orders:', error);
+    logger.error('Error in bulk delete orders:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

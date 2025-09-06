@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -15,6 +18,11 @@ const pool = new Pool({
 
 // GET - Retrieve payment settings
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -148,7 +156,7 @@ export async function GET(request: NextRequest) {
                   instructions: config.instructions || '',
                 };
               } catch (error) {
-                console.error('Error parsing bank account config:', error);
+                logger.error('Error parsing bank account config:', error);
               }
             }
 
@@ -161,7 +169,7 @@ export async function GET(request: NextRequest) {
                   : dbGateway.config;
                 apiKeysConfig = config;
               } catch (error) {
-                console.error('Error parsing API keys config:', error);
+                logger.error('Error parsing API keys config:', error);
               }
             }
 
@@ -193,7 +201,7 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error retrieving payment settings:', error);
+    logger.error('Error retrieving payment settings:', error);
     return NextResponse.json(
       { error: 'Failed to retrieve payment settings' },
       { status: 500 }
@@ -234,7 +242,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Parse request body
+      // Parse request sanitizedBody
       const { settings, gateways } = await request.json();
 
       // Validate required fields
@@ -317,7 +325,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error saving payment settings:', error);
+    logger.error('Error saving payment settings:', error);
     return NextResponse.json(
       { error: 'Failed to save payment settings' },
       { status: 500 }

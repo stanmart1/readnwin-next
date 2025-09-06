@@ -4,6 +4,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+
+// Force dynamic rendering to prevent prerender errors
+export const dynamic = 'force-dynamic';
 import { Trash2, Plus, Minus, ShoppingBag, Download, Package, AlertCircle, User, LogIn } from 'lucide-react';
 import { useGuestCart } from '@/contexts/GuestCartContext';
 import Header from '@/components/Header';
@@ -48,7 +51,9 @@ export default function CartPage() {
     // For guest users, redirect to login/signup
     if (!session) {
       // Store current path to redirect back after login
-      localStorage.setItem('redirectAfterLogin', '/checkout-new');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('redirectAfterLogin', '/checkout-new');
+      }
       router.push('/login?redirect=/checkout-new');
       return;
     }
@@ -58,12 +63,16 @@ export default function CartPage() {
   };
 
   const handleGuestLogin = () => {
-    localStorage.setItem('redirectAfterLogin', '/checkout-new');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('redirectAfterLogin', '/checkout-new');
+    }
     router.push('/login?redirect=/checkout-new');
   };
 
   const handleGuestSignup = () => {
-    localStorage.setItem('redirectAfterLogin', '/checkout-new');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('redirectAfterLogin', '/checkout-new');
+    }
     router.push('/register?redirect=/checkout-new');
   };
 

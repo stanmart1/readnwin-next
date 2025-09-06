@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -7,6 +10,14 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!validateId(params.id)) {
+    return Response.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
   try {
     const session = await getServerSession(authOptions);
     
@@ -50,7 +61,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Error fetching shipping method:', error);
+    logger.error('Error fetching shipping method:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -88,10 +99,19 @@ export async function PUT(
       );
     }
 
-    const body = await request.json();
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
     
     // Validate required fields
-    if (!body.name || !body.description) {
+    if (!sanitizedBody.name || !sanitizedBody.description) {
       return NextResponse.json(
         { error: 'Name and description are required' },
         { status: 400 }
@@ -125,15 +145,15 @@ export async function PUT(
       WHERE id = $10
       RETURNING *
     `, [
-      body.name,
-      body.description,
-      body.base_cost || 0,
-      body.cost_per_item || 0,
-      body.free_shipping_threshold,
-      body.estimated_days_min || 1,
-      body.estimated_days_max || 7,
-      body.is_active !== false, // Default to true
-      body.sort_order || 0,
+      sanitizedBody.name,
+      sanitizedBody.description,
+      sanitizedBody.base_cost || 0,
+      sanitizedBody.cost_per_item || 0,
+      sanitizedBody.free_shipping_threshold,
+      sanitizedBody.estimated_days_min || 1,
+      sanitizedBody.estimated_days_max || 7,
+      sanitizedBody.is_active !== false, // Default to true
+      sanitizedBody.sort_order || 0,
       id
     ]);
 
@@ -143,7 +163,7 @@ export async function PUT(
     });
 
   } catch (error) {
-    console.error('Error updating shipping method:', error);
+    logger.error('Error updating shipping method:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -216,7 +236,7 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('Error deleting shipping method:', error);
+    logger.error('Error deleting shipping method:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

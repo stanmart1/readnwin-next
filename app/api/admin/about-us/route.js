@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
@@ -5,6 +8,11 @@ import { rbacService } from "@/utils/rbac-service";
 import { query } from "@/utils/database";
 
 export async function GET() {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -30,7 +38,7 @@ export async function GET() {
 
     return NextResponse.json(result.rows);
   } catch (error) {
-    console.error("Error fetching about us content:", error);
+    logger.error("Error fetching about us content:", error);
     return NextResponse.json(
       { error: "Failed to fetch about us content" },
       { status: 500 },
@@ -58,7 +66,16 @@ export async function POST(request) {
       );
     }
 
-    const body = await request.json();
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
     const {
       section,
       title,
@@ -66,7 +83,7 @@ export async function POST(request) {
       image_url,
       sort_order = 0,
       is_active = true,
-    } = body;
+    } = sanitizedBody;
 
     if (!section || !title || !content) {
       return NextResponse.json(
@@ -92,7 +109,7 @@ export async function POST(request) {
 
     return NextResponse.json(result.rows[0]);
   } catch (error) {
-    console.error("Error creating about us content:", error);
+    logger.error("Error creating about us content:", error);
     if (error.code === "23505") {
       return NextResponse.json(
         { error: "Section already exists" },
@@ -126,9 +143,18 @@ export async function PUT(request) {
       );
     }
 
-    const body = await request.json();
+    
+  const body = await request.json();
+  const sanitizedBody = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      sanitizedBody[key] = sanitizeInput(value);
+    } else {
+      sanitizedBody[key] = value;
+    }
+  }
     const { id, section, title, content, image_url, sort_order, is_active } =
-      body;
+      sanitizedBody;
 
     if (!id) {
       return NextResponse.json(
@@ -170,7 +196,7 @@ export async function PUT(request) {
 
     return NextResponse.json(result.rows[0]);
   } catch (error) {
-    console.error("Error updating about us content:", error);
+    logger.error("Error updating about us content:", error);
     return NextResponse.json(
       { error: "Failed to update about us content" },
       { status: 500 },
@@ -221,7 +247,7 @@ export async function DELETE(request) {
       message: "About us section deleted successfully",
     });
   } catch (error) {
-    console.error("Error deleting about us content:", error);
+    logger.error("Error deleting about us content:", error);
     return NextResponse.json(
       { error: "Failed to delete about us content" },
       { status: 500 },

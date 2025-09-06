@@ -1,3 +1,6 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -6,6 +9,11 @@ import { emailTemplateService } from '@/utils/email-template-service';
 
 // GET - Fetch function assignments
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -41,7 +49,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching function assignments:', error);
+    logger.error('Error fetching function assignments:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -97,7 +105,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
 
   } catch (error) {
-    console.error('Error creating function assignment:', error);
+    logger.error('Error creating function assignment:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -160,7 +168,7 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error removing function assignment:', error);
+    logger.error('Error removing function assignment:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

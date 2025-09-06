@@ -71,6 +71,7 @@ export default function BookManagementEnhanced() {
     pagination,
     setFilters,
     setPagination,
+    loadBooks,
     updateBook,
     deleteBooks,
     batchUpdateBooks,
@@ -103,11 +104,17 @@ export default function BookManagementEnhanced() {
     }
   }, [modals.assign]);
 
-  // Reload data when modal closes
+  // Handle modal close without refresh
   const handleModalClose = () => {
     setShowAddModal(false);
+  };
+
+  // Handle successful book upload
+  const handleBookUploadSuccess = () => {
     // Refresh the books list after successful upload
-    window.location.reload();
+    bookManagement.loadBooks();
+    // Close the modal
+    setShowAddModal(false);
   };
 
   const loadAuthorsAndCategories = async () => {
@@ -533,7 +540,7 @@ export default function BookManagementEnhanced() {
           <ModernBookUploadModal
             isOpen={showAddModal}
             onClose={handleModalClose}
-            onSuccess={handleModalClose}
+            onSuccess={handleBookUploadSuccess}
             categories={data.categories}
             authors={data.authors}
           />
@@ -786,7 +793,7 @@ export default function BookManagementEnhanced() {
           authors={data.authors}
           onSuccess={() => {
             // Refresh the books list
-            window.location.reload();
+            loadBooks();
           }}
         />
 

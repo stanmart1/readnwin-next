@@ -1,9 +1,17 @@
+import { sanitizeInput, sanitizeQuery, validateId, sanitizeHtml } from '@/lib/security';
+import { requireAdmin, requirePermission } from '@/middleware/auth';
+import logger from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/utils/database';
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -41,7 +49,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching reading analytics:', error);
+    logger.error('Error fetching reading analytics:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -163,7 +171,7 @@ async function getReadingAnalytics(startDate: Date, endDate: Date) {
     };
 
   } catch (error) {
-    console.error('Error in getReadingAnalytics:', error);
+    logger.error('Error in getReadingAnalytics:', error);
     return {
       totalUsers: 0,
       totalBooksRead: 0,

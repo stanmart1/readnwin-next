@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { formatDate } from "@/utils/dateUtils";
 import Modal from "@/components/ui/Modal";
+import toast from 'react-hot-toast';
 
 interface Role {
   id: number;
@@ -46,6 +47,11 @@ export default function RoleManagement() {
   const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
   const [isEditingPermissions, setIsEditingPermissions] = useState(false);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
+  const [saveProgress, setSaveProgress] = useState('');
+  const [permissionSearch, setPermissionSearch] = useState("");
+  const [selectedResource, setSelectedResource] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(12);
 
   // Permissions are now fetched from the API instead of hardcoded
 
@@ -76,9 +82,12 @@ export default function RoleManagement() {
       const data = await response.json();
       if (data.success) {
         setPermissions(data.permissions);
+      } else {
+        setError("Failed to fetch permissions");
       }
     } catch (error) {
-      console.error("Error fetching permissions:", error);
+      setError("Error fetching permissions");
+      console.error("Error:", error);
     }
   };
 
@@ -86,6 +95,37 @@ export default function RoleManagement() {
     fetchRoles();
     fetchPermissions();
   }, []);
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (isEditingPermissions && e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+        const filteredResources = Array.from(new Set(permissions.map(p => p.resource)))
+          .sort()
+          .filter(resource => selectedResource === "all" || resource === selectedResource)
+          .filter(resource => {
+            const resourcePermissions = permissions
+              .filter(p => p.resource === resource)
+              .filter(p => 
+                permissionSearch === "" ||
+                p.display_name.toLowerCase().includes(permissionSearch.toLowerCase()) ||
+                p.description?.toLowerCase().includes(permissionSearch.toLowerCase()) ||
+                p.action.toLowerCase().includes(permissionSearch.toLowerCase())
+              );
+            return resourcePermissions.length > 0;
+          });
+        
+        const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
+        if (currentPage < totalPages) {
+          setCurrentPage(prev => prev + 1);
+        }
+      }
+    };
+
+    if (showPermissionsModal) {
+      document.addEventListener('keydown', handleKeyPress);
+      return () => document.removeEventListener('keydown', handleKeyPress);
+    }
+  }, [isEditingPermissions, showPermissionsModal, currentPage, itemsPerPage, permissions, selectedResource, permissionSearch]);
 
   const handleCreateRole = async () => {
     try {
@@ -185,40 +225,47 @@ export default function RoleManagement() {
 
     try {
       setIsSavingPermissions(true);
-      // Get current permissions
-      const currentPermissionIds = rolePermissions.map((p) => p.id);
-
-      // Remove permissions that are no longer selected
-      for (const permissionId of currentPermissionIds) {
-        if (!selectedPermissions.includes(permissionId)) {
-          await fetch(
-            `/api/admin/roles/${selectedRole.id}/permissions?permission_id=${permissionId}`,
-            {
-              method: "DELETE",
-            },
-          );
-        }
-      }
-
-      // Add new permissions
-      for (const permissionId of selectedPermissions) {
-        if (!currentPermissionIds.includes(permissionId)) {
-          await fetch(`/api/admin/roles/${selectedRole.id}/permissions`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ permission_id: permissionId }),
-          });
-        }
-      }
-
-      // Refresh permissions
-      await handleViewPermissions(selectedRole.id);
-      setIsEditingPermissions(false);
       setError("");
+      setSaveProgress('Preparing permissions update...');
+      
+      // Add a small delay to show the progress message
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setSaveProgress(`Updating ${selectedPermissions.length} permissions...`);
+      
+      // Send all selected permissions in a single batch update
+      const response = await fetch(`/api/admin/roles/${selectedRole.id}/permissions/batch`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ permission_ids: selectedPermissions }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setSaveProgress('Refreshing permissions...');
+        // Refresh permissions
+        await handleViewPermissions(selectedRole.id);
+        setIsEditingPermissions(false);
+        setSaveProgress('');
+        toast.success(`Successfully updated permissions for ${selectedRole.display_name}!`);
+      } else {
+        const errorMsg = data.error || "Failed to update permissions";
+        setError(errorMsg);
+        toast.error(errorMsg);
+      }
     } catch (error) {
-      setError("Error updating role permissions");
+      console.error('Save permissions error:', error);
+      const errorMsg = error instanceof Error ? error.message : "Network error occurred";
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsSavingPermissions(false);
+      setSaveProgress('');
     }
   };
 
@@ -238,6 +285,44 @@ export default function RoleManagement() {
         return "bg-gradient-to-r from-gray-500 to-gray-600";
       default:
         return "bg-gradient-to-r from-blue-600 to-purple-600";
+    }
+  };
+
+  const getResourceIcon = (resource: string) => {
+    switch (resource) {
+      case "users": return "ri-user-line";
+      case "roles": return "ri-shield-user-line";
+      case "permissions": return "ri-shield-keyhole-line";
+      case "books": return "ri-book-line";
+      case "authors": return "ri-user-star-line";
+      case "orders": return "ri-shopping-cart-line";
+      case "content": return "ri-file-text-line";
+      case "system": return "ri-settings-line";
+      case "profile": return "ri-user-settings-line";
+      case "blog": return "ri-article-line";
+      case "faq": return "ri-question-answer-line";
+      case "email": return "ri-mail-line";
+      case "about": return "ri-information-line";
+      case "contact": return "ri-contacts-line";
+      case "reviews": return "ri-star-line";
+      case "shipping": return "ri-truck-line";
+      case "notifications": return "ri-notification-line";
+      case "works": return "ri-palette-line";
+      default: return "ri-folder-line";
+    }
+  };
+
+  const getActionColor = (action: string) => {
+    switch (action) {
+      case "create": return "bg-green-100 text-green-800";
+      case "read": return "bg-blue-100 text-blue-800";
+      case "update": return "bg-yellow-100 text-yellow-800";
+      case "delete": return "bg-red-100 text-red-800";
+      case "manage_roles": return "bg-purple-100 text-purple-800";
+      case "manage_permissions": return "bg-indigo-100 text-indigo-800";
+      case "publish": return "bg-teal-100 text-teal-800";
+      case "moderate": return "bg-orange-100 text-orange-800";
+      default: return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -271,7 +356,7 @@ export default function RoleManagement() {
 
       {/* Header */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
               Role Management
@@ -287,6 +372,46 @@ export default function RoleManagement() {
             <i className="ri-add-line mr-2"></i>
             Create Role
           </button>
+        </div>
+        
+        {/* Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4">
+            <div className="flex items-center">
+              <i className="ri-shield-user-line text-blue-600 text-2xl mr-3"></i>
+              <div>
+                <p className="text-sm text-blue-600 font-medium">Total Roles</p>
+                <p className="text-2xl font-bold text-blue-800">{roles.length}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-4">
+            <div className="flex items-center">
+              <i className="ri-shield-keyhole-line text-green-600 text-2xl mr-3"></i>
+              <div>
+                <p className="text-sm text-green-600 font-medium">Total Permissions</p>
+                <p className="text-2xl font-bold text-green-800">{permissions.length}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-4">
+            <div className="flex items-center">
+              <i className="ri-settings-line text-purple-600 text-2xl mr-3"></i>
+              <div>
+                <p className="text-sm text-purple-600 font-medium">System Roles</p>
+                <p className="text-2xl font-bold text-purple-800">{roles.filter(r => r.is_system_role).length}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg p-4">
+            <div className="flex items-center">
+              <i className="ri-user-settings-line text-orange-600 text-2xl mr-3"></i>
+              <div>
+                <p className="text-sm text-orange-600 font-medium">Custom Roles</p>
+                <p className="text-2xl font-bold text-orange-800">{roles.filter(r => !r.is_system_role).length}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -342,13 +467,21 @@ export default function RoleManagement() {
               {role.description || "No description provided"}
             </p>
 
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-sm mb-3">
               <span className="text-gray-500">Priority: {role.priority}</span>
               {role.is_system_role && (
                 <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
                   System Role
                 </span>
               )}
+            </div>
+            
+            {/* Role capabilities preview */}
+            <div className="text-xs text-gray-500">
+              <span className="inline-flex items-center">
+                <i className="ri-shield-keyhole-line mr-1"></i>
+                Click to view permissions
+              </span>
             </div>
 
             <div className="mt-4 pt-4 border-t border-gray-200">
@@ -589,8 +722,8 @@ export default function RoleManagement() {
                       >
                         {isSavingPermissions ? (
                           <>
-                            <i className="ri-loader-4-line animate-spin mr-2"></i>
-                            Saving...
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            {saveProgress || 'Saving...'}
                           </>
                         ) : (
                           <>
@@ -605,6 +738,9 @@ export default function RoleManagement() {
                           setSelectedPermissions(
                             rolePermissions.map((p) => p.id),
                           );
+                          setPermissionSearch("");
+                          setSelectedResource("all");
+                          setCurrentPage(1);
                         }}
                         className="px-4 py-2 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors duration-200"
                       >
@@ -622,88 +758,332 @@ export default function RoleManagement() {
               </div>
 
               {isEditingPermissions ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {permissions.map((permission) => (
-                    <div
-                      key={permission.id}
-                      className={`rounded-lg p-4 border-2 transition-all duration-200 ${
-                        selectedPermissions.includes(permission.id)
-                          ? "bg-blue-50 border-blue-200"
-                          : "bg-gray-50 border-gray-200"
-                      }`}
-                    >
-                      <div className="flex items-start space-x-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedPermissions.includes(permission.id)}
-                          onChange={() => handlePermissionToggle(permission.id)}
-                          className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-medium text-gray-900">
-                              {permission.display_name}
-                            </h4>
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                              {permission.resource}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-600 mb-2">
-                            {permission.description}
-                          </p>
-                          <div className="flex items-center text-xs text-gray-500">
-                            <span className="mr-2">
-                              Action: {permission.action}
-                            </span>
-                            <span>Scope: {permission.scope}</span>
-                          </div>
+                <div className="space-y-6">
+                  {/* Search and Filter Controls */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Search Permissions
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={permissionSearch}
+                            onChange={(e) => {
+                              setPermissionSearch(e.target.value);
+                              setCurrentPage(1);
+                            }}
+                            placeholder="Search by name or description..."
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <i className="ri-search-line absolute left-3 top-2.5 text-gray-400"></i>
                         </div>
                       </div>
+                      <div className="sm:w-48">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Filter by Resource
+                        </label>
+                        <select
+                          value={selectedResource}
+                          onChange={(e) => {
+                            setSelectedResource(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="all">All Resources</option>
+                          {Array.from(new Set(permissions.map(p => p.resource))).sort().map(resource => (
+                            <option key={resource} value={resource} className="capitalize">
+                              {resource}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Permission Categories */}
+                  {(() => {
+                    const filteredResources = Array.from(new Set(permissions.map(p => p.resource)))
+                      .sort()
+                      .filter(resource => selectedResource === "all" || resource === selectedResource)
+                      .filter(resource => {
+                        const resourcePermissions = permissions
+                          .filter(p => p.resource === resource)
+                          .filter(p => 
+                            permissionSearch === "" ||
+                            p.display_name.toLowerCase().includes(permissionSearch.toLowerCase()) ||
+                            p.description?.toLowerCase().includes(permissionSearch.toLowerCase()) ||
+                            p.action.toLowerCase().includes(permissionSearch.toLowerCase())
+                          );
+                        return resourcePermissions.length > 0;
+                      });
+                    
+                    const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
+                    const startIndex = (currentPage - 1) * itemsPerPage;
+                    const paginatedResources = filteredResources.slice(startIndex, startIndex + itemsPerPage);
+                    
+                    return (
+                      <>
+                        {paginatedResources.map(resource => {
+                          const resourcePermissions = permissions
+                            .filter(p => p.resource === resource)
+                            .filter(p => 
+                              permissionSearch === "" ||
+                              p.display_name.toLowerCase().includes(permissionSearch.toLowerCase()) ||
+                              p.description?.toLowerCase().includes(permissionSearch.toLowerCase()) ||
+                              p.action.toLowerCase().includes(permissionSearch.toLowerCase())
+                            );
+                          
+                          const selectedCount = resourcePermissions.filter(p => selectedPermissions.includes(p.id)).length;
+                          
+                          return (
+                            <div key={resource} className="bg-gray-50 rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center">
+                                  <i className={`${getResourceIcon(resource)} text-gray-600 mr-2 text-xl`}></i>
+                                  <h3 className="text-lg font-semibold text-gray-900 capitalize">
+                                    {resource} Management
+                                  </h3>
+                                  <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                                    {selectedCount}/{resourcePermissions.length}
+                                  </span>
+                                </div>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const resourcePermissionIds = resourcePermissions.map(p => p.id);
+                                      setSelectedPermissions(prev => {
+                                        const filtered = prev.filter(id => !resourcePermissionIds.includes(id));
+                                        return [...filtered, ...resourcePermissionIds];
+                                      });
+                                    }}
+                                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                    title={`Select all ${resource} permissions`}
+                                  >
+                                    <i className="ri-checkbox-multiple-line mr-1"></i>
+                                    Select All
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const resourcePermissionIds = resourcePermissions.map(p => p.id);
+                                      setSelectedPermissions(prev => prev.filter(id => !resourcePermissionIds.includes(id)));
+                                    }}
+                                    className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+                                    title={`Clear all ${resource} permissions`}
+                                  >
+                                    <i className="ri-checkbox-blank-line mr-1"></i>
+                                    Clear All
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {resourcePermissions.map((permission) => (
+                                  <div
+                                    key={permission.id}
+                                    className={`rounded-lg p-3 border-2 transition-all duration-200 ${
+                                      selectedPermissions.includes(permission.id)
+                                        ? "bg-blue-50 border-blue-200"
+                                        : "bg-white border-gray-200"
+                                    }`}
+                                  >
+                                    <div className="flex items-start space-x-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedPermissions.includes(permission.id)}
+                                        onChange={() => handlePermissionToggle(permission.id)}
+                                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                                      />
+                                      <div className="flex-1">
+                                        <div className="flex items-center mb-1">
+                                          <i className={`${getResourceIcon(permission.resource)} text-gray-500 mr-2`}></i>
+                                          <h4 className="font-medium text-gray-900 text-sm">
+                                            {permission.display_name}
+                                          </h4>
+                                        </div>
+                                        <p className="text-xs text-gray-600 mb-2">
+                                          {permission.description}
+                                        </p>
+                                        <div className="flex items-center gap-1 text-xs">
+                                          <span className={`px-2 py-0.5 rounded-full ${getActionColor(permission.action)}`}>
+                                            {permission.action}
+                                          </span>
+                                          <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full">
+                                            {permission.scope}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-4">
+                            <div className="text-sm text-gray-700">
+                              Showing page <strong>{currentPage}</strong> of <strong>{totalPages}</strong> 
+                              ({filteredResources.length} resource categories)
+                              {currentPage < totalPages && (
+                                <span className="ml-2 text-xs text-blue-600">
+                                  Press Enter for next page
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <button
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <i className="ri-arrow-left-line mr-1"></i>
+                                Previous
+                              </button>
+                              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                const pageNum = totalPages <= 5 ? i + 1 : 
+                                  currentPage <= 3 ? i + 1 :
+                                  currentPage >= totalPages - 2 ? totalPages - 4 + i :
+                                  currentPage - 2 + i;
+                                return (
+                                  <button
+                                    key={pageNum}
+                                    onClick={() => setCurrentPage(pageNum)}
+                                    className={`px-2 py-1 text-sm rounded ${
+                                      currentPage === pageNum
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                                  >
+                                    {pageNum}
+                                  </button>
+                                );
+                              })}
+                              <button
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Next
+                                <i className="ri-arrow-right-line ml-1"></i>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                  
+                  {/* Summary */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <i className="ri-information-line text-blue-600 mr-2"></i>
+                        <span className="text-sm text-blue-800">
+                          <strong>{selectedPermissions.length}</strong> of <strong>{permissions.length}</strong> permissions selected
+                        </span>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPermissions(permissions.map(p => p.id))}
+                          className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPermissions([])}
+                          className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {rolePermissions.map((permission) => (
-                    <div
-                      key={permission.id}
-                      className="bg-gray-50 rounded-lg p-4"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-gray-900">
-                          {permission.display_name}
-                        </h4>
-                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                          {permission.resource}
-                        </span>
+                <div className="space-y-6">
+                  {/* Group permissions by resource for read-only view */}
+                  {Array.from(new Set(rolePermissions.map(p => p.resource))).sort().map(resource => {
+                    const resourcePermissions = rolePermissions.filter(p => p.resource === resource);
+                    
+                    return (
+                      <div key={resource} className="bg-gray-50 rounded-lg p-4">
+                        <div className="flex items-center mb-4">
+                          <i className={`${getResourceIcon(resource)} text-gray-600 mr-2 text-xl`}></i>
+                          <h3 className="text-lg font-semibold text-gray-900 capitalize">
+                            {resource} Management
+                          </h3>
+                          <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                            {resourcePermissions.length} permissions
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {resourcePermissions.map((permission) => (
+                            <div
+                              key={permission.id}
+                              className="bg-white rounded-lg p-3 border border-gray-200"
+                            >
+                              <div className="flex items-center mb-2">
+                                <i className={`${getResourceIcon(permission.resource)} text-gray-500 mr-2`}></i>
+                                <h4 className="font-medium text-gray-900 text-sm">
+                                  {permission.display_name}
+                                </h4>
+                              </div>
+                              <p className="text-xs text-gray-600 mb-2">
+                                {permission.description}
+                              </p>
+                              <div className="flex items-center gap-1 text-xs">
+                                <span className={`px-2 py-0.5 rounded-full ${getActionColor(permission.action)}`}>
+                                  {permission.action}
+                                </span>
+                                <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full">
+                                  {permission.scope}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600 mb-2">
-                        {permission.description}
-                      </p>
-                      <div className="flex items-center text-xs text-gray-500">
-                        <span className="mr-2">
-                          Action: {permission.action}
-                        </span>
-                        <span>Scope: {permission.scope}</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
               {!isEditingPermissions && rolePermissions.length === 0 && (
-                <div className="text-center py-8">
-                  <i className="ri-shield-line text-4xl text-gray-400 mb-4"></i>
-                  <p className="text-gray-600">
-                    No permissions assigned to this role
+                <div className="text-center py-12">
+                  <i className="ri-shield-line text-6xl text-gray-300 mb-4"></i>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No Permissions Assigned
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    This role currently has no permissions assigned.
                   </p>
+                  <button
+                    onClick={() => setIsEditingPermissions(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+                  >
+                    <i className="ri-add-line mr-2"></i>
+                    Assign Permissions
+                  </button>
                 </div>
               )}
 
               {isEditingPermissions && permissions.length === 0 && (
-                <div className="text-center py-8">
-                  <i className="ri-shield-line text-4xl text-gray-400 mb-4"></i>
-                  <p className="text-gray-600">No permissions available</p>
+                <div className="text-center py-12">
+                  <i className="ri-shield-line text-6xl text-gray-300 mb-4"></i>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No Permissions Available
+                  </h3>
+                  <p className="text-gray-600">
+                    There are no permissions available in the system.
+                  </p>
                 </div>
               )}
             </div>

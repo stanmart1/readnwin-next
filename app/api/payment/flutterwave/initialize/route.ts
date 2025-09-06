@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
         email,
         phone_number,
         tx_ref,
-        redirect_url: redirect_url || `${process.env.NEXTAUTH_URL}/payment/verify`,
+        redirect_url: redirect_url || `${process.env.NEXTAUTH_URL}/payment/verify?order_number=${orderNumber}`,
         customer: {
           email,
           phone_number,

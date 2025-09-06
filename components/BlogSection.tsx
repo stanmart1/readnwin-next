@@ -22,7 +22,7 @@ interface BlogPost {
   published_at?: string;
   created_at?: string;
   updated_at?: string;
-  cover_image?: string;
+  images?: any[];
 }
 
 export default function BlogSection() {
@@ -40,8 +40,8 @@ export default function BlogSection() {
       setLoading(true);
       setError(null);
       
-      // Fetch featured and recent published posts
-      const response = await fetch('/api/blog?featured=true&limit=6');
+      // Fetch recent published posts with images
+      const response = await fetch('/api/blog?limit=6&include_images=true');
       const data = await response.json();
       
       if (data.success) {
@@ -82,16 +82,44 @@ export default function BlogSection() {
 
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: string } = {
-      'Technology': '#3B82F6',
-      'Self-Improvement': '#10B981',
-      'Literature': '#8B5CF6',
-      'Psychology': '#F59E0B',
-      'Reviews': '#EF4444',
-      'Reading Tips': '#06B6D4',
-      'Author Interviews': '#84CC16',
-      'Industry News': '#6366F1'
+      'technology': '#3B82F6',
+      'self-improvement': '#10B981', 
+      'literature': '#8B5CF6',
+      'psychology': '#F59E0B',
+      'reviews': '#EF4444',
+      'reading-tips': '#06B6D4',
+      'author-interviews': '#84CC16',
+      'industry-news': '#6366F1',
+      'general': '#6B7280'
     };
     return colors[category] || '#3B82F6';
+  };
+
+  const getCategoryDisplayName = (category: string) => {
+    const names: { [key: string]: string } = {
+      'technology': 'Technology',
+      'self-improvement': 'Self-Improvement',
+      'literature': 'Literature', 
+      'psychology': 'Psychology',
+      'reviews': 'Reviews',
+      'reading-tips': 'Reading Tips',
+      'author-interviews': 'Author Interviews',
+      'industry-news': 'Industry News',
+      'general': 'General'
+    };
+    return names[category] || category.charAt(0).toUpperCase() + category.slice(1).replace(/-/g, ' ');
+  };
+
+  const getUniqueImageForPost = (category: string, postId: number) => {
+    const categoryImages: { [key: string]: string } = {
+      'reading-tips': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=400&fit=crop&auto=format',
+      'technology': 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&h=400&fit=crop&auto=format',
+      'self-improvement': 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=400&fit=crop&auto=format',
+      'psychology': 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=800&h=400&fit=crop&auto=format',
+      'literature': 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=400&fit=crop&auto=format',
+      'general': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=400&fit=crop&auto=format'
+    };
+    return categoryImages[category] || `https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=400&fit=crop&auto=format&sig=${postId}`;
   };
 
   return (
@@ -173,19 +201,19 @@ export default function BlogSection() {
                   <article className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 w-full min-h-[520px] flex flex-col">
                     <div className="relative">
                       <img
-                        src={post.cover_image || `https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=400&fit=crop&seq=${post.id}`}
-                        alt={post.title}
-                        className="w-full h-48 object-cover object-top"
+                        src={(post.images && post.images.length > 0) ? post.images[0].file_path : getUniqueImageForPost(post.category, post.id)}
+                        alt={post.images && post.images.length > 0 ? post.images[0].alt_text || post.title : post.title}
+                        className="w-full h-48 object-cover object-center"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
-                          target.src = `https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=400&fit=crop&seq=${post.id}`;
+                          target.src = getUniqueImageForPost(post.category, post.id);
                         }}
                       />
                       <div 
                         className="absolute top-4 left-4 text-white px-3 py-1 rounded-full text-sm font-medium"
                         style={{ backgroundColor: getCategoryColor(post.category) }}
                       >
-                        {post.category}
+                        {getCategoryDisplayName(post.category)}
                       </div>
                       {post.featured && (
                         <div className="absolute top-4 right-4 bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-medium">

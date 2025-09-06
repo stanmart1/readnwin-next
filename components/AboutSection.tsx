@@ -92,7 +92,7 @@ export default function AboutSection() {
     mission: {
       title: 'Our Mission',
       description: 'Our mission is to make quality literature accessible to everyone, everywhere. We\'re building the world\'s most comprehensive digital reading platform, combining cutting-edge technology with timeless storytelling to create an experience that inspires, educates, and entertains.',
-      features: ['Unlimited Access', 'AI-Powered Recommendations', 'Global Community']
+      features: ['Unlimited Access', 'Global Community']
     },
     values: [
       {

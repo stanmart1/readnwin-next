@@ -217,23 +217,42 @@ export class ModernBookService {
               ebookResult.fileHash, ebookResult.mimeType, true, true, 'completed'
             ]);
 
-            // Update book with file information
+            // Update book with file information and set for processing
             await client.query(`
               UPDATE books SET 
                 file_size_bytes = $1, 
-                word_count = $2, 
-                reading_time_minutes = $3,
-                primary_format = $4
+                primary_format = $2,
+                file_format = $3,
+                ebook_file_url = $4,
+                processing_status = 'pending'
               WHERE id = $5
             `, [
-              ebookResult.fileSize, ebookResult.wordCount, 
-              ebookResult.readingTime, ebookResult.format, book.id
+              ebookResult.fileSize, ebookResult.format, ebookResult.format,
+              `/api/books/${book.id}/file`, book.id
             ]);
 
             book.file_size_bytes = ebookResult.fileSize;
-            book.word_count = ebookResult.wordCount;
-            book.reading_time_minutes = ebookResult.readingTime;
             book.primary_format = ebookResult.format;
+            book.file_format = ebookResult.format;
+            book.ebook_file_url = `/api/books/${book.id}/file`;
+            book.processing_status = 'pending';
+            
+            // Trigger background processing using EnhancedBookProcessor
+            try {
+              const { EnhancedBookProcessor } = await import('./EnhancedBookProcessor');
+              const originalFileName = bookData.ebook_file.name;
+              
+              // Process in background (don't await to avoid blocking)
+              EnhancedBookProcessor.processUploadedBook(
+                book.id,
+                ebookResult.filePath,
+                originalFileName
+              ).catch(error => {
+                console.error(`Background processing failed for book ${book.id}:`, error);
+              });
+            } catch (error) {
+              console.error('Error starting background processing:', error);
+            }
           }
         }
 

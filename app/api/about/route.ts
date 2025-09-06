@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
       mission: {
         title: 'Our Mission',
         description: 'At ReadnWin, we believe that reading is the foundation of personal growth and societal progress. Our mission is to make quality literature accessible to everyone, everywhere.',
-        features: ['Unlimited Access', 'AI-Powered Recommendations', 'Global Community']
+        features: ['Unlimited Access', 'Global Community']
       },
       missionGrid: [
         {

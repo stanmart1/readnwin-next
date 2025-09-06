@@ -66,151 +66,31 @@ export default function ModernEReader({ bookId, onClose }: ModernEReaderProps) {
   const [lastInteraction, setLastInteraction] = useState(Date.now());
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // Load ebook directly from storage (EPUB or HTML)
+  // Load ebook using enhanced content API
   const loadEbookFromStorage = useCallback(async (bookId: string, userId: string) => {
     try {
-      // Get book info from database
-      const response = await fetch(`/api/books/${bookId}`);
+      // Get processed book content from new API
+      const response = await fetch(`/api/books/${bookId}/content`);
+      
       if (!response.ok) {
-        throw new Error(`Failed to load book info: ${response.status}`);
+        if (response.status === 202) {
+          // Book is being processed
+          const data = await response.json();
+          setError(data.message || 'Book is being processed. Please try again in a few moments.');
+          return;
+        }
+        throw new Error(`Failed to load book content: ${response.status}`);
       }
       
       const data = await response.json();
-      const bookInfo = data.book || data;
-      if (!bookInfo.ebook_file_url) {
-        throw new Error('No ebook file available');
-      }
-
-      // Load ebook file directly
-      const ebookResponse = await fetch(bookInfo.ebook_file_url);
-      if (!ebookResponse.ok) {
-        throw new Error('Failed to load ebook file');
-      }
-
-      // Check file type by URL extension
-      const fileUrl = bookInfo.ebook_file_url.toLowerCase();
       
-      if (fileUrl.endsWith('.html') || fileUrl.endsWith('.htm')) {
-        // Handle HTML ebook
-        const htmlContent = await ebookResponse.text();
-        
-        const bookData = {
-          id: bookId,
-          title: bookInfo.title,
-          author: bookInfo.author_name || 'Unknown Author',
-          format: 'html',
-          metadata: {
-            wordCount: htmlContent.replace(/<[^>]*>/g, '').split(/\s+/).length,
-            estimatedReadingTime: Math.ceil(htmlContent.replace(/<[^>]*>/g, '').split(/\s+/).length / 200),
-            pages: 1
-          },
-          chapters: [{
-            id: 'chapter-1',
-            chapter_number: 1,
-            chapter_title: bookInfo.title,
-            content_html: htmlContent,
-            reading_time_minutes: Math.ceil(htmlContent.replace(/<[^>]*>/g, '').split(/\s+/).length / 200)
-          }]
-        };
-        
-        loadBook(bookId, userId, bookData);
-        return;
+      if (!data.success || !data.book) {
+        throw new Error('Invalid book data received');
       }
-
-      // Handle EPUB file
-      const ebookBuffer = await ebookResponse.arrayBuffer();
-      const JSZip = (await import('jszip')).default;
-      const zip = await JSZip.loadAsync(ebookBuffer);
-
-      // Parse EPUB structure
-      const containerFile = zip.file('META-INF/container.xml');
-      if (!containerFile) {
-        throw new Error('Invalid EPUB: missing container.xml');
-      }
-
-      const containerXml = await containerFile.async('text');
-      const opfMatch = containerXml.match(/full-path="([^"]+)"/i);
-      if (!opfMatch) {
-        throw new Error('Invalid EPUB: no OPF file found');
-      }
-
-      const opfFile = zip.file(opfMatch[1]);
-      if (!opfFile) {
-        throw new Error('Invalid EPUB: OPF file not found');
-      }
-
-      const opfXml = await opfFile.async('text');
       
-      // Get spine order
-      const spineMatches = opfXml.match(/<itemref[^>]*idref="([^"]+)"/gi) || [];
-      const spine = spineMatches.map(match => {
-        const idMatch = match.match(/idref="([^"]+)"/i);
-        return idMatch ? idMatch[1] : null;
-      }).filter(Boolean);
+      // Load book with processed data
+      loadBook(bookId, userId, data.book);
       
-      // Get manifest
-      const manifestMatches = opfXml.match(/<item[^>]*id="([^"]+)"[^>]*href="([^"]+)"[^>]*media-type="([^"]+)"/gi) || [];
-      const manifest = {};
-      manifestMatches.forEach(match => {
-        const idMatch = match.match(/id="([^"]+)"/i);
-        const hrefMatch = match.match(/href="([^"]+)"/i);
-        const typeMatch = match.match(/media-type="([^"]+)"/i);
-        if (idMatch && hrefMatch && typeMatch) {
-          manifest[idMatch[1]] = { href: hrefMatch[1], mediaType: typeMatch[1] };
-        }
-      });
-
-      // Build chapters
-      const chapters = [];
-      const opfDir = opfMatch[1].split('/').slice(0, -1).join('/');
-      
-      for (let i = 0; i < spine.length; i++) {
-        const spineId = spine[i];
-        const manifestItem = manifest[spineId];
-        
-        if (manifestItem && manifestItem.mediaType === 'application/xhtml+xml') {
-          const chapterPath = opfDir ? `${opfDir}/${manifestItem.href}` : manifestItem.href;
-          const chapterFile = zip.file(chapterPath);
-          
-          if (chapterFile) {
-            const chapterContent = await chapterFile.async('text');
-            
-            // Extract title
-            const titleMatch = chapterContent.match(/<title>([^<]+)<\/title>/i) || 
-                              chapterContent.match(/<h[1-6][^>]*>([^<]+)<\/h[1-6]>/i);
-            const title = titleMatch?.[1]?.trim() || `Chapter ${i + 1}`;
-            
-            chapters.push({
-              id: spineId,
-              chapter_number: i + 1,
-              chapter_title: title,
-              content_html: chapterContent,
-              reading_time_minutes: Math.ceil(chapterContent.replace(/<[^>]*>/g, '').split(/\s+/).length / 200)
-            });
-          }
-        }
-      }
-
-      const bookData = {
-        id: bookId,
-        title: bookInfo.title,
-        author: bookInfo.author_name || 'Unknown Author',
-        format: 'epub',
-        metadata: {
-          wordCount: chapters.length * 1000,
-          estimatedReadingTime: chapters.length * 5,
-          pages: chapters.length * 2
-        },
-        chapters: chapters.length > 0 ? chapters : [{
-          id: 'chapter-1',
-          chapter_number: 1,
-          chapter_title: bookInfo.title,
-          content_html: '<p>No content available</p>',
-          reading_time_minutes: 1
-        }]
-      };
-      
-      loadBook(bookId, userId, bookData);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to load book');
     }
